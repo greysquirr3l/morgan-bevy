@@ -1,6 +1,5 @@
 import { Mesh, BoxGeometry, MeshStandardMaterial } from 'three'
 import { useRef } from 'react'
-import TransformGizmos from './TransformGizmos'
 import { useEditorStore } from '@/store/editorStore'
 
 // Ground plane
@@ -100,6 +99,7 @@ function SceneObject({
   return (
     <mesh
       ref={meshRef}
+      name={id} // Set the name so TransformGizmos can find it
       position={position}
       rotation={rotation}
       scale={scale}
@@ -156,9 +156,6 @@ export default function Scene() {
         new BoxGeometry(0.1, 0.1, 5),
         new MeshStandardMaterial({ color: 'blue', transparent: true, opacity: 0.3 })
       )} position={[0, 0, 2.5]} />
-      
-      {/* Transform Gizmos */}
-      <TransformGizmos selectedObjects={selectedObjects} />
     </>
   )
 }

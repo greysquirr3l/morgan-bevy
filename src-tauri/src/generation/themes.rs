@@ -18,6 +18,7 @@ pub struct Theme {
     pub mesh_variants: HashMap<String, Vec<String>>,
 }
 
+#[allow(dead_code)]
 impl Theme {
     pub fn office() -> Self {
         let mut materials = HashMap::new();

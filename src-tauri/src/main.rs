@@ -1,17 +1,18 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
-use log::{info, error};
-use serde::{Serialize, Deserialize};
+use log::{error, info};
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use tauri::State;
 
-mod generation;
+mod assets;
 mod export;
+mod generation;
 mod spatial;
 
-use generation::bsp::BSPGenerator;
 use export::{ExportFormat, LevelExporter};
-use spatial::{SpatialIndex, BoundingBox};
+use generation::bsp::BSPGenerator;
+use spatial::{BoundingBox, SpatialIndex};
 
 // Core data structures for level editing
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -68,10 +69,10 @@ pub struct AppState {
 #[tauri::command]
 async fn generate_bsp_level(
     params: BSPGenerationParams,
-    state: State<'_, std::sync::Mutex<AppState>>
+    state: State<'_, std::sync::Mutex<AppState>>,
 ) -> Result<LevelData, String> {
     info!("Generating BSP level with params: {:?}", params);
-    
+
     let generator = BSPGenerator::new();
     match generator.generate(params).await {
         Ok(level_data) => {
@@ -82,8 +83,11 @@ async fn generate_bsp_level(
                 app_state.spatial_index.insert(&obj.id, &obj.transform);
             }
             app_state.current_level = Some(level_data.clone());
-            
-            info!("Successfully generated level with {} objects", level_data.objects.len());
+
+            info!(
+                "Successfully generated level with {} objects",
+                level_data.objects.len()
+            );
             Ok(level_data)
         }
         Err(e) => {
@@ -97,12 +101,18 @@ async fn generate_bsp_level(
 async fn export_level(
     level_data: LevelData,
     formats: Vec<ExportFormat>,
-    output_path: String
+    output_path: String,
 ) -> Result<String, String> {
-    info!("Exporting level to {:?} formats at path: {}", formats, output_path);
-    
+    info!(
+        "Exporting level to {:?} formats at path: {}",
+        formats, output_path
+    );
+
     let exporter = LevelExporter::new();
-    match exporter.export_multi_format(&level_data, &formats, &output_path).await {
+    match exporter
+        .export_multi_format(&level_data, &formats, &output_path)
+        .await
+    {
         Ok(export_paths) => {
             let paths_str = export_paths.join(", ");
             info!("Successfully exported to: {}", paths_str);
@@ -118,7 +128,7 @@ async fn export_level(
 #[tauri::command]
 async fn query_objects_in_bounds(
     bounds: BoundingBox,
-    state: State<'_, std::sync::Mutex<AppState>>
+    state: State<'_, std::sync::Mutex<AppState>>,
 ) -> Result<Vec<String>, String> {
     let app_state = state.lock().unwrap();
     let object_ids = app_state.spatial_index.query_bounds(&bounds);
@@ -129,10 +139,10 @@ async fn query_objects_in_bounds(
 async fn update_object_transform(
     object_id: String,
     transform: Transform3D,
-    state: State<'_, std::sync::Mutex<AppState>>
+    state: State<'_, std::sync::Mutex<AppState>>,
 ) -> Result<(), String> {
     let mut app_state = state.lock().unwrap();
-    
+
     if let Some(ref mut level) = app_state.current_level {
         if let Some(obj) = level.objects.iter_mut().find(|o| o.id == object_id) {
             obj.transform = transform.clone();
@@ -149,25 +159,21 @@ async fn update_object_transform(
 
 #[tauri::command]
 async fn get_current_level(
-    state: State<'_, std::sync::Mutex<AppState>>
+    state: State<'_, std::sync::Mutex<AppState>>,
 ) -> Result<Option<LevelData>, String> {
     let app_state = state.lock().unwrap();
     Ok(app_state.current_level.clone())
 }
 
 #[tauri::command]
-async fn save_level_to_file(
-    level_data: LevelData,
-    file_path: String
-) -> Result<(), String> {
+async fn save_level_to_file(level_data: LevelData, file_path: String) -> Result<(), String> {
     info!("Saving level to file: {}", file_path);
-    
+
     let json_data = serde_json::to_string_pretty(&level_data)
         .map_err(|e| format!("Failed to serialize level data: {}", e))?;
-    
-    std::fs::write(&file_path, json_data)
-        .map_err(|e| format!("Failed to write file: {}", e))?;
-    
+
+    std::fs::write(&file_path, json_data).map_err(|e| format!("Failed to write file: {}", e))?;
+
     info!("Successfully saved level to: {}", file_path);
     Ok(())
 }
@@ -175,16 +181,16 @@ async fn save_level_to_file(
 #[tauri::command]
 async fn load_level_from_file(
     file_path: String,
-    state: State<'_, std::sync::Mutex<AppState>>
+    state: State<'_, std::sync::Mutex<AppState>>,
 ) -> Result<LevelData, String> {
     info!("Loading level from file: {}", file_path);
-    
-    let file_content = std::fs::read_to_string(&file_path)
-        .map_err(|e| format!("Failed to read file: {}", e))?;
-    
+
+    let file_content =
+        std::fs::read_to_string(&file_path).map_err(|e| format!("Failed to read file: {}", e))?;
+
     let level_data: LevelData = serde_json::from_str(&file_content)
         .map_err(|e| format!("Failed to parse level data: {}", e))?;
-    
+
     // Update application state
     let mut app_state = state.lock().unwrap();
     app_state.spatial_index.clear();
@@ -192,8 +198,11 @@ async fn load_level_from_file(
         app_state.spatial_index.insert(&obj.id, &obj.transform);
     }
     app_state.current_level = Some(level_data.clone());
-    
-    info!("Successfully loaded level with {} objects", level_data.objects.len());
+
+    info!(
+        "Successfully loaded level with {} objects",
+        level_data.objects.len()
+    );
     Ok(level_data)
 }
 
@@ -210,7 +219,10 @@ fn main() {
             update_object_transform,
             get_current_level,
             save_level_to_file,
-            load_level_from_file
+            load_level_from_file,
+            assets::scan_assets,
+            assets::browse_assets_folder,
+            assets::scan_assets_folder
         ])
         .setup(|_app| {
             info!("Tauri application setup complete");

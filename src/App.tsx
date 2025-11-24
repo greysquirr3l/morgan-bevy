@@ -3,6 +3,7 @@ import Viewport3D from '@/components/Viewport3D/Viewport3D'
 import Hierarchy from '@/components/Hierarchy/Hierarchy'
 import Inspector from '@/components/Inspector/Inspector'
 import { ActionsPanel } from '@/components/ActionsPanel'
+import { AssetsPanel } from '@/components/AssetsPanel'
 import { useEditorStore } from '@/store/editorStore'
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts'
 
@@ -125,9 +126,10 @@ function App() {
 
       {/* Main Content Area */}
       <div className="flex flex-1 overflow-hidden">
-        {/* Left Panel - Actions and Hierarchy */}
+        {/* Left Panel - Actions, Assets and Hierarchy */}
         <div className="w-64 bg-editor-panel border-r border-editor-border flex flex-col">
           <ActionsPanel />
+          <AssetsPanel />
           <Hierarchy />
         </div>
 

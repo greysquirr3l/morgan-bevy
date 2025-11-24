@@ -87,7 +87,48 @@ export const useEditorStore = create<EditorState>()(
       { id: 'doors', name: 'Doors', visible: true, locked: false, color: '#f59e0b' },
       { id: 'lights', name: 'Lights', visible: true, locked: false, color: '#fbbf24' },
     ],
-    sceneObjects: {},
+    sceneObjects: {
+      // Demo objects for testing
+      'demo_cube_1': {
+        id: 'demo_cube_1',
+        name: 'Demo Cube',
+        type: 'mesh' as const,
+        position: [2, 1, 0] as [number, number, number],
+        rotation: [0, 0, 0] as [number, number, number],
+        scale: [1, 1, 1] as [number, number, number],
+        visible: true,
+        locked: false,
+        layerId: 'default',
+        children: [],
+        meshType: 'cube' as const
+      },
+      'demo_sphere_1': {
+        id: 'demo_sphere_1',
+        name: 'Demo Sphere',
+        type: 'mesh' as const,
+        position: [-2, 1, 0] as [number, number, number],
+        rotation: [0, 0, 0] as [number, number, number],
+        scale: [1, 1, 1] as [number, number, number],
+        visible: true,
+        locked: false,
+        layerId: 'default',
+        children: [],
+        meshType: 'sphere' as const
+      },
+      'demo_pyramid_1': {
+        id: 'demo_pyramid_1',
+        name: 'Demo Pyramid',
+        type: 'mesh' as const,
+        position: [0, 1, 2] as [number, number, number],
+        rotation: [0, 0, 0] as [number, number, number],
+        scale: [1, 1, 1] as [number, number, number],
+        visible: true,
+        locked: false,
+        layerId: 'default',
+        children: [],
+        meshType: 'pyramid' as const
+      }
+    },
     showGrid: true,
     showStats: false,
     

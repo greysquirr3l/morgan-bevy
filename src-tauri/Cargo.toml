@@ -19,6 +19,10 @@ tokio = { version = "1", features = ["full"] }
 rand = "0.8"
 uuid = { version = "1.0", features = ["v4", "serde"] }
 
+# Asset management
+rfd = "0.10"
+md5 = "0.7"
+
 # BSP and procedural generation
 petgraph = "0.6"
 noise = "0.8"

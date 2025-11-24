@@ -2,15 +2,89 @@ import { Canvas } from '@react-three/fiber'
 import { OrbitControls, Grid, Stats } from '@react-three/drei'
 import Scene from './Scene'
 import BoxSelection from './BoxSelection'
+import TransformGizmos from '../TransformGizmos'
 import { useEditorStore } from '@/store/editorStore'
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts'
+import { useCallback, useState } from 'react'
 
 export default function Viewport3D() {
-  const { showGrid, showStats, cameraMode, transformMode } = useEditorStore()
+  const { showGrid, showStats, cameraMode, transformMode, addObject } = useEditorStore()
+  const [isDragOver, setIsDragOver] = useState(false)
   useKeyboardShortcuts()
 
+  // Handle drag and drop from assets panel
+  const handleDragOver = useCallback((event: React.DragEvent) => {
+    event.preventDefault()
+    event.dataTransfer.dropEffect = 'copy'
+    setIsDragOver(true)
+  }, [])
+
+  const handleDragLeave = useCallback((event: React.DragEvent) => {
+    event.preventDefault()
+    setIsDragOver(false)
+  }, [])
+
+  const handleDrop = useCallback((event: React.DragEvent) => {
+    event.preventDefault()
+    setIsDragOver(false)
+    
+    try {
+      const assetData = JSON.parse(event.dataTransfer.getData('application/json'))
+      
+      // Only handle asset drops (not other types of drag data)
+      if (!assetData.isAsset) {
+        return
+      }
+      
+      // Calculate drop position (simplified - would normally use raycasting)
+      const rect = event.currentTarget.getBoundingClientRect()
+      const x = ((event.clientX - rect.left) / rect.width) * 20 - 10
+      const z = ((event.clientY - rect.top) / rect.height) * 20 - 10
+      
+      // Determine object type based on asset type and name
+      let objectType: 'cube' | 'sphere' | 'pyramid' = 'cube' // default fallback
+      if (assetData.type === 'model') {
+        // Map common model names to basic shapes for demo
+        const fileName = assetData.name.toLowerCase()
+        if (fileName.includes('sphere')) {
+          objectType = 'sphere'
+        } else if (fileName.includes('cube') || fileName.includes('box')) {
+          objectType = 'cube'
+        } else if (fileName.includes('pyramid') || fileName.includes('cone')) {
+          objectType = 'pyramid'
+        } else {
+          objectType = 'cube' // default for unknown models
+        }
+      }
+      
+      // Create the 3D object in the scene
+      const objectId = addObject(objectType, [x, 0, z])
+      
+      console.log(`Dropped asset "${assetData.name}" (${assetData.type}) at position [${x.toFixed(2)}, 0, ${z.toFixed(2)}]`)
+      console.log('Created object ID:', objectId, 'Type:', objectType)
+      
+    } catch (error) {
+      console.error('Failed to handle asset drop:', error)
+    }
+  }, [addObject])
+
   return (
-    <div className="viewport-3d w-full h-full bg-gray-900">
+    <div 
+      className={`viewport-3d w-full h-full bg-gray-900 relative ${
+        isDragOver ? 'ring-2 ring-blue-400 ring-inset' : ''
+      }`}
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
+    >
+      {/* Drag overlay */}
+      {isDragOver && (
+        <div className="absolute inset-0 bg-blue-400/10 border-2 border-dashed border-blue-400 pointer-events-none flex items-center justify-center z-10">
+          <div className="bg-blue-600/80 text-white px-4 py-2 rounded-lg backdrop-blur-sm">
+            Drop asset here to add to scene
+          </div>
+        </div>
+      )}
       <Canvas
         camera={{ 
           position: [10, 10, 10], 
@@ -77,12 +151,15 @@ export default function Viewport3D() {
         {/* Scene Content */}
         <Scene />
 
+        {/* Transform Gizmos - needs to be inside Canvas for R3F hooks */}
+        <TransformGizmos />
+
+        {/* Box Selection - needs to be inside Canvas for R3F hooks */}
+        <BoxSelection />
+
         {/* Performance Stats */}
         {showStats && <Stats />}
       </Canvas>
-
-      {/* Box Selection Overlay */}
-      <BoxSelection />
 
       {/* Viewport UI Overlay */}
       <div className="absolute top-2 left-2 bg-black bg-opacity-50 text-white text-xs p-2 rounded">

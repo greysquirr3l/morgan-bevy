@@ -1,4 +1,4 @@
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum ExportFormat {
@@ -9,6 +9,7 @@ pub enum ExportFormat {
     FBX,
 }
 
+#[allow(dead_code)]
 impl ExportFormat {
     pub fn file_extension(&self) -> &'static str {
         match self {
@@ -19,7 +20,7 @@ impl ExportFormat {
             ExportFormat::FBX => "fbx",
         }
     }
-    
+
     pub fn description(&self) -> &'static str {
         match self {
             ExportFormat::JSON => "Universal JSON format for any engine",
@@ -29,7 +30,7 @@ impl ExportFormat {
             ExportFormat::FBX => "Autodesk FBX format for 3D software",
         }
     }
-    
+
     pub fn supports_materials(&self) -> bool {
         match self {
             ExportFormat::JSON => true,
@@ -39,7 +40,7 @@ impl ExportFormat {
             ExportFormat::FBX => true,
         }
     }
-    
+
     pub fn supports_animations(&self) -> bool {
         match self {
             ExportFormat::JSON => false,

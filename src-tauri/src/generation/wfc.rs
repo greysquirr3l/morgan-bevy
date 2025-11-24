@@ -3,7 +3,7 @@
 
 use crate::LevelData;
 use anyhow::Result;
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct WFCGenerationParams {
@@ -18,11 +18,12 @@ pub struct WFCGenerator {
     // Placeholder for WFC implementation
 }
 
+#[allow(dead_code)]
 impl WFCGenerator {
     pub fn new() -> Self {
         Self {}
     }
-    
+
     pub async fn generate(&self, _params: WFCGenerationParams) -> Result<LevelData> {
         // TODO: Implement Wave Function Collapse algorithm
         unimplemented!("WFC generation will be implemented in future iteration")
