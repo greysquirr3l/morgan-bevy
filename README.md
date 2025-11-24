@@ -17,6 +17,7 @@
 Morgan-Bevy is a comprehensive 3D level editor specifically designed for the [Bevy game engine](https://bevyengine.org/). It combines **procedural generation algorithms** (BSP, WFC) with **professional manual editing tools** to enable rapid level design and iteration.
 
 ### 🎮 **Target Users**
+
 - **Game Developers** using Bevy engine
 - **Level Designers** and 3D environment artists
 - **Indie Game Studios** needing rapid prototyping tools
@@ -27,13 +28,16 @@ Morgan-Bevy is a comprehensive 3D level editor specifically designed for the [Be
 ## ✨ Current Features
 
 ### 🎨 **3D Editor Foundation**
+
 - ✅ **Interactive 3D Viewport** - Professional Three.js rendering with orbit camera controls
 - ✅ **Transform Gizmos** - Move, rotate, and scale objects with industry-standard controls (W/E/R keys)
 - ✅ **Object Selection** - Click selection with multi-select (Ctrl+click) and visual feedback
 - ✅ **Grid System** - Configurable snapping (0.1, 0.5, 1.0, 2.0 units) with visual overlay
-- ✅ **Professional UI** - Dark-themed interface with hierarchy, inspector, and asset panels
+- ✅ **Professional Resizable UI** - Dynamic panel system with drag handles and constraint boundaries
+- ✅ **Advanced Camera Controls** - Reset view and focus selection with bounding box calculations
 
 ### 📁 **Asset Management**
+
 - ✅ **Assets Panel** - Collapsible asset browser with drag-and-drop functionality
 - ✅ **File System Integration** - Browse local and external folders with native file dialogs
 - ✅ **Asset Types** - Support for models, textures, materials, and audio files
@@ -41,21 +45,28 @@ Morgan-Bevy is a comprehensive 3D level editor specifically designed for the [Be
 - ✅ **Metadata Display** - File size, type, and modification date information
 
 ### ⌨️ **Professional Workflow**
+
 - ✅ **Keyboard Shortcuts** - Complete shortcut system for efficient editing
   - `W` / `E` / `R` - Transform modes (translate/rotate/scale)
   - `G` - Toggle grid display
+  - `F` - Frame selected objects (focus camera)
+  - `Alt+F` - Frame all objects
   - `Ctrl+D` - Duplicate selected objects
   - `Delete` / `Backspace` - Remove selected objects
   - `Esc` - Clear selection
-  - `1` / `2` / `3` - Camera mode switching
+  - Camera controls via toolbar buttons (Reset View, Focus Selection)
 
 ### 🏗️ **Scene Management**
-- ✅ **Hierarchy Panel** - Tree view of scene objects with selection synchronization
+
+- ✅ **Resizable Hierarchy Panel** - Tree view of scene objects with dynamic sizing and selection synchronization
+- ✅ **Resizable Inspector Panel** - Object property editing with drag-handle resizing
 - ✅ **Object Management** - Create, duplicate, and remove 3D objects
 - ✅ **State Management** - Zustand store with real-time viewport synchronization
+- ✅ **Collapsible Bottom Panel** - Asset browser with toggle and resize functionality
 - ✅ **Layer System** - Organize objects by layers (Walls, Floors, Doors, Lights)
 
 ### 🔧 **Technical Foundation**
+
 - ✅ **Cross-Platform** - Windows, macOS, and Linux support via Tauri
 - ✅ **Hot Reload** - Development environment with frontend/backend hot reload
 - ✅ **Type Safety** - Full TypeScript coverage with strict configuration
@@ -66,18 +77,22 @@ Morgan-Bevy is a comprehensive 3D level editor specifically designed for the [Be
 ## 🚀 **Upcoming Features** (In Development)
 
 ### 📦 **Phase 2: Advanced Editing**
+
 - 🔄 **Box Selection** - Multi-object selection with drag rectangles
 - 🔄 **Undo/Redo System** - Command pattern with efficient history management
 - 🔄 **Copy/Paste** - Full clipboard operations with transform data
-- 🔄 **Inspector Panel** - Detailed property editing for selected objects
+- ✅ **Enhanced Inspector Panel** - Detailed property editing with resizable interface
+- 🔄 **Multi-Object Editing** - Edit multiple selected objects simultaneously
 
 ### 🌱 **Phase 3: Procedural Generation**
+
 - 🔄 **BSP Algorithm** - Binary Space Partitioning for room generation
 - 🔄 **WFC Integration** - Wave Function Collapse for detailed layouts
 - 🔄 **Theme System** - Office, Dungeon, Sci-Fi architectural styles
 - 🔄 **Seed Management** - Reproducible generation with seed control
 
 ### 📤 **Phase 4: Export System**
+
 - 🔄 **Multi-Format Export** - JSON, RON (Bevy native), and Rust code generation
 - 🔄 **Bevy Integration** - Direct import into Bevy projects
 - 🔄 **Collision Data** - Export collision shapes and navigation meshes
@@ -102,24 +117,28 @@ Morgan-Bevy is a comprehensive 3D level editor specifically designed for the [Be
 ## 🚀 Quick Start
 
 ### Prerequisites
-- [Node.js](https://nodejs.org/) 18+ and npm
+
+- [Node.js](https://nodejs.org/) 22.21.1+ and npm
 - [Rust](https://rustup.rs/) 1.70+ with Cargo
 - Platform-specific dependencies for Tauri
 
 ### Development Setup
 
 1. **Clone the repository**
+
    ```bash
    git clone https://github.com/greysquirr3l/morgan-bevy.git
    cd morgan-bevy
    ```
 
 2. **Install dependencies**
+
    ```bash
    npm install
    ```
 
 3. **Start development server**
+
    ```bash
    npm run tauri dev
    ```
@@ -131,6 +150,7 @@ Morgan-Bevy is a comprehensive 3D level editor specifically designed for the [Be
    - Drag assets from the Assets panel to create new objects
 
 ### Build for Production
+
 ```bash
 npm run tauri build
 ```
@@ -154,8 +174,11 @@ npm run tauri build
 > 📸 *Screenshots and demo videos coming soon as features are completed*
 
 ### Current Capabilities
+
 - **Interactive 3D Scene** with real-time object manipulation
 - **Professional Transform Gizmos** for precise editing
+- **Industry-Standard Resizable Interface** with drag handles and constraints
+- **Advanced Camera Controls** with reset view and focus selection
 - **Asset Drag-and-Drop** workflow from file browser to 3D viewport
 - **Multi-object Selection** with visual feedback
 - **Grid-based Snapping** for precision placement
@@ -164,20 +187,32 @@ npm run tauri build
 
 ## 🤝 Contributing
 
-Morgan-Bevy is under active development and welcomes contributions!
+**🚀 We're actively seeking contributors!** Morgan-Bevy is an ambitious open-source project that would benefit greatly from community involvement. Whether you're a Rust developer, TypeScript expert, 3D graphics enthusiast, or UI/UX designer, there are opportunities to make a significant impact.
+
+### 🎯 **Areas Where We Need Help**
+
+- **Rust Backend Development** - Procedural generation algorithms (BSP, WFC), export systems
+- **Three.js/WebGL** - 3D rendering optimizations, advanced visual features
+- **React/TypeScript** - UI components, state management, performance improvements
+- **Game Development** - Bevy engine integration, level design workflows
+- **Documentation** - Technical writing, tutorials, examples
+- **Testing** - Unit tests, integration tests, performance testing
 
 ### 🐛 **Bug Reports & Feature Requests**
+
 - Open an [issue](https://github.com/greysquirr3l/morgan-bevy/issues) with detailed reproduction steps
 - Check existing issues before creating new ones
 - Include system information and error messages
 
 ### 💻 **Development Contributions**
+
 - Fork the repository and create a feature branch
 - Follow existing code style and patterns
 - Add tests for new functionality
 - Update documentation for user-facing changes
 
 ### 📚 **Documentation**
+
 - Improve README, code comments, or user guides
 - Create tutorials or example projects
 - Report unclear or missing documentation

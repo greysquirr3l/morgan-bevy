@@ -1,5 +1,18 @@
 import { useState } from 'react'
 import { useEditorStore } from '@/store/editorStore'
+import { 
+  Box, 
+  Circle, 
+  Triangle, 
+  Package, 
+  Lightbulb, 
+  Folder, 
+  HelpCircle, 
+  Eye, 
+  EyeOff, 
+  Lock, 
+  Unlock 
+} from 'lucide-react'
 
 export default function Hierarchy() {
   const { 
@@ -45,17 +58,17 @@ export default function Hierarchy() {
   const getObjectIcon = (type: string, meshType?: string) => {
     if (type === 'mesh' && meshType) {
       switch (meshType) {
-        case 'cube': return '🟩'
-        case 'sphere': return '🔵'
-        case 'pyramid': return '🔺'
-        default: return '📦'
+        case 'cube': return <Box className="w-4 h-4 text-green-500" />
+        case 'sphere': return <Circle className="w-4 h-4 text-blue-500" />
+        case 'pyramid': return <Triangle className="w-4 h-4 text-red-500" />
+        default: return <Package className="w-4 h-4" />
       }
     } else if (type === 'light') {
-      return '💡'
+      return <Lightbulb className="w-4 h-4 text-yellow-500" />
     } else if (type === 'group') {
-      return '📁'
+      return <Folder className="w-4 h-4" />
     }
-    return '❓'
+    return <HelpCircle className="w-4 h-4" />
   }
 
   const renderTreeItem = (obj: any, level: number = 0) => {
@@ -85,9 +98,9 @@ export default function Hierarchy() {
               title={obj.visible ? 'Hide' : 'Show'}
             >
               {obj.visible ? (
-                <span className="text-xs">👁</span>
+                <Eye className="w-3 h-3" />
               ) : (
-                <span className="text-xs">🚫</span>
+                <EyeOff className="w-3 h-3" />
               )}
             </button>
             <button
@@ -96,9 +109,9 @@ export default function Hierarchy() {
               title={obj.locked ? 'Unlock' : 'Lock'}
             >
               {obj.locked ? (
-                <span className="text-xs">🔒</span>
+                <Lock className="w-3 h-3" />
               ) : (
-                <span className="text-xs">🔓</span>
+                <Unlock className="w-3 h-3" />
               )}
             </button>
           </div>

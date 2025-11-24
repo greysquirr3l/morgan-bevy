@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { immer } from 'zustand/middleware/immer'
+import type { Command } from '@/utils/commands'
 
 export interface EditorState {
   // Selection
@@ -46,6 +47,11 @@ export interface EditorState {
   showGrid: boolean
   showStats: boolean
   
+  // Undo/Redo system
+  undoHistory: Command[]
+  redoHistory: Command[]
+  maxHistorySize: number
+  
   // Actions
   setSelectedObjects: (ids: string[]) => void
   addToSelection: (id: string) => void
@@ -66,6 +72,16 @@ export interface EditorState {
   removeObject: (id: string) => void
   duplicateObjects: (ids: string[]) => string[]
   updateObjectTransform: (id: string, transform: Partial<{ position: [number, number, number], rotation: [number, number, number], scale: [number, number, number] }>) => void
+  groupObjects: (ids: string[]) => string
+  ungroupObject: (groupId: string) => void
+  
+  // Undo/Redo system
+  executeCommand: (command: Command) => void
+  undo: () => void
+  redo: () => void
+  canUndo: () => boolean
+  canRedo: () => boolean
+  clearHistory: () => void
 }
 
 export const useEditorStore = create<EditorState>()(
@@ -131,6 +147,11 @@ export const useEditorStore = create<EditorState>()(
     },
     showGrid: true,
     showStats: false,
+    
+    // Undo/Redo system
+    undoHistory: [],
+    redoHistory: [],
+    maxHistorySize: 50,
     
     // Actions
     setSelectedObjects: (ids) =>
@@ -264,6 +285,122 @@ export const useEditorStore = create<EditorState>()(
             state.sceneObjects[id].scale = transform.scale
           }
         }
+      }),
+    
+    groupObjects: (ids) => {
+      const groupId = `group_${Date.now()}`
+      set((state) => {
+        // Calculate center position of selected objects
+        let centerX = 0, centerY = 0, centerZ = 0
+        const validObjects = ids.map(id => state.sceneObjects[id]).filter(Boolean)
+        
+        if (validObjects.length === 0) return groupId
+        
+        validObjects.forEach(obj => {
+          centerX += obj.position[0]
+          centerY += obj.position[1]
+          centerZ += obj.position[2]
+        })
+        centerX /= validObjects.length
+        centerY /= validObjects.length
+        centerZ /= validObjects.length
+
+        // Create group object
+        state.sceneObjects[groupId] = {
+          id: groupId,
+          name: `Group_${Object.keys(state.sceneObjects).length + 1}`,
+          type: 'group',
+          position: [centerX, centerY, centerZ],
+          rotation: [0, 0, 0],
+          scale: [1, 1, 1],
+          visible: true,
+          locked: false,
+          layerId: state.activeLayer,
+          children: ids,
+        }
+
+        // Update child objects to be parented to this group
+        ids.forEach(id => {
+          if (state.sceneObjects[id]) {
+            state.sceneObjects[id].parentId = groupId
+          }
+        })
+
+        // Update selection to the new group
+        state.selectedObjects = [groupId]
+      })
+      return groupId
+    },
+
+    ungroupObject: (groupId) =>
+      set((state) => {
+        const group = state.sceneObjects[groupId]
+        if (group && group.type === 'group') {
+          // Clear parent relationships for children
+          group.children.forEach(childId => {
+            if (state.sceneObjects[childId]) {
+              state.sceneObjects[childId].parentId = undefined
+            }
+          })
+
+          // Select the ungrouped objects
+          state.selectedObjects = group.children
+
+          // Remove the group object
+          delete state.sceneObjects[groupId]
+        }
+      }),
+    
+    // Undo/Redo system implementation
+    executeCommand: (command) =>
+      set((state) => {
+        // Note: Command should already be executed by the caller
+        // This just adds it to history
+        
+        // Add to undo history
+        state.undoHistory.push(command)
+        
+        // Clear redo history when new command is executed
+        state.redoHistory = []
+        
+        // Limit history size
+        if (state.undoHistory.length > state.maxHistorySize) {
+          state.undoHistory.shift()
+        }
+      }),
+    
+    undo: () =>
+      set((state) => {
+        if (state.undoHistory.length > 0) {
+          const command = state.undoHistory.pop()!
+          command.undo()
+          state.redoHistory.push(command)
+        }
+      }),
+    
+    redo: () =>
+      set((state) => {
+        if (state.redoHistory.length > 0) {
+          const command = state.redoHistory.pop()!
+          command.execute()
+          state.undoHistory.push(command)
+        }
+      }),
+    
+    canUndo: () => {
+      const state = useEditorStore.getState()
+      return state.undoHistory.length > 0
+    },
+    
+    canRedo: () => {
+      const state = useEditorStore.getState()
+      return state.redoHistory.length > 0
+    },
+    
+    clearHistory: () =>
+      set((state) => {
+        state.undoHistory = []
+        state.redoHistory = []
       }),
   }))
 )

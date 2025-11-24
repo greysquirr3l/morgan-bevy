@@ -1,6 +1,18 @@
 import { useState, useCallback, useEffect } from 'react'
 import { useEditorStore } from '@/store/editorStore'
 import { invoke } from '@tauri-apps/api/tauri'
+import {
+  Target,
+  Image,
+  Palette,
+  ChevronRight,
+  ChevronDown,
+  RotateCcw,
+  FolderOpen,
+  AlertTriangle,
+  Loader,
+  Folder
+} from 'lucide-react'
 
 interface AssetFile {
   id: string
@@ -131,11 +143,11 @@ export default function AssetsPanel() {
 
   const getFileIcon = (type: string) => {
     switch (type) {
-      case 'model': return '🎯'
-      case 'texture': return '🖼️'
-      case 'material': return '🎨'
-      case 'audio': return '🎵'
-      default: return '📄'
+      case 'model': return <Target className="w-4 h-4" />
+      case 'texture': return <Image className="w-4 h-4" />
+      case 'material': return <Palette className="w-4 h-4" />
+      case 'audio': return <Folder className="w-4 h-4" />
+      default: return <Folder className="w-4 h-4" />
     }
   }
 
@@ -162,26 +174,28 @@ export default function AssetsPanel() {
             className="text-editor-text hover:text-editor-accent transition-colors"
             title={isCollapsed ? 'Expand Assets' : 'Collapse Assets'}
           >
-            {isCollapsed ? '▶️' : '🔽'}
+            {isCollapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
           </button>
           <h3 className="text-sm font-medium text-editor-text">Assets</h3>
         </div>
         <div className="flex space-x-1">
           <button
             onClick={loadLocalAssets}
-            className="text-xs px-2 py-1 bg-editor-bg hover:bg-editor-hover rounded text-editor-text"
+            className="text-xs px-2 py-1 bg-editor-bg hover:bg-editor-hover rounded text-editor-text flex items-center gap-1"
             title="Reload Local Assets"
             disabled={isLoading}
           >
-            🔄 Local
+            <RotateCcw className="w-3 h-3" />
+            Local
           </button>
           <button
             onClick={browseForFolder}
-            className="text-xs px-2 py-1 bg-editor-bg hover:bg-editor-hover rounded text-editor-text"
+            className="text-xs px-2 py-1 bg-editor-bg hover:bg-editor-hover rounded text-editor-text flex items-center gap-1"
             title="Browse for Assets Folder"
             disabled={isLoading}
           >
-            📁 Browse
+            <FolderOpen className="w-3 h-3" />
+            Browse
           </button>
         </div>
       </div>
@@ -192,16 +206,16 @@ export default function AssetsPanel() {
           {/* Current Folder Path */}
           <div className="px-4 py-2 bg-editor-bg border-b border-editor-border">
             <div className="text-xs text-editor-textMuted truncate" title={currentFolder}>
-              📂 {currentFolder}
+              <Folder className="w-4 h-4 inline mr-2" /> {currentFolder}
             </div>
             {error && (
               <div className="text-xs text-red-400 mt-1">
-                ⚠️ {error}
+                <AlertTriangle className="w-4 h-4 inline mr-2" /> {error}
               </div>
             )}
             {isLoading && (
               <div className="text-xs text-editor-accent mt-1">
-                🔄 Loading assets...
+                <Loader className="w-4 h-4 inline mr-2 animate-spin" /> Loading assets...
               </div>
             )}
           </div>
@@ -210,7 +224,7 @@ export default function AssetsPanel() {
           <div className="flex-1 p-2 overflow-y-auto custom-scrollbar">
             {assets.length === 0 && !isLoading ? (
               <div className="flex flex-col items-center justify-center h-full text-center">
-                <div className="text-4xl mb-2">📁</div>
+                <Folder className="w-8 h-8 mb-2" />
                 <div className="text-sm text-editor-textMuted mb-3">No assets found</div>
                 <div className="flex flex-col space-y-2">
                   <button

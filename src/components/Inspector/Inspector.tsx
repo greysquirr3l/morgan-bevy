@@ -1,13 +1,46 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useEditorStore } from '@/store/editorStore'
+import MaterialEditor from '../MaterialEditor'
+import { Search } from 'lucide-react'
 
 export default function Inspector() {
-  const { selectedObjects } = useEditorStore()
-  const [transform, setTransform] = useState({
-    position: { x: 2.0, y: 0.0, z: 5.0 },
-    rotation: { x: 0, y: 90, z: 0 },
-    scale: { x: 1.0, y: 3.5, z: 0.2 }
-  })
+  const { selectedObjects, sceneObjects, updateObjectTransform } = useEditorStore()
+  const [editingName, setEditingName] = useState<string | null>(null)
+
+  // Get data for the first selected object (for single selection)
+  const primaryObject = selectedObjects.length > 0 ? sceneObjects[selectedObjects[0]] : null
+  
+  const handleTransformChange = (
+    field: 'position' | 'rotation' | 'scale',
+    axis: 'x' | 'y' | 'z',
+    value: number
+  ) => {
+    if (!primaryObject) return
+
+    // For multi-selection, apply to all selected objects
+    selectedObjects.forEach(objectId => {
+      const obj = sceneObjects[objectId]
+      if (obj) {
+        const newTransform = { ...obj }
+        if (field === 'position') {
+          const newPos = [...obj.position] as [number, number, number]
+          const axisIndex = axis === 'x' ? 0 : axis === 'y' ? 1 : 2
+          newPos[axisIndex] = value
+          updateObjectTransform(objectId, { position: newPos })
+        } else if (field === 'rotation') {
+          const newRot = [...obj.rotation] as [number, number, number]
+          const axisIndex = axis === 'x' ? 0 : axis === 'y' ? 1 : 2
+          newRot[axisIndex] = value * (Math.PI / 180) // Convert degrees to radians
+          updateObjectTransform(objectId, { rotation: newRot })
+        } else if (field === 'scale') {
+          const newScale = [...obj.scale] as [number, number, number]
+          const axisIndex = axis === 'x' ? 0 : axis === 'y' ? 1 : 2
+          newScale[axisIndex] = value
+          updateObjectTransform(objectId, { scale: newScale })
+        }
+      }
+    })
+  }
 
   if (selectedObjects.length === 0) {
     return (
@@ -17,7 +50,7 @@ export default function Inspector() {
         </div>
         <div className="flex-1 flex items-center justify-center text-editor-textMuted">
           <div className="text-center">
-            <div className="text-4xl mb-2">🔍</div>
+            <Search className="w-8 h-8 mb-2 mx-auto" />
             <div className="text-sm">No object selected</div>
           </div>
         </div>
@@ -26,7 +59,17 @@ export default function Inspector() {
   }
 
   const selectedCount = selectedObjects.length
-  const objectName = selectedCount === 1 ? 'Wall_001' : `${selectedCount} objects`
+  const objectName = selectedCount === 1 && primaryObject ? primaryObject.name : `${selectedCount} objects`
+
+  // Transform values - use primary object values or show mixed for multi-selection
+  const getTransformValue = (field: 'position' | 'rotation' | 'scale', axis: 'x' | 'y' | 'z'): number => {
+    if (!primaryObject) return 0
+    const axisIndex = axis === 'x' ? 0 : axis === 'y' ? 1 : 2
+    if (field === 'rotation') {
+      return primaryObject[field][axisIndex] * (180 / Math.PI) // Convert radians to degrees
+    }
+    return primaryObject[field][axisIndex]
+  }
 
   return (
     <div className="flex flex-col h-full">
@@ -47,8 +90,17 @@ export default function Inspector() {
           <input
             type="text"
             value={objectName}
+            onChange={(e) => {
+              if (selectedCount === 1 && primaryObject) {
+                // Update object name directly in store
+                useEditorStore.setState((state) => {
+                  state.sceneObjects[primaryObject.id].name = e.target.value
+                })
+              }
+            }}
             className="w-full px-2 py-1 text-sm font-semibold bg-editor-bg border border-editor-border rounded focus:outline-none focus:border-editor-accent"
             readOnly={selectedCount > 1}
+            placeholder={selectedCount > 1 ? 'Multiple objects selected' : 'Object name'}
           />
         </div>
 
@@ -64,11 +116,8 @@ export default function Inspector() {
                 <label className="block text-xs text-editor-textMuted">X</label>
                 <input
                   type="number"
-                  value={transform.position.x}
-                  onChange={(e) => setTransform(prev => ({
-                    ...prev,
-                    position: { ...prev.position, x: parseFloat(e.target.value) }
-                  }))}
+                  value={getTransformValue('position', 'x')}
+                  onChange={(e) => handleTransformChange('position', 'x', parseFloat(e.target.value) || 0)}
                   className="w-full px-2 py-1 text-xs bg-editor-bg border border-editor-border rounded focus:outline-none focus:border-editor-accent"
                   step="0.1"
                 />
@@ -77,11 +126,8 @@ export default function Inspector() {
                 <label className="block text-xs text-editor-textMuted">Y</label>
                 <input
                   type="number"
-                  value={transform.position.y}
-                  onChange={(e) => setTransform(prev => ({
-                    ...prev,
-                    position: { ...prev.position, y: parseFloat(e.target.value) }
-                  }))}
+                  value={getTransformValue('position', 'y')}
+                  onChange={(e) => handleTransformChange('position', 'y', parseFloat(e.target.value) || 0)}
                   className="w-full px-2 py-1 text-xs bg-editor-bg border border-editor-border rounded focus:outline-none focus:border-editor-accent"
                   step="0.1"
                 />
@@ -90,11 +136,8 @@ export default function Inspector() {
                 <label className="block text-xs text-editor-textMuted">Z</label>
                 <input
                   type="number"
-                  value={transform.position.z}
-                  onChange={(e) => setTransform(prev => ({
-                    ...prev,
-                    position: { ...prev.position, z: parseFloat(e.target.value) }
-                  }))}
+                  value={getTransformValue('position', 'z')}
+                  onChange={(e) => handleTransformChange('position', 'z', parseFloat(e.target.value) || 0)}
                   className="w-full px-2 py-1 text-xs bg-editor-bg border border-editor-border rounded focus:outline-none focus:border-editor-accent"
                   step="0.1"
                 />
@@ -110,11 +153,8 @@ export default function Inspector() {
                 <label className="block text-xs text-editor-textMuted">X</label>
                 <input
                   type="number"
-                  value={transform.rotation.x}
-                  onChange={(e) => setTransform(prev => ({
-                    ...prev,
-                    rotation: { ...prev.rotation, x: parseFloat(e.target.value) }
-                  }))}
+                  value={getTransformValue('rotation', 'x')}
+                  onChange={(e) => handleTransformChange('rotation', 'x', parseFloat(e.target.value) || 0)}
                   className="w-full px-2 py-1 text-xs bg-editor-bg border border-editor-border rounded focus:outline-none focus:border-editor-accent"
                   step="1"
                 />
@@ -123,11 +163,8 @@ export default function Inspector() {
                 <label className="block text-xs text-editor-textMuted">Y</label>
                 <input
                   type="number"
-                  value={transform.rotation.y}
-                  onChange={(e) => setTransform(prev => ({
-                    ...prev,
-                    rotation: { ...prev.rotation, y: parseFloat(e.target.value) }
-                  }))}
+                  value={getTransformValue('rotation', 'y')}
+                  onChange={(e) => handleTransformChange('rotation', 'y', parseFloat(e.target.value) || 0)}
                   className="w-full px-2 py-1 text-xs bg-editor-bg border border-editor-border rounded focus:outline-none focus:border-editor-accent"
                   step="1"
                 />
@@ -136,11 +173,8 @@ export default function Inspector() {
                 <label className="block text-xs text-editor-textMuted">Z</label>
                 <input
                   type="number"
-                  value={transform.rotation.z}
-                  onChange={(e) => setTransform(prev => ({
-                    ...prev,
-                    rotation: { ...prev.rotation, z: parseFloat(e.target.value) }
-                  }))}
+                  value={getTransformValue('rotation', 'z')}
+                  onChange={(e) => handleTransformChange('rotation', 'z', parseFloat(e.target.value) || 0)}
                   className="w-full px-2 py-1 text-xs bg-editor-bg border border-editor-border rounded focus:outline-none focus:border-editor-accent"
                   step="1"
                 />
@@ -156,11 +190,8 @@ export default function Inspector() {
                 <label className="block text-xs text-editor-textMuted">X</label>
                 <input
                   type="number"
-                  value={transform.scale.x}
-                  onChange={(e) => setTransform(prev => ({
-                    ...prev,
-                    scale: { ...prev.scale, x: parseFloat(e.target.value) }
-                  }))}
+                  value={getTransformValue('scale', 'x')}
+                  onChange={(e) => handleTransformChange('scale', 'x', parseFloat(e.target.value) || 0)}
                   className="w-full px-2 py-1 text-xs bg-editor-bg border border-editor-border rounded focus:outline-none focus:border-editor-accent"
                   step="0.1"
                 />
@@ -169,11 +200,8 @@ export default function Inspector() {
                 <label className="block text-xs text-editor-textMuted">Y</label>
                 <input
                   type="number"
-                  value={transform.scale.y}
-                  onChange={(e) => setTransform(prev => ({
-                    ...prev,
-                    scale: { ...prev.scale, y: parseFloat(e.target.value) }
-                  }))}
+                  value={getTransformValue('scale', 'y')}
+                  onChange={(e) => handleTransformChange('scale', 'y', parseFloat(e.target.value) || 0)}
                   className="w-full px-2 py-1 text-xs bg-editor-bg border border-editor-border rounded focus:outline-none focus:border-editor-accent"
                   step="0.1"
                 />
@@ -182,11 +210,8 @@ export default function Inspector() {
                 <label className="block text-xs text-editor-textMuted">Z</label>
                 <input
                   type="number"
-                  value={transform.scale.z}
-                  onChange={(e) => setTransform(prev => ({
-                    ...prev,
-                    scale: { ...prev.scale, z: parseFloat(e.target.value) }
-                  }))}
+                  value={getTransformValue('scale', 'z')}
+                  onChange={(e) => handleTransformChange('scale', 'z', parseFloat(e.target.value) || 0)}
                   className="w-full px-2 py-1 text-xs bg-editor-bg border border-editor-border rounded focus:outline-none focus:border-editor-accent"
                   step="0.1"
                 />
@@ -195,65 +220,23 @@ export default function Inspector() {
           </div>
         </div>
 
+        {/* Material Editor */}
+        <MaterialEditor 
+          selectedObjects={selectedObjects}
+          onMaterialChange={(materialProps) => {
+            console.log('Material changed:', materialProps)
+            // TODO: Apply material to selected objects in the store/scene
+          }}
+        />
+
         {/* Mesh */}
         <div className="space-y-2">
           <h4 className="text-sm font-medium border-b border-editor-border pb-1">Mesh</h4>
           <select className="w-full px-2 py-1 text-sm bg-editor-bg border border-editor-border rounded focus:outline-none focus:border-editor-accent">
-            <option value="wall_standard">Wall_Standard</option>
-            <option value="wall_corner">Wall_Corner</option>
-            <option value="wall_door">Wall_Door</option>
+            <option value="cube">Cube</option>
+            <option value="sphere">Sphere</option>
+            <option value="pyramid">Pyramid</option>
           </select>
-        </div>
-
-        {/* Material */}
-        <div className="space-y-2">
-          <h4 className="text-sm font-medium border-b border-editor-border pb-1">Material</h4>
-          <select className="w-full px-2 py-1 text-sm bg-editor-bg border border-editor-border rounded focus:outline-none focus:border-editor-accent">
-            <option value="concrete_gray">Concrete_Gray</option>
-            <option value="brick_red">Brick_Red</option>
-            <option value="metal_steel">Metal_Steel</option>
-          </select>
-          
-          <div className="grid grid-cols-2 gap-2 mt-2">
-            <div>
-              <label className="block text-xs text-editor-textMuted">Base Color</label>
-              <div className="flex">
-                <div className="w-6 h-6 bg-gray-500 border border-editor-border rounded-l"></div>
-                <input
-                  type="text"
-                  value="#808080"
-                  className="flex-1 px-2 py-1 text-xs bg-editor-bg border border-editor-border rounded-r focus:outline-none focus:border-editor-accent"
-                />
-              </div>
-            </div>
-            <button className="px-2 py-1 text-xs bg-editor-bg border border-editor-border rounded hover:bg-editor-border self-end">
-              📁 Load
-            </button>
-          </div>
-
-          <div>
-            <label className="block text-xs text-editor-textMuted mb-1">Metallic</label>
-            <input
-              type="range"
-              min="0"
-              max="1"
-              step="0.1"
-              defaultValue="0"
-              className="w-full"
-            />
-          </div>
-
-          <div>
-            <label className="block text-xs text-editor-textMuted mb-1">Roughness</label>
-            <input
-              type="range"
-              min="0"
-              max="1"
-              step="0.1"
-              defaultValue="0.8"
-              className="w-full"
-            />
-          </div>
         </div>
 
         {/* Tile Properties */}

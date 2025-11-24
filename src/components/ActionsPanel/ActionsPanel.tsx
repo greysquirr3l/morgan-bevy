@@ -1,4 +1,6 @@
+import React from 'react'
 import { useEditorStore } from '@/store/editorStore'
+import { Plus, Save, FolderOpen, Download, Triangle } from 'lucide-react'
 
 export default function ActionsPanel() {
   const { 
@@ -67,7 +69,7 @@ export default function ActionsPanel() {
               onClick={() => createPrimitive('pyramid')}
               title="Create Pyramid"
             >
-              <span className="text-2xl mb-1">🔺</span>
+              <Triangle className="w-8 h-8 mb-1 text-editor-accent" />
               <span>Pyramid</span>
             </button>
           </div>
@@ -88,7 +90,7 @@ export default function ActionsPanel() {
               disabled={selectedObjects.length === 0}
               title="Duplicate Selected (Ctrl+D)"
             >
-              <span className="text-sm mr-2">➕</span>
+              <Plus className="w-4 h-4 mr-2" />
               Duplicate
             </button>
             <button 
@@ -111,7 +113,7 @@ export default function ActionsPanel() {
               onClick={saveProject}
               title="Save Project (Ctrl+S)"
             >
-              <span className="text-sm mr-2">💾</span>
+              <Save className="w-4 h-4 mr-2" />
               Save
             </button>
             <button 
@@ -119,7 +121,7 @@ export default function ActionsPanel() {
               onClick={openProject}
               title="Open Project (Ctrl+O)"
             >
-              <span className="text-sm mr-2">📂</span>
+              <FolderOpen className="w-4 h-4 mr-2" />
               Open
             </button>
             <button 
@@ -127,7 +129,7 @@ export default function ActionsPanel() {
               onClick={exportLevel}
               title="Export Level"
             >
-              <span className="text-sm mr-2">⬇️</span>
+              <Download className="w-4 h-4 mr-2" />
               Export
             </button>
           </div>

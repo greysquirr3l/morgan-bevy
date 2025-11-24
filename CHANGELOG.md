@@ -9,6 +9,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Professional Resizable UI System**
+  - Dynamic panel resizing with drag handles for left sidebar (hierarchy), right sidebar (inspector), and bottom panel (assets)
+  - Custom useResizablePanels hook managing resize state with mouse event handlers and collision boundaries
+  - Min/max width constraints (200px-600px) and height constraints (150px-400px) for optimal UX
+  - Visual resize indicators with hover effects and proper cursor styling
+  - Smooth drag interactions with real-time panel size updates
+  - Collapsible bottom panel with toggle button and minimal collapsed state
+
+- **Advanced Camera Control System**
+  - Custom useCameraControls hook for Three.js camera manipulation within React context
+  - Reset view functionality returning camera to default position (10, 10, 10) with smooth transitions
+  - Focus selection feature calculating bounding boxes of selected objects for optimal framing
+  - Camera control buttons integrated into viewport toolbar with professional styling
+  - Proper Three.js OrbitControls integration with programmatic camera positioning
+  - forwardRef pattern in Viewport3D component enabling external camera control access
+
 - **Complete Assets Panel System**
   - Collapsible asset browser with local and external folder support
   - Drag-and-drop integration from assets panel to 3D viewport
@@ -66,7 +82,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Grid snapping controls with configurable increments (0.1, 0.5, 1.0, 2.0)
   - Camera mode switcher with orbit/fly/top-down options
   - Viewport coordinate display and status indicators
-  - Consistent dark theme styling across all panels
+  - **Industry-Standard Resizable Panels** - Drag handles with visual feedback and constraint boundaries
+  - **Professional Camera Navigation** - Reset and focus controls matching Unity/Blender workflows
+  - Consistent dark theme styling across all panels with enhanced interaction states
 
 - **Three.js Integration Optimizations**
   - Proper mesh naming for transform gizmo attachment

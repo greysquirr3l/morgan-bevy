@@ -1,15 +1,52 @@
 import { Canvas } from '@react-three/fiber'
 import { OrbitControls, Grid, Stats } from '@react-three/drei'
 import Scene from './Scene'
-import BoxSelection from './BoxSelection'
+import BoxSelection, { BoxSelectionOverlay } from './BoxSelection'
 import TransformGizmos from '../TransformGizmos'
+import TransformConstraintIndicator from '../TransformConstraintIndicator'
 import { useEditorStore } from '@/store/editorStore'
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts'
-import { useCallback, useState } from 'react'
+import { useBoxSelection } from '@/hooks/useBoxSelection'
+import { useCameraControls } from '@/hooks/useCameraControls'
+import { useCallback, useState, forwardRef, useImperativeHandle } from 'react'
 
-export default function Viewport3D() {
-  const { showGrid, showStats, cameraMode, transformMode, addObject } = useEditorStore()
+// Camera controls interface
+export interface CameraControlsRef {
+  resetView: () => void
+  focusSelection: () => void
+}
+
+// Camera controls component that provides the controls within Canvas context
+function CameraControls({ cameraControlsRef }: { cameraControlsRef: React.RefObject<CameraControlsRef> }) {
+  const { controlsRef, resetView, focusSelection } = useCameraControls()
+  const { cameraMode } = useEditorStore()
+  
+  useImperativeHandle(cameraControlsRef, () => ({
+    resetView,
+    focusSelection
+  }), [resetView, focusSelection])
+
+  if (cameraMode !== 'orbit') return null
+
+  return (
+    <OrbitControls
+      ref={controlsRef}
+      enablePan={true}
+      enableZoom={true}
+      enableRotate={true}
+      panSpeed={1}
+      zoomSpeed={1}
+      rotateSpeed={1}
+      minDistance={1}
+      maxDistance={100}
+    />
+  )
+}
+
+export default forwardRef<CameraControlsRef>((props, ref) => {
+  const { showGrid, showStats, transformMode, addObject } = useEditorStore()
   const [isDragOver, setIsDragOver] = useState(false)
+  const { boxState } = useBoxSelection()
   useKeyboardShortcuts()
 
   // Handle drag and drop from assets panel
@@ -85,6 +122,17 @@ export default function Viewport3D() {
           </div>
         </div>
       )}
+
+      {/* Box Selection Overlay */}
+      <BoxSelectionOverlay 
+        isSelecting={boxState.isSelecting}
+        startPoint={boxState.startPoint}
+        currentPoint={boxState.currentPoint}
+      />
+
+      {/* Transform Constraint Indicator */}
+      <TransformConstraintIndicator />
+
       <Canvas
         camera={{ 
           position: [10, 10, 10], 
@@ -118,18 +166,8 @@ export default function Viewport3D() {
         <pointLight position={[-10, -10, -10]} intensity={0.2} />
 
         {/* Camera Controls */}
-        {cameraMode === 'orbit' && (
-          <OrbitControls
-            enablePan={true}
-            enableZoom={true}
-            enableRotate={true}
-            panSpeed={1}
-            zoomSpeed={1}
-            rotateSpeed={1}
-            minDistance={1}
-            maxDistance={100}
-          />
-        )}
+        {/* Camera Controls */}
+        <CameraControls cameraControlsRef={ref} />
 
         {/* Grid */}
         {showGrid && (
@@ -208,4 +246,4 @@ export default function Viewport3D() {
       </div>
     </div>
   )
-}
+})

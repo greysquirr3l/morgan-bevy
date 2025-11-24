@@ -4,7 +4,7 @@ version = "0.1.0"
 description = "Visual 3D Level Editor & Procedural Generator for Bevy"
 authors = ["Morgan-Bevy Team"]
 license = "MIT"
-repository = "https://github.com/nickcampbell/morgan-bevy"
+repository = "https://github.com/greysquirr3l/morgan-bevy"
 edition = "2021"
 
 # Tauri specific configuration

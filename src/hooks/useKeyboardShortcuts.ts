@@ -1,5 +1,7 @@
 import { useEffect } from 'react'
 import { useEditorStore } from '@/store/editorStore'
+import { copySelectedObjects, pasteFromClipboard } from '@/utils/clipboard'
+import { transformConstraints } from '@/utils/transformConstraints'
 
 export function useKeyboardShortcuts() {
   const { 
@@ -11,7 +13,14 @@ export function useKeyboardShortcuts() {
     setCameraMode,
     transformMode,
     removeObject,
-    duplicateObjects
+    duplicateObjects,
+    undo,
+    redo,
+    canUndo,
+    canRedo,
+    groupObjects,
+    ungroupObject,
+    sceneObjects
   } = useEditorStore()
 
   useEffect(() => {
@@ -42,6 +51,8 @@ export function useKeyboardShortcuts() {
         case 'escape':
           event.preventDefault()
           clearSelection()
+          // Also clear transform constraints
+          transformConstraints.clearConstraint()
           break
         case 'delete':
         case 'backspace':
@@ -68,6 +79,36 @@ export function useKeyboardShortcuts() {
             setCameraMode('top-down')
           }
           break
+        case 'x':
+          if (!event.ctrlKey && !event.metaKey && transformMode !== 'select') {
+            event.preventDefault()
+            if (event.shiftKey) {
+              transformConstraints.setConstraint('yz') // Constrain to YZ plane
+            } else {
+              transformConstraints.setConstraint('x') // X-axis only
+            }
+          }
+          break
+        case 'y':
+          if (!event.ctrlKey && !event.metaKey && transformMode !== 'select') {
+            event.preventDefault()
+            if (event.shiftKey) {
+              transformConstraints.setConstraint('xz') // Constrain to XZ plane
+            } else {
+              transformConstraints.setConstraint('y') // Y-axis only
+            }
+          }
+          break
+        case 'z':
+          if (!event.ctrlKey && !event.metaKey && transformMode !== 'select') {
+            event.preventDefault()
+            if (event.shiftKey) {
+              transformConstraints.setConstraint('xy') // Constrain to XY plane
+            } else {
+              transformConstraints.setConstraint('z') // Z-axis only
+            }
+          }
+          break
       }
 
       // Ctrl/Cmd combinations
@@ -75,8 +116,11 @@ export function useKeyboardShortcuts() {
         switch (event.key.toLowerCase()) {
           case 'a':
             event.preventDefault()
-            // TODO: Select all objects
-            console.log('Select all')
+            // Select all objects
+            const { sceneObjects, setSelectedObjects } = useEditorStore.getState()
+            const allObjectIds = Object.keys(sceneObjects)
+            setSelectedObjects(allObjectIds)
+            console.log('Select all objects:', allObjectIds.length)
             break
           case 'd':
             event.preventDefault()
@@ -84,15 +128,66 @@ export function useKeyboardShortcuts() {
               duplicateObjects(selectedObjects)
             }
             break
+          case 'c':
+            event.preventDefault()
+            if (selectedObjects.length > 0) {
+              copySelectedObjects()
+              console.log('Copied objects to clipboard:', selectedObjects.length)
+            }
+            break
+          case 'v':
+            event.preventDefault()
+            // Paste at origin by default, could be enhanced to paste at cursor/camera position
+            pasteFromClipboard([0, 0, 0]).then(pastedIds => {
+              if (pastedIds.length > 0) {
+                const { setSelectedObjects } = useEditorStore.getState()
+                setSelectedObjects(pastedIds)
+                console.log('Pasted objects from clipboard:', pastedIds.length)
+              }
+            })
+            break
+          case 'g':
+            event.preventDefault()
+            if (event.shiftKey) {
+              // Ctrl+Shift+G: Ungroup
+              if (selectedObjects.length === 1) {
+                const obj = sceneObjects[selectedObjects[0]]
+                if (obj && obj.type === 'group') {
+                  ungroupObject(obj.id)
+                  console.log('Ungrouped objects')
+                }
+              }
+            } else {
+              // Ctrl+G: Group
+              if (selectedObjects.length > 1) {
+                const groupId = groupObjects(selectedObjects)
+                console.log('Grouped objects into:', groupId)
+              }
+            }
+            break
           case 'z':
             event.preventDefault()
-            // TODO: Undo
-            console.log('Undo')
+            if (event.shiftKey) {
+              // Ctrl+Shift+Z or Cmd+Shift+Z for redo
+              if (canRedo()) {
+                redo()
+                console.log('Redo')
+              }
+            } else {
+              // Ctrl+Z or Cmd+Z for undo
+              if (canUndo()) {
+                undo()
+                console.log('Undo')
+              }
+            }
             break
           case 'y':
             event.preventDefault()
-            // TODO: Redo
-            console.log('Redo')
+            // Ctrl+Y or Cmd+Y for redo (alternative)
+            if (canRedo()) {
+              redo()
+              console.log('Redo')
+            }
             break
         }
       }
@@ -100,7 +195,7 @@ export function useKeyboardShortcuts() {
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [selectedObjects, setTransformMode, toggleGrid, toggleStats, setCameraMode, clearSelection])
+  }, [selectedObjects, setTransformMode, toggleGrid, toggleStats, setCameraMode, clearSelection, removeObject, duplicateObjects, undo, redo, canUndo, canRedo, groupObjects, ungroupObject, sceneObjects, transformMode])
 
   return { transformMode }
 }
