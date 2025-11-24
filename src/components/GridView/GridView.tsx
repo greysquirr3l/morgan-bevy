@@ -1,0 +1,505 @@
+import React, { useRef, useEffect, useState, useCallback } from 'react'
+import { invoke } from '@tauri-apps/api/tauri'
+
+interface GridViewProps {
+  className?: string
+}
+
+interface TileDefinition {
+  tile_type: string
+  name: string
+  description: string
+  visual: {
+    icon: string
+    color: string
+    background_color: string | null
+  }
+  mesh: any
+  collision: boolean
+  walkable: boolean
+  tags: string[]
+}
+
+interface Theme {
+  id: string
+  name: string
+  description: string
+  tiles: Record<string, TileDefinition>
+  [key: string]: any
+}
+
+export interface GridViewRef {
+  exportGrid: () => string
+  importGrid: (gridString: string) => void
+  clearGrid: () => void
+}
+
+const GridView = React.forwardRef<GridViewRef, GridViewProps>(({ className = '' }, ref) => {
+  const canvasRef = useRef<HTMLCanvasElement>(null)
+  const [gridData, setGridData] = useState<string[][]>([])
+  const [selectedTheme, setSelectedTheme] = useState<Theme | null>(null)
+  const [availableThemes, setAvailableThemes] = useState<Theme[]>([])
+  const [isDrawing, setIsDrawing] = useState(false)
+  const [selectedTile, setSelectedTile] = useState<string>('floor')
+  const [gridSize, setGridSize] = useState({ width: 48, height: 36 })
+  const [cellSize, setCellSize] = useState(16)
+  const [showGrid, setShowGrid] = useState(true)
+  const [dragStart, setDragStart] = useState<{ x: number; y: number } | null>(null)
+  const [selection, setSelection] = useState<{
+    start: { x: number; y: number }
+    end: { x: number; y: number }
+  } | null>(null)
+  const [editMode, setEditMode] = useState<'paint' | 'select' | 'fill'>('paint')
+  const [copiedData, setCopiedData] = useState<string[][] | null>(null)
+
+  // Initialize grid and load themes
+  useEffect(() => {
+    initializeGrid()
+    loadThemes()
+  }, [gridSize])
+
+  // Initialize empty grid
+  const initializeGrid = () => {
+    const newGrid = Array(gridSize.height)
+      .fill(null)
+      .map(() => Array(gridSize.width).fill('empty'))
+    setGridData(newGrid)
+  }
+
+  // Load available themes from backend
+  const loadThemes = async () => {
+    try {
+      const themes: Theme[] = await invoke('get_available_themes')
+      setAvailableThemes(themes)
+      if (themes.length > 0) {
+        setSelectedTheme(themes[0])
+      }
+    } catch (error) {
+      console.error('Failed to load themes:', error)
+    }
+  }
+
+  // Convert mouse position to grid coordinates
+  const getGridPosition = (event: MouseEvent, canvas: HTMLCanvasElement) => {
+    const rect = canvas.getBoundingClientRect()
+    const x = Math.floor((event.clientX - rect.left) / cellSize)
+    const y = Math.floor((event.clientY - rect.top) / cellSize)
+    return { x: Math.max(0, Math.min(x, gridSize.width - 1)), y: Math.max(0, Math.min(y, gridSize.height - 1)) }
+  }
+
+  // Paint tile at position
+  const paintTile = (x: number, y: number, tileType: string) => {
+    if (x < 0 || x >= gridSize.width || y < 0 || y >= gridSize.height) return
+    
+    setGridData(prev => {
+      const newGrid = [...prev]
+      if (newGrid[y]) {
+        newGrid[y] = [...newGrid[y]]
+        newGrid[y][x] = tileType
+      }
+      return newGrid
+    })
+  }
+
+  // Fill connected area with same tile type
+  const floodFill = (startX: number, startY: number, targetTile: string, replaceTile: string) => {
+    if (targetTile === replaceTile) return
+    
+    const stack = [{ x: startX, y: startY }]
+    const visited = new Set<string>()
+    
+    setGridData(prev => {
+      const newGrid = prev.map(row => [...row])
+      
+      while (stack.length > 0) {
+        const { x, y } = stack.pop()!
+        const key = `${x},${y}`
+        
+        if (visited.has(key) || x < 0 || x >= gridSize.width || y < 0 || y >= gridSize.height) continue
+        if (newGrid[y][x] !== targetTile) continue
+        
+        visited.add(key)
+        newGrid[y][x] = replaceTile
+        
+        // Add adjacent cells
+        stack.push({ x: x + 1, y }, { x: x - 1, y }, { x, y: y + 1 }, { x, y: y - 1 })
+      }
+      
+      return newGrid
+    })
+  }
+
+  // Mouse event handlers
+  const handleMouseDown = (event: React.MouseEvent<HTMLCanvasElement>) => {
+    const canvas = canvasRef.current
+    if (!canvas) return
+
+    const pos = getGridPosition(event.nativeEvent, canvas)
+    setDragStart(pos)
+
+    if (editMode === 'paint') {
+      setIsDrawing(true)
+      paintTile(pos.x, pos.y, selectedTile)
+    } else if (editMode === 'select') {
+      setSelection({ start: pos, end: pos })
+    } else if (editMode === 'fill') {
+      if (gridData[pos.y] && gridData[pos.y][pos.x]) {
+        const targetTile = gridData[pos.y][pos.x]
+        floodFill(pos.x, pos.y, targetTile, selectedTile)
+      }
+    }
+  }
+
+  const handleMouseMove = (event: React.MouseEvent<HTMLCanvasElement>) => {
+    const canvas = canvasRef.current
+    if (!canvas || !dragStart) return
+
+    const pos = getGridPosition(event.nativeEvent, canvas)
+
+    if (editMode === 'paint' && isDrawing) {
+      paintTile(pos.x, pos.y, selectedTile)
+    } else if (editMode === 'select') {
+      setSelection({ start: dragStart, end: pos })
+    }
+  }
+
+  const handleMouseUp = () => {
+    setIsDrawing(false)
+    setDragStart(null)
+  }
+
+  // Keyboard handlers for copy/paste
+  const handleKeyDown = useCallback((event: KeyboardEvent) => {
+    if (!selection) return
+
+    if (event.ctrlKey || event.metaKey) {
+      if (event.key === 'c') {
+        // Copy selection
+        const { start, end } = selection
+        const minX = Math.min(start.x, end.x)
+        const maxX = Math.max(start.x, end.x)
+        const minY = Math.min(start.y, end.y)
+        const maxY = Math.max(start.y, end.y)
+        
+        const copied = []
+        for (let y = minY; y <= maxY; y++) {
+          const row = []
+          for (let x = minX; x <= maxX; x++) {
+            row.push(gridData[y]?.[x] || 'empty')
+          }
+          copied.push(row)
+        }
+        setCopiedData(copied)
+        event.preventDefault()
+      } else if (event.key === 'v' && copiedData) {
+        // Paste at selection start
+        const { start } = selection
+        setGridData(prev => {
+          const newGrid = prev.map(row => [...row])
+          
+          copiedData.forEach((row, dy) => {
+            row.forEach((tile, dx) => {
+              const x = start.x + dx
+              const y = start.y + dy
+              if (x >= 0 && x < gridSize.width && y >= 0 && y < gridSize.height) {
+                newGrid[y][x] = tile
+              }
+            })
+          })
+          
+          return newGrid
+        })
+        event.preventDefault()
+      }
+    }
+
+    if (event.key === 'Delete' || event.key === 'Backspace') {
+      // Delete selection
+      const { start, end } = selection
+      const minX = Math.min(start.x, end.x)
+      const maxX = Math.max(start.x, end.x)
+      const minY = Math.min(start.y, end.y)
+      const maxY = Math.max(start.y, end.y)
+      
+      setGridData(prev => {
+        const newGrid = prev.map(row => [...row])
+        
+        for (let y = minY; y <= maxY; y++) {
+          for (let x = minX; x <= maxX; x++) {
+            if (newGrid[y]) {
+              newGrid[y][x] = 'empty'
+            }
+          }
+        }
+        
+        return newGrid
+      })
+      event.preventDefault()
+    }
+  }, [selection, gridData, copiedData, gridSize])
+
+  useEffect(() => {
+    document.addEventListener('keydown', handleKeyDown)
+    return () => document.removeEventListener('keydown', handleKeyDown)
+  }, [handleKeyDown])
+
+  // Render the grid
+  const renderGrid = useCallback(() => {
+    const canvas = canvasRef.current
+    if (!canvas || !selectedTheme) return
+
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return
+
+    canvas.width = gridSize.width * cellSize
+    canvas.height = gridSize.height * cellSize
+
+    // Clear canvas
+    ctx.fillStyle = '#1a1a1a'
+    ctx.fillRect(0, 0, canvas.width, canvas.height)
+
+    // Draw tiles
+    for (let y = 0; y < gridSize.height; y++) {
+      for (let x = 0; x < gridSize.width; x++) {
+        const tileType = gridData[y]?.[x] || 'empty'
+        const tileDef = selectedTheme.tiles[tileType]
+        
+        if (tileDef) {
+          // Background color
+          if (tileDef.visual.background_color) {
+            ctx.fillStyle = tileDef.visual.background_color
+            ctx.fillRect(x * cellSize, y * cellSize, cellSize, cellSize)
+          }
+          
+          // Draw tile icon
+          ctx.fillStyle = tileDef.visual.color
+          ctx.font = `${Math.floor(cellSize * 0.8)}px monospace`
+          ctx.textAlign = 'center'
+          ctx.textBaseline = 'middle'
+          ctx.fillText(
+            tileDef.visual.icon,
+            x * cellSize + cellSize / 2,
+            y * cellSize + cellSize / 2
+          )
+        }
+      }
+    }
+
+    // Draw grid lines
+    if (showGrid) {
+      ctx.strokeStyle = '#404040'
+      ctx.lineWidth = 1
+      
+      for (let x = 0; x <= gridSize.width; x++) {
+        ctx.beginPath()
+        ctx.moveTo(x * cellSize, 0)
+        ctx.lineTo(x * cellSize, canvas.height)
+        ctx.stroke()
+      }
+      
+      for (let y = 0; y <= gridSize.height; y++) {
+        ctx.beginPath()
+        ctx.moveTo(0, y * cellSize)
+        ctx.lineTo(canvas.width, y * cellSize)
+        ctx.stroke()
+      }
+    }
+
+    // Draw selection
+    if (selection) {
+      const { start, end } = selection
+      const minX = Math.min(start.x, end.x) * cellSize
+      const maxX = (Math.max(start.x, end.x) + 1) * cellSize
+      const minY = Math.min(start.y, end.y) * cellSize
+      const maxY = (Math.max(start.y, end.y) + 1) * cellSize
+      
+      ctx.strokeStyle = '#00ff00'
+      ctx.lineWidth = 2
+      ctx.setLineDash([5, 5])
+      ctx.strokeRect(minX, minY, maxX - minX, maxY - minY)
+      ctx.setLineDash([])
+    }
+  }, [gridData, selectedTheme, gridSize, cellSize, showGrid, selection])
+
+  useEffect(() => {
+    renderGrid()
+  }, [renderGrid])
+
+  // Expose methods via ref
+  React.useImperativeHandle(ref, () => ({
+    exportGrid: () => {
+      if (!selectedTheme) return ''
+      return gridData.map(row => 
+        row.map(tileType => selectedTheme.tiles[tileType]?.visual.icon || ' ').join('')
+      ).join('\n')
+    },
+    importGrid: async (gridString: string) => {
+      if (!selectedTheme) return
+      try {
+        const tileMap: string[][] = await invoke('parse_grid_to_tiles', {
+          themeId: selectedTheme.id,
+          gridString
+        })
+        setGridData(tileMap)
+      } catch (error) {
+        console.error('Failed to import grid:', error)
+      }
+    },
+    clearGrid: () => {
+      initializeGrid()
+      setSelection(null)
+    }
+  }))
+
+  const getTileList = () => {
+    if (!selectedTheme) return []
+    return Object.entries(selectedTheme.tiles).filter(([key]) => key !== 'empty')
+  }
+
+  return (
+    <div className={`flex flex-col h-full ${className}`}>
+      {/* Toolbar */}
+      <div className="bg-editor-panel border-b border-editor-border p-2 flex items-center space-x-4 text-sm">
+        {/* Theme Selection */}
+        <div className="flex items-center space-x-2">
+          <label className="text-editor-textMuted">Theme:</label>
+          <select
+            value={selectedTheme?.id || ''}
+            onChange={(e) => {
+              const theme = availableThemes.find(t => t.id === e.target.value)
+              setSelectedTheme(theme || null)
+            }}
+            className="bg-editor-bg text-editor-text border border-editor-border rounded px-2 py-1"
+          >
+            {availableThemes.map(theme => (
+              <option key={theme.id} value={theme.id}>
+                {theme.name}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {/* Edit Mode */}
+        <div className="flex items-center space-x-2">
+          <label className="text-editor-textMuted">Mode:</label>
+          {['paint', 'select', 'fill'].map(mode => (
+            <button
+              key={mode}
+              onClick={() => setEditMode(mode as any)}
+              className={`px-2 py-1 rounded text-xs ${
+                editMode === mode
+                  ? 'bg-editor-accent text-white'
+                  : 'bg-editor-bg text-editor-text hover:bg-gray-600'
+              }`}
+            >
+              {mode.charAt(0).toUpperCase() + mode.slice(1)}
+            </button>
+          ))}
+        </div>
+
+        {/* Grid Settings */}
+        <div className="flex items-center space-x-2">
+          <label className="text-editor-textMuted">Cell Size:</label>
+          <input
+            type="range"
+            min="12"
+            max="32"
+            value={cellSize}
+            onChange={(e) => setCellSize(Number(e.target.value))}
+            className="w-16"
+          />
+          <span className="text-editor-textMuted w-8">{cellSize}</span>
+        </div>
+
+        {/* Grid Toggle */}
+        <button
+          onClick={() => setShowGrid(!showGrid)}
+          className={`px-2 py-1 rounded text-xs ${
+            showGrid
+              ? 'bg-editor-accent text-white'
+              : 'bg-editor-bg text-editor-text hover:bg-gray-600'
+          }`}
+        >
+          Grid
+        </button>
+
+        {/* Size Settings */}
+        <div className="flex items-center space-x-2">
+          <label className="text-editor-textMuted">Size:</label>
+          <input
+            type="number"
+            value={gridSize.width}
+            onChange={(e) => setGridSize(prev => ({ ...prev, width: Number(e.target.value) }))}
+            className="bg-editor-bg text-editor-text border border-editor-border rounded px-2 py-1 w-16 text-xs"
+            min="10"
+            max="100"
+          />
+          <span className="text-editor-textMuted">×</span>
+          <input
+            type="number"
+            value={gridSize.height}
+            onChange={(e) => setGridSize(prev => ({ ...prev, height: Number(e.target.value) }))}
+            className="bg-editor-bg text-editor-text border border-editor-border rounded px-2 py-1 w-16 text-xs"
+            min="10"
+            max="100"
+          />
+        </div>
+      </div>
+
+      {/* Main Grid Area */}
+      <div className="flex flex-1 overflow-hidden">
+        {/* Tile Palette */}
+        <div className="w-48 bg-editor-panel border-r border-editor-border p-2 overflow-y-auto">
+          <div className="text-sm font-medium text-editor-text mb-2">Tile Palette</div>
+          <div className="space-y-1">
+            {getTileList().map(([tileKey, tileDef]) => (
+              <button
+                key={tileKey}
+                onClick={() => setSelectedTile(tileKey)}
+                className={`w-full text-left px-2 py-1 rounded text-xs flex items-center space-x-2 ${
+                  selectedTile === tileKey
+                    ? 'bg-editor-accent text-white'
+                    : 'bg-editor-bg text-editor-text hover:bg-gray-600'
+                }`}
+                title={tileDef.description}
+              >
+                <span 
+                  className="w-4 h-4 flex items-center justify-center font-mono text-xs"
+                  style={{ color: tileDef.visual.color, backgroundColor: tileDef.visual.background_color || 'transparent' }}
+                >
+                  {tileDef.visual.icon}
+                </span>
+                <span className="truncate">{tileDef.name}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Grid Canvas */}
+        <div className="flex-1 overflow-auto bg-gray-900 relative">
+          <canvas
+            ref={canvasRef}
+            onMouseDown={handleMouseDown}
+            onMouseMove={handleMouseMove}
+            onMouseUp={handleMouseUp}
+            onMouseLeave={handleMouseUp}
+            className="border border-editor-border cursor-crosshair"
+            style={{ imageRendering: 'pixelated' }}
+          />
+          
+          {/* Instructions Overlay */}
+          {selection && (
+            <div className="absolute top-2 left-2 bg-editor-panel/90 border border-editor-border rounded p-2 text-xs text-editor-text">
+              <div>Selection: {Math.abs(selection.end.x - selection.start.x) + 1}×{Math.abs(selection.end.y - selection.start.y) + 1}</div>
+              <div>Ctrl+C: Copy | Ctrl+V: Paste | Del: Clear</div>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+})
+
+GridView.displayName = 'GridView'
+
+export default GridView

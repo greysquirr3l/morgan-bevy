@@ -12,7 +12,10 @@ mod spatial;
 
 use export::{ExportFormat, LevelExporter};
 use generation::bsp::BSPGenerator;
+use generation::wfc::{WFCGenerationParams, WFCGenerator};
 use spatial::{BoundingBox, SpatialIndex};
+
+use generation::themes::{Theme, ThemeLibrary};
 
 // Core data structures for level editing
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -66,6 +69,57 @@ pub struct AppState {
 
 // Tauri Commands
 
+// Theme System Commands
+#[tauri::command]
+async fn get_available_themes() -> Result<Vec<Theme>, String> {
+    info!("Getting available themes");
+    Ok(ThemeLibrary::get_all_themes())
+}
+
+#[tauri::command]
+async fn get_theme_by_id(theme_id: String) -> Result<Theme, String> {
+    info!("Getting theme by ID: {}", theme_id);
+    match ThemeLibrary::get_theme(&theme_id) {
+        Some(theme) => Ok(theme),
+        None => Err(format!("Theme not found: {}", theme_id)),
+    }
+}
+
+#[tauri::command]
+async fn get_theme_legend(theme_id: String) -> Result<String, String> {
+    info!("Getting theme legend for: {}", theme_id);
+    match ThemeLibrary::get_theme(&theme_id) {
+        Some(theme) => Ok(generation::themes::generate_theme_legend(&theme)),
+        None => Err(format!("Theme not found: {}", theme_id)),
+    }
+}
+
+#[tauri::command]
+async fn parse_grid_to_tiles(
+    theme_id: String,
+    grid_string: String,
+) -> Result<Vec<Vec<String>>, String> {
+    info!("Parsing grid string to tiles for theme: {}", theme_id);
+    match ThemeLibrary::get_theme(&theme_id) {
+        Some(theme) => Ok(generation::themes::parse_grid_string(&theme, &grid_string)),
+        None => Err(format!("Theme not found: {}", theme_id)),
+    }
+}
+
+#[tauri::command]
+async fn render_tiles_to_grid(
+    theme_id: String,
+    tile_map: Vec<Vec<String>>,
+) -> Result<String, String> {
+    info!("Rendering tiles to grid string for theme: {}", theme_id);
+    match ThemeLibrary::get_theme(&theme_id) {
+        Some(theme) => Ok(generation::themes::render_grid_string(&theme, &tile_map)),
+        None => Err(format!("Theme not found: {}", theme_id)),
+    }
+}
+
+// Level Generation Commands
+
 #[tauri::command]
 async fn generate_bsp_level(
     params: BSPGenerationParams,
@@ -92,6 +146,37 @@ async fn generate_bsp_level(
         }
         Err(e) => {
             error!("Failed to generate BSP level: {}", e);
+            Err(e.to_string())
+        }
+    }
+}
+
+#[tauri::command]
+async fn generate_wfc_level(
+    params: WFCGenerationParams,
+    state: State<'_, std::sync::Mutex<AppState>>,
+) -> Result<LevelData, String> {
+    info!("Generating WFC level with params: {:?}", params);
+
+    let mut generator = WFCGenerator::new();
+    match generator.generate(params).await {
+        Ok(level_data) => {
+            // Update application state
+            let mut app_state = state.lock().unwrap();
+            app_state.spatial_index.clear();
+            for obj in &level_data.objects {
+                app_state.spatial_index.insert(&obj.id, &obj.transform);
+            }
+            app_state.current_level = Some(level_data.clone());
+
+            info!(
+                "Successfully generated WFC level with {} objects",
+                level_data.objects.len()
+            );
+            Ok(level_data)
+        }
+        Err(e) => {
+            error!("Failed to generate WFC level: {}", e);
             Err(e.to_string())
         }
     }
@@ -213,7 +298,13 @@ fn main() {
     tauri::Builder::default()
         .manage(std::sync::Mutex::new(AppState::default()))
         .invoke_handler(tauri::generate_handler![
+            get_available_themes,
+            get_theme_by_id,
+            get_theme_legend,
+            parse_grid_to_tiles,
+            render_tiles_to_grid,
             generate_bsp_level,
+            generate_wfc_level,
             export_level,
             query_objects_in_bounds,
             update_object_transform,

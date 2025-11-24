@@ -2,7 +2,7 @@ import { useEffect } from 'react'
 import { useEditorStore } from '@/store/editorStore'
 import { copySelectedObjects, clipboard } from '@/utils/clipboard'
 import { transformConstraints } from '@/utils/transformConstraints'
-import { DeleteObjectCommand, DuplicateCommand, PasteCommand, GroupCommand, UngroupCommand } from '@/utils/commands'
+import { DeleteObjectCommand, DuplicateCommand, PasteCommand, GroupCommand, UngroupCommand, SaveCommand, LoadCommand } from '@/utils/commands'
 
 export function useKeyboardShortcuts() {
   const { 
@@ -198,6 +198,99 @@ export function useKeyboardShortcuts() {
             if (canRedo()) {
               redo()
               console.log('Redo')
+            }
+            break
+          case 'n':
+            event.preventDefault()
+            // Ctrl+N: New Scene
+            if (Object.keys(sceneObjects).length > 0) {
+              const confirmClear = window.confirm('Are you sure? This will clear the current scene.')
+              if (confirmClear) {
+                useEditorStore.setState({
+                  sceneObjects: {},
+                  selectedObjects: [],
+                  undoHistory: [],
+                  redoHistory: [],
+                  activeLayer: 'default'
+                })
+                console.log('New scene created')
+              }
+            } else {
+              useEditorStore.setState({
+                sceneObjects: {},
+                selectedObjects: [],
+                undoHistory: [],
+                redoHistory: [],
+                activeLayer: 'default'
+              })
+              console.log('New scene created')
+            }
+            break
+          case 's':
+            event.preventDefault()
+            // Ctrl+S: Save Scene
+            const saveCommand = new SaveCommand()
+            saveCommand.execute()
+            console.log('Scene saved')
+            break
+          case 'o':
+            event.preventDefault()
+            // Ctrl+O: Open/Load Scene
+            const input = document.createElement('input')
+            input.type = 'file'
+            input.accept = '.json,.morgan'
+            input.onchange = (fileEvent) => {
+              const file = (fileEvent.target as HTMLInputElement).files?.[0]
+              if (file) {
+                const reader = new FileReader()
+                reader.onload = (e) => {
+                  try {
+                    const content = e.target?.result as string
+                    const data = JSON.parse(content)
+                    const loadCommand = new LoadCommand(data)
+                    loadCommand.execute()
+                    executeCommand(loadCommand)
+                    console.log('Scene loaded successfully')
+                  } catch (error) {
+                    alert('Error loading file: Invalid format')
+                    console.error('Load error:', error)
+                  }
+                }
+                reader.readAsText(file)
+              }
+            }
+            input.click()
+            break
+          case 'e':
+            if (event.shiftKey) {
+              // Ctrl+Shift+E: Export Scene
+              event.preventDefault()
+              const state = useEditorStore.getState()
+              const exportData = {
+                metadata: {
+                  version: '1.0.0',
+                  editor: 'Morgan-Bevy',
+                  exportedAt: new Date().toISOString(),
+                  objectCount: Object.keys(state.sceneObjects).length,
+                  layerCount: state.layers.length
+                },
+                scene: {
+                  objects: state.sceneObjects,
+                  layers: state.layers,
+                  settings: {
+                    gridSize: state.gridSize,
+                    snapToGrid: state.snapToGrid
+                  }
+                }
+              }
+              const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' })
+              const url = URL.createObjectURL(blob)
+              const a = document.createElement('a')
+              a.href = url
+              a.download = `morgan-scene-${Date.now()}.json`
+              a.click()
+              URL.revokeObjectURL(url)
+              console.log('Scene exported')
             }
             break
         }

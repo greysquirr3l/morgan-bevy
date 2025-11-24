@@ -309,3 +309,117 @@ export class PasteCommand implements Command {
     })
   }
 }
+
+// Save command for persisting scene to localStorage
+export class SaveCommand implements Command {
+  private savedData: any
+  public description: string
+
+  constructor(fileName?: string) {
+    this.description = `Save scene${fileName ? ` as ${fileName}` : ''}`
+  }
+
+  execute(): void {
+    const state = useEditorStore.getState()
+    
+    // Create save data
+    this.savedData = {
+      metadata: {
+        version: '1.0.0',
+        editor: 'Morgan-Bevy',
+        savedAt: new Date().toISOString(),
+        objectCount: Object.keys(state.sceneObjects).length,
+        layerCount: state.layers.length
+      },
+      scene: {
+        objects: state.sceneObjects,
+        layers: state.layers,
+        activeLayer: state.activeLayer,
+        settings: {
+          gridSize: state.gridSize,
+          snapToGrid: state.snapToGrid,
+          transformMode: state.transformMode,
+          coordinateSpace: state.coordinateSpace
+        }
+      }
+    }
+
+    // Save to localStorage
+    localStorage.setItem('morgan-bevy-scene', JSON.stringify(this.savedData))
+    
+    // Also create downloadable backup
+    const blob = new Blob([JSON.stringify(this.savedData, null, 2)], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `morgan-scene-${new Date().toISOString().slice(0, 10)}.json`
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
+  undo(): void {
+    // Cannot undo a save operation
+  }
+}
+
+// Load command for restoring scene from data
+export class LoadCommand implements Command {
+  private previousState: any
+  private newData: any
+  public description: string
+
+  constructor(sceneData: any) {
+    this.newData = sceneData
+    this.description = 'Load scene'
+  }
+
+  execute(): void {
+    const state = useEditorStore.getState()
+    
+    // Store current state for undo
+    this.previousState = {
+      sceneObjects: { ...state.sceneObjects },
+      layers: [...state.layers],
+      activeLayer: state.activeLayer,
+      selectedObjects: [...state.selectedObjects],
+      settings: {
+        gridSize: state.gridSize,
+        snapToGrid: state.snapToGrid,
+        transformMode: state.transformMode,
+        coordinateSpace: state.coordinateSpace
+      }
+    }
+
+    // Load new scene data
+    useEditorStore.setState((state: any) => {
+      if (this.newData.scene) {
+        state.sceneObjects = this.newData.scene.objects || {}
+        state.layers = this.newData.scene.layers || state.layers
+        state.activeLayer = this.newData.scene.activeLayer || 'default'
+        state.selectedObjects = []
+        
+        if (this.newData.scene.settings) {
+          state.gridSize = this.newData.scene.settings.gridSize || state.gridSize
+          state.snapToGrid = this.newData.scene.settings.snapToGrid || false
+          state.transformMode = this.newData.scene.settings.transformMode || 'select'
+          state.coordinateSpace = this.newData.scene.settings.coordinateSpace || 'world'
+        }
+      }
+    })
+  }
+
+  undo(): void {
+    if (this.previousState) {
+      useEditorStore.setState((state: any) => {
+        state.sceneObjects = this.previousState.sceneObjects
+        state.layers = this.previousState.layers
+        state.activeLayer = this.previousState.activeLayer
+        state.selectedObjects = this.previousState.selectedObjects
+        state.gridSize = this.previousState.settings.gridSize
+        state.snapToGrid = this.previousState.settings.snapToGrid
+        state.transformMode = this.previousState.settings.transformMode
+        state.coordinateSpace = this.previousState.settings.coordinateSpace
+      })
+    }
+  }
+}

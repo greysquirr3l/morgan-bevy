@@ -121,7 +121,13 @@ function SceneObject({
 }
 
 export default function Scene() {
-  const { sceneObjects } = useEditorStore()
+  const { sceneObjects, layers } = useEditorStore()
+  
+  // Helper function to check if object should be visible (combines object and layer visibility)
+  const isObjectVisible = (obj: any) => {
+    const layer = layers.find(l => l.id === obj.layerId)
+    return obj.visible && (layer?.visible ?? true)
+  }
   
   return (
     <>
@@ -138,7 +144,7 @@ export default function Scene() {
             position={obj.position}
             rotation={obj.rotation}
             scale={obj.scale}
-            visible={obj.visible}
+            visible={isObjectVisible(obj)}
           />
         ) : null
       ))}

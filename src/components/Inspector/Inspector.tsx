@@ -2,9 +2,10 @@
 import { useEditorStore } from '@/store/editorStore'
 import MaterialEditor from '../MaterialEditor'
 import { Search } from 'lucide-react'
+import { TransformCommand } from '@/utils/commands'
 
 export default function Inspector() {
-  const { selectedObjects, sceneObjects, updateObjectTransform } = useEditorStore()
+  const { selectedObjects, sceneObjects, executeCommand } = useEditorStore()
 
   // Get data for the first selected object (for single selection)
   const primaryObject = selectedObjects.length > 0 ? sceneObjects[selectedObjects[0]] : null
@@ -20,22 +21,30 @@ export default function Inspector() {
     selectedObjects.forEach((objectId: string) => {
       const obj = sceneObjects[objectId]
       if (obj) {
-        if (field === 'position') {
-          const newPos = [...obj.position] as [number, number, number]
-          const axisIndex = axis === 'x' ? 0 : axis === 'y' ? 1 : 2
-          newPos[axisIndex] = value
-          updateObjectTransform(objectId, { position: newPos })
-        } else if (field === 'rotation') {
-          const newRot = [...obj.rotation] as [number, number, number]
-          const axisIndex = axis === 'x' ? 0 : axis === 'y' ? 1 : 2
-          newRot[axisIndex] = value * (Math.PI / 180) // Convert degrees to radians
-          updateObjectTransform(objectId, { rotation: newRot })
-        } else if (field === 'scale') {
-          const newScale = [...obj.scale] as [number, number, number]
-          const axisIndex = axis === 'x' ? 0 : axis === 'y' ? 1 : 2
-          newScale[axisIndex] = value
-          updateObjectTransform(objectId, { scale: newScale })
+        // Capture old transform for undo
+        const oldTransform = {
+          position: [...obj.position] as [number, number, number],
+          rotation: [...obj.rotation] as [number, number, number],
+          scale: [...obj.scale] as [number, number, number]
         }
+
+        let newTransform = { ...oldTransform }
+
+        if (field === 'position') {
+          const axisIndex = axis === 'x' ? 0 : axis === 'y' ? 1 : 2
+          newTransform.position[axisIndex] = value
+        } else if (field === 'rotation') {
+          const axisIndex = axis === 'x' ? 0 : axis === 'y' ? 1 : 2
+          newTransform.rotation[axisIndex] = value * (Math.PI / 180) // Convert degrees to radians
+        } else if (field === 'scale') {
+          const axisIndex = axis === 'x' ? 0 : axis === 'y' ? 1 : 2
+          newTransform.scale[axisIndex] = value
+        }
+
+        // Create and execute command for undo/redo support
+        const command = new TransformCommand(objectId, oldTransform, newTransform)
+        command.execute()
+        executeCommand(command)
       }
     })
   }
@@ -43,9 +52,6 @@ export default function Inspector() {
   if (selectedObjects.length === 0) {
     return (
       <div className="flex flex-col h-full">
-        <div className="p-3 border-b border-editor-border">
-          <h3 className="text-sm font-semibold">Inspector</h3>
-        </div>
         <div className="flex-1 flex items-center justify-center text-editor-textMuted">
           <div className="text-center">
             <Search className="w-8 h-8 mb-2 mx-auto" />
@@ -71,15 +77,14 @@ export default function Inspector() {
 
   return (
     <div className="flex flex-col h-full">
-      {/* Header */}
-      <div className="p-3 border-b border-editor-border">
-        <h3 className="text-sm font-semibold">Inspector</h3>
-        {selectedCount > 1 && (
-          <div className="text-xs text-editor-textMuted mt-1">
+      {/* Object count info */}
+      {selectedCount > 1 && (
+        <div className="p-3 border-b border-editor-border">
+          <div className="text-xs text-editor-textMuted">
             {selectedCount} objects selected
           </div>
-        )}
-      </div>
+        </div>
+      )}
 
       {/* Content */}
       <div className="flex-1 overflow-auto custom-scrollbar p-3 space-y-4">

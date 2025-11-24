@@ -14,6 +14,9 @@ export interface EditorState {
   snapToGrid: boolean
   gridSize: number
   
+  // Viewport
+  viewportMode: '3d' | '2d'
+  
   // Camera
   cameraMode: 'orbit' | 'fly' | 'top-down'
   
@@ -63,6 +66,7 @@ export interface EditorState {
   toggleGridSnap: () => void
   toggleSnapToGrid: () => void
   setGridSize: (size: number) => void
+  setViewportMode: (mode: '3d' | '2d') => void
   setCameraMode: (mode: 'orbit' | 'fly' | 'top-down') => void
   toggleGrid: () => void
   toggleStats: () => void
@@ -94,6 +98,7 @@ export const useEditorStore = create<EditorState>()(
     gridSnapEnabled: true,
     snapToGrid: true,
     gridSize: 1.0,
+    viewportMode: '3d' as '3d' | '2d',
     cameraMode: 'orbit',
     activeLayer: 'default',
     layers: [
@@ -178,7 +183,12 @@ export const useEditorStore = create<EditorState>()(
         state.gridSize = size
       }),
       
-    setCameraMode: (mode: 'orbit' | 'fly' | 'top-down') =>
+      setViewportMode: (mode: '3d' | '2d') =>
+      set((state) => {
+        state.viewportMode = mode
+      }),
+      
+      setCameraMode: (mode: 'orbit' | 'fly' | 'top-down') =>
       set((state) => {
         state.cameraMode = mode
       }),

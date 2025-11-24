@@ -3,7 +3,11 @@ import { useState } from 'react'
 import { useEditorStore } from '@/store/editorStore'
 import { Eye, EyeOff, Lock, Unlock, X, ChevronRight } from 'lucide-react'
 
-export default function Layers() {
+interface LayersProps {
+  hideHeader?: boolean
+}
+
+export default function Layers({ hideHeader = false }: LayersProps) {
   const { layers, activeLayer, sceneObjects, setSelectedObjects } = useEditorStore()
   const [isExpanded, setIsExpanded] = useState(true)
   const [editingLayerId, setEditingLayerId] = useState<string | null>(null)
@@ -90,13 +94,15 @@ export default function Layers() {
   if (!isExpanded) {
     return (
       <div className="border-b border-editor-border">
-        <div
-          className="p-2 bg-editor-panel flex items-center cursor-pointer hover:bg-editor-border"
-          onClick={() => setIsExpanded(true)}
-        >
-          <ChevronRight className="w-3 h-3" />
-          <span className="ml-2 text-sm font-medium">Layers ({layers.length})</span>
-        </div>
+        {!hideHeader && (
+          <div
+            className="p-2 bg-editor-panel flex items-center cursor-pointer hover:bg-editor-border"
+            onClick={() => setIsExpanded(true)}
+          >
+            <ChevronRight className="w-3 h-3" />
+            <span className="ml-2 text-sm font-medium">Layers ({layers.length})</span>
+          </div>
+        )}
       </div>
     )
   }
@@ -104,25 +110,40 @@ export default function Layers() {
   return (
     <div className="border-b border-editor-border">
       {/* Header */}
-      <div
-        className="p-2 bg-editor-panel flex items-center justify-between cursor-pointer hover:bg-editor-border"
-        onClick={() => setIsExpanded(false)}
-      >
-        <div className="flex items-center">
-          <span className="text-xs">▼</span>
-          <span className="ml-2 text-sm font-medium">Layers ({layers.length})</span>
-        </div>
-        <button
-          onClick={(e) => {
-            e.stopPropagation()
-            addLayer()
-          }}
-          className="text-xs hover:text-editor-accent"
-          title="Add Layer"
+      {!hideHeader && (
+        <div
+          className="p-2 bg-editor-panel flex items-center justify-between cursor-pointer hover:bg-editor-border"
+          onClick={() => setIsExpanded(false)}
         >
-          ＋
-        </button>
-      </div>
+          <div className="flex items-center">
+            <span className="text-xs">▼</span>
+            <span className="ml-2 text-sm font-medium">Layers ({layers.length})</span>
+          </div>
+          <button
+            onClick={(e) => {
+              e.stopPropagation()
+              addLayer()
+            }}
+            className="text-xs hover:text-editor-accent"
+            title="Add Layer"
+          >
+            ＋
+          </button>
+        </div>
+      )}
+
+      {/* Add Layer button when header is hidden */}
+      {hideHeader && (
+        <div className="p-2 flex justify-end">
+          <button
+            onClick={addLayer}
+            className="text-xs hover:text-editor-accent"
+            title="Add Layer"
+          >
+            ＋ Add Layer
+          </button>
+        </div>
+      )}
 
       {/* Layers List */}
       <div className="max-h-32 overflow-y-auto custom-scrollbar">

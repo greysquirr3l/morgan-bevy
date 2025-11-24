@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Updated
 
+- **UI/UX Improvements (November 24, 2025)**
+  - **Thinner Resize Bars** - Reduced resize handle width from 2px to 1px for more subtle interface
+  - **Improved Resize Handles** - Enhanced visual feedback with better hover states and z-index layering
+  - **Fixed Duplicate Headers** - Eliminated duplicate "Inspector" and "Layers" headers between CollapsiblePanel and component titles
+  - **Enhanced Panel Management** - Added hideHeader prop to Layers component for cleaner integration with CollapsiblePanel
+  - **Refined Visual Design** - More professional appearance with consistent styling across all panels
+  - **Fixed Resize Functionality** - Resolved 3-column layout locking issue preventing proper panel resizing
+  - **Improved Layout Calculations** - Better center width calculation with proper handle width accounting
+  - **Window Resize Support** - Added window resize listener to maintain proper layout proportions
+
 - **Dependency Management (November 24, 2025)**
   - Updated all npm packages to newer, compatible versions
   - **Zustand** - Upgraded from 4.5.7 to 5.0.8 to resolve major type inference issues
