@@ -1,0 +1,79 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Custom CSS for 3D editor */
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background: #1e1e1e;
+  color: #cccccc;
+  overflow: hidden;
+}
+
+/* Disable text selection on UI elements */
+.no-select {
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
+}
+
+/* Custom scrollbars for editor panels */
+.custom-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: #3e3e42 #252526;
+}
+
+.custom-scrollbar::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: #252526;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: #3e3e42;
+  border-radius: 4px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #4e4e52;
+}
+
+/* Panel resize handles */
+.resize-handle {
+  background: #3e3e42;
+  transition: background-color 0.2s;
+}
+
+.resize-handle:hover {
+  background: #007acc;
+}
+
+/* 3D viewport specific styles */
+.viewport-3d {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
+.viewport-3d canvas {
+  display: block;
+  outline: none;
+}
+
+/* Transform gizmo helpers */
+.transform-gizmo {
+  pointer-events: none;
+}
+
+.transform-gizmo.active {
+  pointer-events: all;
+}

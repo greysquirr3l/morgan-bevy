@@ -1,0 +1,49 @@
+[package]
+name = "morgan-bevy"
+version = "0.1.0"
+description = "Visual 3D Level Editor & Procedural Generator for Bevy"
+authors = ["Morgan-Bevy Team"]
+license = "MIT"
+repository = "https://github.com/nickcampbell/morgan-bevy"
+edition = "2021"
+
+# Tauri specific configuration
+[build-dependencies]
+tauri-build = { version = "1.5", features = [] }
+
+[dependencies]
+tauri = { version = "1.5", features = [ "dialog-open", "fs-read-file", "dialog-message", "fs-exists", "dialog-confirm", "dialog-ask", "shell-open", "fs-write-file", "fs-read-dir", "fs-create-dir", "dialog-save"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+tokio = { version = "1", features = ["full"] }
+rand = "0.8"
+uuid = { version = "1.0", features = ["v4", "serde"] }
+
+# BSP and procedural generation
+petgraph = "0.6"
+noise = "0.8"
+
+# Spatial data structures for 3D operations
+kdtree = "0.6"
+rstar = "0.11"
+
+# File I/O and serialization
+ron = "0.8"
+toml = "0.8"
+csv = "1.2"
+
+# Error handling
+anyhow = "1.0"
+thiserror = "1.0"
+
+# Logging
+log = "0.4"
+env_logger = "0.10"
+
+# Performance and math
+nalgebra = "0.32"
+glam = "0.24"
+
+[features]
+default = ["custom-protocol"]
+custom-protocol = ["tauri/custom-protocol"]
