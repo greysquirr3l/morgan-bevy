@@ -1,7 +1,7 @@
 // Layer management component for scene organization
-import React, { useState } from 'react'
+import { useState } from 'react'
 import { useEditorStore } from '@/store/editorStore'
-import { Eye, EyeOff, Lock, Unlock, X, ChevronRight, ChevronDown } from 'lucide-react'
+import { Eye, EyeOff, Lock, Unlock, X, ChevronRight } from 'lucide-react'
 
 export default function Layers() {
   const { layers, activeLayer, sceneObjects, setSelectedObjects } = useEditorStore()
@@ -9,8 +9,8 @@ export default function Layers() {
   const [editingLayerId, setEditingLayerId] = useState<string | null>(null)
 
   const toggleLayerVisibility = (layerId: string) => {
-    useEditorStore.setState((state) => {
-      const layer = state.layers.find(l => l.id === layerId)
+    useEditorStore.setState((state: any) => {
+      const layer = state.layers.find((l: any) => l.id === layerId)
       if (layer) {
         layer.visible = !layer.visible
       }
@@ -19,7 +19,7 @@ export default function Layers() {
 
   const toggleLayerLock = (layerId: string) => {
     useEditorStore.setState((state) => {
-      const layer = state.layers.find(l => l.id === layerId)
+      const layer = state.layers.find((l: any) => l.id === layerId)
       if (layer) {
         layer.locked = !layer.locked
       }
@@ -28,8 +28,8 @@ export default function Layers() {
 
   const selectLayerObjects = (layerId: string) => {
     const layerObjectIds = Object.values(sceneObjects)
-      .filter(obj => obj.layerId === layerId)
-      .map(obj => obj.id)
+      .filter((obj: any) => obj.layerId === layerId)
+      .map((obj: any) => obj.id)
     setSelectedObjects(layerObjectIds)
   }
 
@@ -40,8 +40,8 @@ export default function Layers() {
   }
 
   const renameLayer = (layerId: string, newName: string) => {
-    useEditorStore.setState((state) => {
-      const layer = state.layers.find(l => l.id === layerId)
+    useEditorStore.setState((state: any) => {
+      const layer = state.layers.find((l: any) => l.id === layerId)
       if (layer) {
         layer.name = newName
       }
@@ -51,7 +51,7 @@ export default function Layers() {
 
   const addLayer = () => {
     const newLayerId = `layer_${Date.now()}`
-    useEditorStore.setState((state) => {
+    useEditorStore.setState((state: any) => {
       state.layers.push({
         id: newLayerId,
         name: 'New Layer',
@@ -68,14 +68,14 @@ export default function Layers() {
     if (layers.length <= 1 || layerId === 'default') return
 
     // Move objects to default layer
-    useEditorStore.setState((state) => {
-      Object.values(state.sceneObjects).forEach(obj => {
+    useEditorStore.setState((state: any) => {
+      Object.values(state.sceneObjects).forEach((obj: any) => {
         if (obj.layerId === layerId) {
           obj.layerId = 'default'
         }
       })
       // Remove the layer
-      state.layers = state.layers.filter(l => l.id !== layerId)
+      state.layers = state.layers.filter((l: any) => l.id !== layerId)
       // Set active layer to default if we deleted the active layer
       if (state.activeLayer === layerId) {
         state.activeLayer = 'default'
@@ -84,7 +84,7 @@ export default function Layers() {
   }
 
   const getLayerObjectCount = (layerId: string): number => {
-    return Object.values(sceneObjects).filter(obj => obj.layerId === layerId).length
+    return Object.values(sceneObjects).filter((obj: any) => obj.layerId === layerId).length
   }
 
   if (!isExpanded) {
@@ -126,7 +126,7 @@ export default function Layers() {
 
       {/* Layers List */}
       <div className="max-h-32 overflow-y-auto custom-scrollbar">
-        {layers.map((layer) => (
+        {layers.map((layer: any) => (
           <div
             key={layer.id}
             className={`flex items-center px-2 py-1 text-xs hover:bg-editor-border ${

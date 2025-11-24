@@ -1,5 +1,4 @@
 import { useState, useCallback, useEffect } from 'react'
-import { useEditorStore } from '@/store/editorStore'
 import { invoke } from '@tauri-apps/api/tauri'
 import {
   Target,

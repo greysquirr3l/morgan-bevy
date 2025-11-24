@@ -1,4 +1,3 @@
-import React from 'react'
 import { useTransformConstraints } from '@/utils/transformConstraints'
 import { Lock } from 'lucide-react'
 

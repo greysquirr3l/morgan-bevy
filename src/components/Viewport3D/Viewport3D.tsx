@@ -17,7 +17,7 @@ export interface CameraControlsRef {
 }
 
 // Camera controls component that provides the controls within Canvas context
-function CameraControls({ cameraControlsRef }: { cameraControlsRef: React.RefObject<CameraControlsRef> }) {
+function CameraControls({ cameraControlsRef }: { cameraControlsRef: React.ForwardedRef<CameraControlsRef> }) {
   const { controlsRef, resetView, focusSelection } = useCameraControls()
   const { cameraMode } = useEditorStore()
   
@@ -43,8 +43,8 @@ function CameraControls({ cameraControlsRef }: { cameraControlsRef: React.RefObj
   )
 }
 
-export default forwardRef<CameraControlsRef>((props, ref) => {
-  const { showGrid, showStats, transformMode, addObject } = useEditorStore()
+export default forwardRef<CameraControlsRef, object>((_props, ref) => {
+  const { showGrid, showStats, transformMode, addObject, cameraMode } = useEditorStore()
   const [isDragOver, setIsDragOver] = useState(false)
   const { boxState } = useBoxSelection()
   useKeyboardShortcuts()

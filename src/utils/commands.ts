@@ -108,11 +108,9 @@ export class DeleteObjectCommand implements Command {
 
   undo(): void {
     // Manually restore object to store using setState
-    const { sceneObjects } = useEditorStore.getState()
     useEditorStore.setState((state) => {
       // Use immer's draft to safely modify the state
       state.sceneObjects[this.objectData.id] = this.objectData
-      return state
     })
   }
 }
@@ -217,8 +215,8 @@ export class UngroupCommand implements Command {
 
   constructor(groupId: string) {
     this.groupId = groupId
-    const { sceneObjects } = useEditorStore.getState()
-    this.groupData = { ...sceneObjects[groupId] }
+    const state = useEditorStore.getState()
+    this.groupData = { ...state.sceneObjects[groupId] }
     this.childIds = this.groupData.children || []
     this.description = `Ungroup ${this.childIds.length} object(s)`
   }

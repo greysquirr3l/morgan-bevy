@@ -58,7 +58,7 @@ export function useKeyboardShortcuts() {
         case 'backspace':
           if (selectedObjects.length > 0) {
             event.preventDefault()
-            selectedObjects.forEach(id => removeObject(id))
+            selectedObjects.forEach((id: string) => removeObject(id))
           }
           break
         case '1':
@@ -117,7 +117,7 @@ export function useKeyboardShortcuts() {
           case 'a':
             event.preventDefault()
             // Select all objects
-            const { sceneObjects, setSelectedObjects } = useEditorStore.getState()
+            const { setSelectedObjects } = useEditorStore.getState()
             const allObjectIds = Object.keys(sceneObjects)
             setSelectedObjects(allObjectIds)
             console.log('Select all objects:', allObjectIds.length)

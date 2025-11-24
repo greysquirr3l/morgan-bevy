@@ -87,7 +87,7 @@ class ClipboardManager {
         return []
       }
 
-      const { addObject, sceneObjects } = useEditorStore.getState()
+      // Note: Using useEditorStore.setState directly instead of destructured addObject
       const pastedIds: string[] = []
 
       // Calculate offset for pasted objects
@@ -114,7 +114,7 @@ class ClipboardManager {
         ]
 
         // Use store's setState to directly add the object
-        useEditorStore.setState((state) => {
+        useEditorStore.setState((state: any) => {
           state.sceneObjects[newId] = {
             ...objData,
             id: newId,

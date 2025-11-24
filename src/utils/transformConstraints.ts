@@ -228,7 +228,7 @@ export function useTransformConstraints() {
 }
 
 // Add to keyboard shortcuts
-export function addConstraintKeyHandlers(): void {
+export function addConstraintKeyHandlers(): () => void {
   const handleKeyDown = (event: KeyboardEvent) => {
     const key = event.shiftKey ? `shift+${event.key.toLowerCase()}` : event.key.toLowerCase()
     if (transformConstraints.handleKeyInput(key, true)) {

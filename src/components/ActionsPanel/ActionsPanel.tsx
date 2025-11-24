@@ -1,4 +1,3 @@
-import React from 'react'
 import { useEditorStore } from '@/store/editorStore'
 import { Plus, Save, FolderOpen, Download, Triangle } from 'lucide-react'
 
@@ -22,7 +21,7 @@ export default function ActionsPanel() {
 
   const deleteSelected = () => {
     if (selectedObjects.length > 0) {
-      selectedObjects.forEach(id => removeObject(id))
+      selectedObjects.forEach((id: string) => removeObject(id))
     }
   }
 

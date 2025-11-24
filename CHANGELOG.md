@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased] - 2025-11-24
 
+### Updated
+
+- **Dependency Management (November 24, 2025)**
+  - Updated all npm packages to newer, compatible versions
+  - **Zustand** - Upgraded from 4.5.7 to 5.0.8 to resolve major type inference issues
+  - Fixed type inference problem where `selectedObjects` was incorrectly inferred as `never[]` instead of `string[]`
+  - Added explicit type annotations throughout codebase for strict TypeScript compliance
+  - Resolved 25+ TypeScript compilation errors systematically
+  - Achieved successful production build with `npm run build`
+
+### Fixed
+
+- **TypeScript Compilation Issues (November 24, 2025)**
+  - Resolved Zustand type inference problems with array initialization and object properties
+  - Added explicit parameter types to all callback functions and store methods
+  - Fixed array spread type issues in TransformGizmos with explicit tuple typing
+  - Corrected state parameter types in setState callbacks across all components
+  - Eliminated unused variable warnings in command pattern implementations
+  - Fixed parameter type annotations in component callbacks (ActionsPanel, Inspector, Scene, etc.)
+
 ### Added
 
 - **Professional Resizable UI System**
@@ -199,7 +219,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Initial Project Structure
 
-```
+```text
 morgan-bevy/
 ├── src/                          # React frontend
 │   ├── components/               # UI components
@@ -249,8 +269,8 @@ morgan-bevy/
 
 ## Project Information
 
-**Repository**: [Morgan-Bevy](https://github.com/user/morgan-bevy)  
-**License**: MIT  
+**Repository**: [Morgan-Bevy](https://github.com/greysquirr3l/morgan-bevy)  
+**License**: MIT OR Apache-2.0  
 **Author**: Nick Campbell  
 **Started**: November 23, 2025  
 

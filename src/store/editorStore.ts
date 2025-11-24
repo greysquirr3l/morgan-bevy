@@ -86,9 +86,9 @@ export interface EditorState {
 
 export const useEditorStore = create<EditorState>()(
   immer((set) => ({
-    // Initial state
-    selectedObjects: [],
-    hoveredObject: null,
+      // Initial state  
+      selectedObjects: [] as string[],
+      hoveredObject: null as string | null,
     transformMode: 'select',
     coordinateSpace: 'world',
     gridSnapEnabled: true,
@@ -103,70 +103,42 @@ export const useEditorStore = create<EditorState>()(
       { id: 'doors', name: 'Doors', visible: true, locked: false, color: '#f59e0b' },
       { id: 'lights', name: 'Lights', visible: true, locked: false, color: '#fbbf24' },
     ],
-    sceneObjects: {
-      // Demo objects for testing
-      'demo_cube_1': {
-        id: 'demo_cube_1',
-        name: 'Demo Cube',
-        type: 'mesh' as const,
-        position: [2, 1, 0] as [number, number, number],
-        rotation: [0, 0, 0] as [number, number, number],
-        scale: [1, 1, 1] as [number, number, number],
-        visible: true,
-        locked: false,
-        layerId: 'default',
-        children: [],
-        meshType: 'cube' as const
-      },
-      'demo_sphere_1': {
-        id: 'demo_sphere_1',
-        name: 'Demo Sphere',
-        type: 'mesh' as const,
-        position: [-2, 1, 0] as [number, number, number],
-        rotation: [0, 0, 0] as [number, number, number],
-        scale: [1, 1, 1] as [number, number, number],
-        visible: true,
-        locked: false,
-        layerId: 'default',
-        children: [],
-        meshType: 'sphere' as const
-      },
-      'demo_pyramid_1': {
-        id: 'demo_pyramid_1',
-        name: 'Demo Pyramid',
-        type: 'mesh' as const,
-        position: [0, 1, 2] as [number, number, number],
-        rotation: [0, 0, 0] as [number, number, number],
-        scale: [1, 1, 1] as [number, number, number],
-        visible: true,
-        locked: false,
-        layerId: 'default',
-        children: [],
-        meshType: 'pyramid' as const
-      }
-    },
+    sceneObjects: {} as Record<string, {
+      id: string
+      name: string
+      type: 'mesh' | 'light' | 'group'
+      position: [number, number, number]
+      rotation: [number, number, number]
+      scale: [number, number, number]
+      visible: boolean
+      locked: boolean
+      layerId: string
+      parentId?: string
+      children: string[]
+      meshType?: 'cube' | 'sphere' | 'pyramid'
+    }>,
     showGrid: true,
     showStats: false,
     
     // Undo/Redo system
-    undoHistory: [],
-    redoHistory: [],
+    undoHistory: [] as Command[],
+    redoHistory: [] as Command[],
     maxHistorySize: 50,
     
     // Actions
-    setSelectedObjects: (ids) =>
+    setSelectedObjects: (ids: string[]) =>
       set((state) => {
         state.selectedObjects = ids
       }),
       
-    addToSelection: (id) =>
+    addToSelection: (id: string) =>
       set((state) => {
         if (!state.selectedObjects.includes(id)) {
           state.selectedObjects.push(id)
         }
       }),
       
-    removeFromSelection: (id) =>
+    removeFromSelection: (id: string) =>
       set((state) => {
         state.selectedObjects = state.selectedObjects.filter(objId => objId !== id)
       }),
@@ -176,12 +148,12 @@ export const useEditorStore = create<EditorState>()(
         state.selectedObjects = []
       }),
       
-    setHoveredObject: (id) =>
+    setHoveredObject: (id: string | null) =>
       set((state) => {
         state.hoveredObject = id
       }),
       
-    setTransformMode: (mode) =>
+    setTransformMode: (mode: 'select' | 'translate' | 'rotate' | 'scale') =>
       set((state) => {
         state.transformMode = mode
       }),
@@ -201,12 +173,12 @@ export const useEditorStore = create<EditorState>()(
         state.snapToGrid = !state.snapToGrid
       }),
       
-    setGridSize: (size) =>
+    setGridSize: (size: number) =>
       set((state) => {
         state.gridSize = size
       }),
       
-    setCameraMode: (mode) =>
+    setCameraMode: (mode: 'orbit' | 'fly' | 'top-down') =>
       set((state) => {
         state.cameraMode = mode
       }),
@@ -222,7 +194,7 @@ export const useEditorStore = create<EditorState>()(
       }),
     
     // Object management
-    addObject: (type, position = [0, 0, 0]) => {
+    addObject: (type: 'cube' | 'sphere' | 'pyramid', position = [0, 0, 0] as [number, number, number]) => {
       const id = `${type}_${Date.now()}`
       set((state) => {
         state.sceneObjects[id] = {
@@ -242,13 +214,13 @@ export const useEditorStore = create<EditorState>()(
       return id
     },
     
-    removeObject: (id) =>
+    removeObject: (id: string) =>
       set((state) => {
         delete state.sceneObjects[id]
         state.selectedObjects = state.selectedObjects.filter(objId => objId !== id)
       }),
     
-    duplicateObjects: (ids) => {
+    duplicateObjects: (ids: string[]) => {
       const newIds: string[] = []
       set((state) => {
         ids.forEach(id => {
@@ -272,7 +244,7 @@ export const useEditorStore = create<EditorState>()(
       return newIds
     },
     
-    updateObjectTransform: (id, transform) =>
+    updateObjectTransform: (id: string, transform: Partial<{ position: [number, number, number], rotation: [number, number, number], scale: [number, number, number] }>) =>
       set((state) => {
         if (state.sceneObjects[id]) {
           if (transform.position) {
@@ -287,7 +259,7 @@ export const useEditorStore = create<EditorState>()(
         }
       }),
     
-    groupObjects: (ids) => {
+    groupObjects: (ids: string[]) => {
       const groupId = `group_${Date.now()}`
       set((state) => {
         // Calculate center position of selected objects
@@ -332,7 +304,7 @@ export const useEditorStore = create<EditorState>()(
       return groupId
     },
 
-    ungroupObject: (groupId) =>
+    ungroupObject: (groupId: string) =>
       set((state) => {
         const group = state.sceneObjects[groupId]
         if (group && group.type === 'group') {
@@ -352,7 +324,7 @@ export const useEditorStore = create<EditorState>()(
       }),
     
     // Undo/Redo system implementation
-    executeCommand: (command) =>
+    executeCommand: (command: Command) =>
       set((state) => {
         // Note: Command should already be executed by the caller
         // This just adds it to history
@@ -387,12 +359,12 @@ export const useEditorStore = create<EditorState>()(
         }
       }),
     
-    canUndo: () => {
+    canUndo: (): boolean => {
       const state = useEditorStore.getState()
       return state.undoHistory.length > 0
     },
     
-    canRedo: () => {
+    canRedo: (): boolean => {
       const state = useEditorStore.getState()
       return state.redoHistory.length > 0
     },

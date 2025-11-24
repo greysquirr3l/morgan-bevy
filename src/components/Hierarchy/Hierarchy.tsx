@@ -121,7 +121,7 @@ export default function Hierarchy() {
   }
 
   // Filter objects based on search term
-  const filteredObjects = Object.values(sceneObjects).filter(obj =>
+  const filteredObjects = Object.values(sceneObjects).filter((obj: any) =>
     obj.name.toLowerCase().includes(searchTerm.toLowerCase())
   )
 

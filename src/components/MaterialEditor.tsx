@@ -1,5 +1,5 @@
 // Material editor component for PBR material properties
-import React, { useState } from 'react'
+import { useState } from 'react'
 import { Palette, Folder, X, Copy, Save, ChevronRight } from 'lucide-react'
 
 interface MaterialEditorProps {
@@ -23,15 +23,6 @@ export default function MaterialEditor({ selectedObjects, onMaterialChange }: Ma
     const newMaterial = { ...material, [property]: value }
     setMaterial(newMaterial)
     onMaterialChange?.(newMaterial)
-  }
-
-  const hexToRgb = (hex: string) => {
-    const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex)
-    return result ? {
-      r: parseInt(result[1], 16) / 255,
-      g: parseInt(result[2], 16) / 255,
-      b: parseInt(result[3], 16) / 255
-    } : null
   }
 
   if (selectedObjects.length === 0) {

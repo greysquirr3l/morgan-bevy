@@ -3,7 +3,6 @@ import { TransformControls } from '@react-three/drei'
 import { useThree } from '@react-three/fiber'
 import { useEditorStore } from '@/store/editorStore'
 import { TransformCommand } from '@/utils/commands'
-import * as THREE from 'three'
 
 export default function TransformGizmos() {
   const { scene } = useThree()
@@ -38,9 +37,9 @@ export default function TransformGizmos() {
       const currentObject = sceneObjects[selectedObjectId]
       if (currentObject) {
         initialTransformRef.current = {
-          position: [...currentObject.position],
-          rotation: [...currentObject.rotation],
-          scale: [...currentObject.scale]
+          position: [...currentObject.position] as [number, number, number],
+          rotation: [...currentObject.rotation] as [number, number, number],
+          scale: [...currentObject.scale] as [number, number, number]
         }
       }
     }

@@ -53,7 +53,7 @@ function SceneObject({
     if (e.shiftKey || e.ctrlKey || e.metaKey) {
       // Additive selection
       if (isSelected) {
-        setSelectedObjects(selectedObjects.filter(objId => objId !== id))
+        setSelectedObjects(selectedObjects.filter((objId: string) => objId !== id))
       } else {
         addToSelection(id)
       }
@@ -121,7 +121,7 @@ function SceneObject({
 }
 
 export default function Scene() {
-  const { selectedObjects, sceneObjects } = useEditorStore()
+  const { sceneObjects } = useEditorStore()
   
   return (
     <>
@@ -129,7 +129,7 @@ export default function Scene() {
       <Ground />
       
       {/* Scene objects from store */}
-      {Object.values(sceneObjects).map(obj => (
+      {Object.values(sceneObjects).map((obj: any) => (
         obj.type === 'mesh' && obj.meshType ? (
           <SceneObject
             key={obj.id}

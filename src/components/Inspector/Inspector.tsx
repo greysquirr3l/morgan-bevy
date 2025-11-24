@@ -1,11 +1,10 @@
-import { useState, useEffect } from 'react'
+
 import { useEditorStore } from '@/store/editorStore'
 import MaterialEditor from '../MaterialEditor'
 import { Search } from 'lucide-react'
 
 export default function Inspector() {
   const { selectedObjects, sceneObjects, updateObjectTransform } = useEditorStore()
-  const [editingName, setEditingName] = useState<string | null>(null)
 
   // Get data for the first selected object (for single selection)
   const primaryObject = selectedObjects.length > 0 ? sceneObjects[selectedObjects[0]] : null
@@ -18,10 +17,9 @@ export default function Inspector() {
     if (!primaryObject) return
 
     // For multi-selection, apply to all selected objects
-    selectedObjects.forEach(objectId => {
+    selectedObjects.forEach((objectId: string) => {
       const obj = sceneObjects[objectId]
       if (obj) {
-        const newTransform = { ...obj }
         if (field === 'position') {
           const newPos = [...obj.position] as [number, number, number]
           const axisIndex = axis === 'x' ? 0 : axis === 'y' ? 1 : 2
@@ -93,7 +91,7 @@ export default function Inspector() {
             onChange={(e) => {
               if (selectedCount === 1 && primaryObject) {
                 // Update object name directly in store
-                useEditorStore.setState((state) => {
+                useEditorStore.setState((state: any) => {
                   state.sceneObjects[primaryObject.id].name = e.target.value
                 })
               }

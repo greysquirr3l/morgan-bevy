@@ -1,11 +1,11 @@
-import { useRef } from 'react'
+import { useRef, RefObject } from 'react'
 import { useThree } from '@react-three/fiber'
 import { OrbitControls as OrbitControlsImpl } from 'three-stdlib'
 import * as THREE from 'three'
 import { useEditorStore } from '@/store/editorStore'
 
 export const useCameraControls = () => {
-  const controlsRef = useRef<OrbitControlsImpl>()
+  const controlsRef: RefObject<OrbitControlsImpl> = useRef<OrbitControlsImpl>(null)
   const { camera } = useThree()
   const { selectedObjects, sceneObjects } = useEditorStore()
 
@@ -26,7 +26,7 @@ export const useCameraControls = () => {
     const box = new THREE.Box3()
     const sphere = new THREE.Sphere()
 
-    selectedObjects.forEach(id => {
+    selectedObjects.forEach((id: string) => {
       const obj = sceneObjects[id]
       if (obj) {
         const center = new THREE.Vector3(...obj.position)
