@@ -10,6 +10,7 @@ mod export;
 mod generation;
 mod spatial;
 
+use assets::AssetDatabaseState;
 use export::{ExportFormat, LevelExporter};
 use generation::bsp::BSPGenerator;
 use generation::wfc::{WFCGenerationParams, WFCGenerator};
@@ -417,30 +418,57 @@ fn main() {
     info!("Starting Morgan-Bevy Level Editor");
 
     tauri::Builder::default()
+        .plugin(tauri_plugin_fs::init())
+        .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_shell::init())
         .manage(std::sync::Mutex::new(AppState::default()))
+        .manage(AssetDatabaseState::new())
         .invoke_handler(tauri::generate_handler![
+            // Theme System
             get_available_themes,
             get_theme_by_id,
             get_theme_legend,
             parse_grid_to_tiles,
             render_tiles_to_grid,
+            // Level Generation
             generate_bsp_level,
             generate_wfc_level,
+            // Export System
             export_level,
             export_level_simple,
+            // Project Management
             save_project,
             load_project,
+            // Spatial Queries
             query_objects_in_bounds,
             update_object_transform,
             get_current_level,
             save_level_to_file,
             load_level_from_file,
+            // Legacy Asset System
             assets::scan_assets,
             assets::browse_assets_folder,
-            assets::scan_assets_folder
+            assets::scan_assets_folder,
+            // New Asset Database System
+            assets::initialize_asset_database,
+            assets::scan_assets_database,
+            assets::search_assets_database,
+            assets::get_asset_database_stats,
+            assets::get_asset_collections
         ])
-        .setup(|_app| {
+        .setup(|app| {
             info!("Tauri application setup complete");
+
+            // Initialize asset database in the background
+            let handle = app.handle().clone();
+            tauri::async_runtime::spawn(async move {
+                if let Err(e) = assets::initialize_asset_database(handle).await {
+                    error!("Failed to initialize asset database: {}", e);
+                } else {
+                    info!("Asset database initialized successfully");
+                }
+            });
+
             Ok(())
         })
         .run(tauri::generate_context!())

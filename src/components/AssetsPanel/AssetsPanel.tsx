@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect } from 'react'
-import { invoke } from '@tauri-apps/api/tauri'
+import { invoke } from '@tauri-apps/api/core'
 import {
   Target,
   Image,
@@ -38,7 +38,7 @@ export default function AssetsPanel() {
       setError(null)
       
       // Check if we're running in Tauri context
-      if (typeof window === 'undefined' || !window.__TAURI__) {
+      if (typeof window === 'undefined' || !(window as any).__TAURI__) {
         throw new Error('Not running in Tauri context')
       }
       
@@ -85,7 +85,7 @@ export default function AssetsPanel() {
       setError(null)
       
       // Check if we're running in Tauri context
-      if (typeof window === 'undefined' || !window.__TAURI__) {
+      if (typeof window === 'undefined' || !(window as any).__TAURI__) {
         throw new Error('Folder browsing only available in Tauri desktop app')
       }
       

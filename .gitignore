@@ -33,6 +33,11 @@ dist-ssr
 # Tauri
 /src-tauri/Cargo.lock
 
+# Assets - Third-party content
+Assets/TopDownEngine/
+Assets/Kenney/
+Assets/KenneyPremium/
+
 # Documentation & Implementation Notes
 IMPLEMENTATION_SUMMARY.md
 

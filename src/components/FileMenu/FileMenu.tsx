@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Save, FolderOpen, FileText, Download } from 'lucide-react'
 import { useEditorStore } from '@/store/editorStore'
 import { SaveCommand, LoadCommand } from '@/utils/commands'
-import { invoke } from '@tauri-apps/api/tauri'
+import { invoke } from '@tauri-apps/api/core'
 
 interface FileMenuProps {
   isOpen: boolean

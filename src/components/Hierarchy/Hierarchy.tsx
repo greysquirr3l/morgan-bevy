@@ -14,7 +14,11 @@ import {
   Unlock 
 } from 'lucide-react'
 
-export default function Hierarchy() {
+interface HierarchyProps {
+  hideHeader?: boolean
+}
+
+export default function Hierarchy({ hideHeader = false }: HierarchyProps) {
   const { 
     selectedObjects, 
     sceneObjects, 
@@ -172,11 +176,15 @@ export default function Hierarchy() {
 
   return (
     <div className="flex flex-col h-full">
-      {/* Header */}
+      {/* Header - only show if not hiding header */}
+      {!hideHeader && (
+        <div className="p-3 border-b border-editor-border">
+          <h3 className="text-lg font-medium">Hierarchy</h3>
+        </div>
+      )}
+      
+      {/* Search and info */}
       <div className="p-3 border-b border-editor-border">
-        <h3 className="text-sm font-semibold mb-2">Hierarchy</h3>
-        
-        {/* Search */}
         <input
           type="text"
           placeholder="Search objects..."
@@ -184,18 +192,19 @@ export default function Hierarchy() {
           onChange={(e) => setSearchTerm(e.target.value)}
           className="w-full px-2 py-1 text-xs bg-editor-bg border border-editor-border rounded focus:outline-none focus:border-editor-accent"
         />
-        
-        {/* Filter buttons */}
-        <div className="flex space-x-1 mt-2">
-          <button className="px-2 py-1 text-xs bg-editor-bg border border-editor-border rounded hover:bg-editor-border">
-            All
-          </button>
-          <button className="px-2 py-1 text-xs bg-editor-bg border border-editor-border rounded hover:bg-editor-border">
-            Visible
-          </button>
-          <button className="px-2 py-1 text-xs bg-editor-bg border border-editor-border rounded hover:bg-editor-border">
-            Selected
-          </button>
+        <div className="flex justify-between items-center mt-2 text-sm text-editor-textMuted">
+          <div className="flex items-center space-x-3">
+            <div className="flex items-center space-x-1">
+              <Package className="w-4 h-4" />
+              <span>{Object.keys(sceneObjects).length}</span>
+            </div>
+            {selectedObjects.length > 0 && (
+              <div className="flex items-center space-x-1">
+                <Box className="w-4 h-4" />
+                <span>{selectedObjects.length}</span>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
@@ -208,13 +217,6 @@ export default function Hierarchy() {
         ) : (
           filteredObjects.map(obj => renderTreeItem(obj))
         )}
-      </div>
-
-      {/* Footer */}
-      <div className="p-2 border-t border-editor-border">
-        <div className="text-xs text-editor-textMuted">
-          {selectedObjects.length} selected • {Object.keys(sceneObjects).length} total objects
-        </div>
       </div>
     </div>
   )

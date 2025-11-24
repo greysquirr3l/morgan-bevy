@@ -1,6 +1,6 @@
 [package]
 name = "morgan-bevy"
-version = "0.1.0"
+version = "0.3.5"
 description = "Visual 3D Level Editor & Procedural Generator for Bevy"
 authors = ["Nick Campbell <s0ma@protonmail.com>"]
 license = "MIT OR Apache-2.0"
@@ -9,10 +9,14 @@ edition = "2021"
 
 # Tauri specific configuration
 [build-dependencies]
-tauri-build = { version = "1.5", features = [] }
+tauri-build = { version = "2.5.2", features = [] }
 
 [dependencies]
-tauri = { version = "1.5", features = [ "dialog-open", "fs-read-file", "dialog-message", "fs-exists", "dialog-confirm", "dialog-ask", "shell-open", "fs-write-file", "fs-read-dir", "fs-create-dir", "dialog-save"] }
+tauri = { version = "2.9", features = [] }
+tauri-plugin-fs = "2"
+tauri-plugin-dialog = "2"
+tauri-plugin-shell = "2"
+tauri-plugin-sql = { version = "2.3.1", features = ["sqlite"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 tokio = { version = "1", features = ["full"] }
@@ -20,8 +24,11 @@ rand = "0.8"
 uuid = { version = "1.0", features = ["v4", "serde"] }
 
 # Asset management
-rfd = "0.10"
+rfd = "0.14"
 md5 = "0.7"
+rusqlite = { version = "0.32.1", features = ["bundled", "chrono"] }
+sha2 = "0.10"  # For asset fingerprinting
+rayon = "1.8"  # For parallel asset scanning
 
 # BSP and procedural generation
 petgraph = "0.6"
@@ -53,6 +60,7 @@ glam = "0.24"
 
 [dev-dependencies]
 tokio-test = "0.4"
+tempfile = "3.8"
 
 [features]
 default = ["custom-protocol"]

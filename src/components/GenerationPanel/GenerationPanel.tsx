@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Play, Shuffle, Download } from 'lucide-react'
-import { invoke } from '@tauri-apps/api/tauri'
+import { invoke } from '@tauri-apps/api/core'
 import { useEditorStore } from '@/store/editorStore'
 import { CreateObjectCommand } from '@/utils/commands'
 

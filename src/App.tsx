@@ -9,7 +9,7 @@ import FileMenu from '@/components/FileMenu/FileMenu'
 import PrefabManager from '@/components/PrefabManager/PrefabManager'
 import GenerationPanel from '@/components/GenerationPanel/GenerationPanel'
 import { ActionsPanel } from '@/components/ActionsPanel'
-import { AssetsPanel } from '@/components/AssetsPanel'
+import AssetBrowser from '@/components/AssetBrowser'
 import CollapsiblePanel from '@/components/CollapsiblePanel'
 import { useEditorStore } from '@/store/editorStore'
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts'
@@ -90,41 +90,41 @@ function useViewportSync() {
   useEffect(() => {
     if (!isInitializedRef.current) {
       isInitializedRef.current = true
-      debugLogger.log('VIEWPORT_SYNC_INIT', 'useViewportSync hook initialized', {
-        initialViewportMode: viewportMode
-      })
+      // debugLogger.log('VIEWPORT_SYNC_INIT', 'useViewportSync hook initialized', {
+      //   initialViewportMode: viewportMode
+      // })
     }
   }, [])  // Empty dependency array to run only once
 
   // Sync grid to 3D scene (when switching from 2D to 3D)
   const syncGridToScene = useCallback(() => {
-    debugLogger.log('SYNC_GRID_TO_SCENE', 'Starting grid to scene sync')
+    // debugLogger.log('SYNC_GRID_TO_SCENE', 'Starting grid to scene sync')
     
     // Get fresh data from store to avoid stale closure issues
     const { selectedTheme, gridData, removeObject, addObjectDirect, sceneObjects } = useEditorStore.getState()
     
     if (!selectedTheme || !gridData || gridData.length === 0) {
-      debugLogger.log('SYNC_GRID_TO_SCENE', 'Sync aborted - missing data', {
-        hasSelectedTheme: !!selectedTheme,
-        hasGridData: !!gridData,
-        gridDataLength: gridData?.length || 0
-      })
+      // debugLogger.log('SYNC_GRID_TO_SCENE', 'Sync aborted - missing data', {
+      //   hasSelectedTheme: !!selectedTheme,
+      //   hasGridData: !!gridData,
+      //   gridDataLength: gridData?.length || 0
+      // })
       return
     }
     
-    debugLogger.log('SYNC_GRID_TO_SCENE', 'Got editor store state', {
-      sceneObjectsCount: Object.keys(sceneObjects).length
-    })
+    // debugLogger.log('SYNC_GRID_TO_SCENE', 'Got editor store state', {
+    //   sceneObjectsCount: Object.keys(sceneObjects).length
+    // })
     
     // Remove all grid-generated objects
     const objectsToRemove = Object.entries(sceneObjects).filter(([objectId, obj]: [string, any]) => 
       obj.metadata?.fromGrid || objectId.startsWith('tile_')
     )
     
-    debugLogger.log('SYNC_GRID_TO_SCENE', 'Found objects to remove', {
-      objectsToRemoveCount: objectsToRemove.length,
-      objectIds: objectsToRemove.map(([id]) => id)
-    })
+    // debugLogger.log('SYNC_GRID_TO_SCENE', 'Found objects to remove', {
+    //   objectsToRemoveCount: objectsToRemove.length,
+    //   objectIds: objectsToRemove.map(([id]) => id)
+    // })
     
     objectsToRemove.forEach(([objectId]) => {
       removeObject(objectId)
@@ -184,24 +184,24 @@ function useViewportSync() {
       })
     })
     
-    debugLogger.log('SYNC_GRID_TO_SCENE', 'Sync completed', {
-      objectsCreated,
-      removedObjects: objectsToRemove.length
-    })
+    // debugLogger.log('SYNC_GRID_TO_SCENE', 'Sync completed', {
+    //   objectsCreated,
+    //   removedObjects: objectsToRemove.length
+    // })
   }, [])  // CRITICAL FIX: Remove dependencies to prevent re-creation during sync operations
 
   // Sync 3D scene objects back to 2D grid (when switching from 3D to 2D)
   const sync3DToGrid = useCallback(() => {
-    debugLogger.log('SYNC_3D_TO_GRID', 'Starting 3D to grid sync')
+    // debugLogger.log('SYNC_3D_TO_GRID', 'Starting 3D to grid sync')
     
     const { sceneObjects, setGridData } = useEditorStore.getState()
-    debugLogger.log('SYNC_3D_TO_GRID', 'Got editor store state', {
-      sceneObjectsCount: Object.keys(sceneObjects || {}).length
-    })
+    // debugLogger.log('SYNC_3D_TO_GRID', 'Got editor store state', {
+    //   sceneObjectsCount: Object.keys(sceneObjects || {}).length
+    // })
     
     // Only sync if we have valid scene data
     if (!sceneObjects || Object.keys(sceneObjects).length === 0) {
-      debugLogger.log('SYNC_3D_TO_GRID', 'No scene objects, creating empty grid')
+      // debugLogger.log('SYNC_3D_TO_GRID', 'No scene objects, creating empty grid')
       // If no scene objects, create empty grid (don't load backup if user chose fresh start)
       const emptyGrid = Array(36).fill(null).map(() => Array(48).fill('empty'))
       setGridData(emptyGrid)
@@ -217,12 +217,12 @@ function useViewportSync() {
       obj.metadata?.gridPosition && obj.metadata?.tileType
     )
     
-    debugLogger.log('SYNC_3D_TO_GRID', 'Found grid objects to convert', {
-      totalSceneObjects: Object.keys(sceneObjects).length,
-      gridObjectsCount: gridObjects.length
-    })
+    // debugLogger.log('SYNC_3D_TO_GRID', 'Found grid objects to convert', {
+    //   totalSceneObjects: Object.keys(sceneObjects).length,
+    //   gridObjectsCount: gridObjects.length
+    // })
     
-    gridObjects.forEach(([objectId, obj]: [string, any]) => {
+    gridObjects.forEach(([, obj]: [string, any]) => {
       const { x, y } = obj.metadata.gridPosition
       const tileType = obj.metadata.tileType
       
@@ -230,17 +230,17 @@ function useViewportSync() {
         newGrid[y][x] = tileType
         tilesConverted++
       } else {
-        debugLogger.logError('SYNC_3D_TO_GRID', `Invalid grid position for object ${objectId}`, {
-          gridPosition: { x, y },
-          tileType
-        })
+        // debugLogger.logError('SYNC_3D_TO_GRID', `Invalid grid position for object ${objectId}`, {
+        //   gridPosition: { x, y },
+        //   tileType
+        // })
       }
     })
     
-    debugLogger.log('SYNC_3D_TO_GRID', 'Sync completed', {
-      tilesConverted,
-      gridObjectsProcessed: gridObjects.length
-    })
+    // debugLogger.log('SYNC_3D_TO_GRID', 'Sync completed', {
+    //   tilesConverted,
+    //   gridObjectsProcessed: gridObjects.length
+    // })
     
     setGridData(newGrid)
   }, []) // No dependencies needed, [])  // No dependencies needed as it uses getState()
@@ -255,28 +255,28 @@ function useViewportSync() {
     const effectId = Math.random().toString(36).substr(2, 9)
     const now = Date.now()
     
-    debugLogger.log('VIEWPORT_EFFECT', `Effect ${effectId} triggered`, {
-      prevMode,
-      currentMode: viewportMode,
-      syncing: isSyncingRef.current,
-      timeSinceLastEffect: now - lastEffectTimeRef.current
-    })
+    // debugLogger.log('VIEWPORT_EFFECT', `Effect ${effectId} triggered`, {
+    //   prevMode,
+    //   currentMode: viewportMode,
+    //   syncing: isSyncingRef.current,
+    //   timeSinceLastEffect: now - lastEffectTimeRef.current
+    // })
     
     // CRITICAL: Prevent React StrictMode double effects and rapid triggers
     if (now - lastEffectTimeRef.current < 100) {
-      debugLogger.log('VIEWPORT_EFFECT', `Effect ${effectId} skipped - too soon after last effect (StrictMode protection)`)
+      // debugLogger.log('VIEWPORT_EFFECT', `Effect ${effectId} skipped - too soon after last effect (StrictMode protection)`)
       return
     }
     
     // Prevent infinite loops during sync operations
     if (isSyncingRef.current) {
-      debugLogger.log('VIEWPORT_EFFECT', `Effect ${effectId} skipped - already syncing`)
+      // debugLogger.log('VIEWPORT_EFFECT', `Effect ${effectId} skipped - already syncing`)
       prevViewportModeRef.current = viewportMode
       return
     }
     
     if (prevMode !== null && prevMode !== viewportMode) {
-      debugLogger.log('VIEWPORT_EFFECT', `Effect ${effectId} mode change: ${prevMode} -> ${viewportMode}`)
+      // debugLogger.log('VIEWPORT_EFFECT', `Effect ${effectId} mode change: ${prevMode} -> ${viewportMode}`)
       
       // Set syncing flag to prevent loops
       isSyncingRef.current = true
@@ -287,24 +287,24 @@ function useViewportSync() {
         useEditorStore.getState().saveToLocalStorage()
         
         if (prevMode === '2d' && viewportMode === '3d') {
-          debugLogger.log('VIEWPORT_EFFECT', `Effect ${effectId} performing 2D -> 3D sync`)
+          // debugLogger.log('VIEWPORT_EFFECT', `Effect ${effectId} performing 2D -> 3D sync`)
           syncGridToScene()
           isSyncingRef.current = false
-          debugLogger.log('VIEWPORT_EFFECT', `Effect ${effectId} 2D -> 3D sync complete`)
+          // debugLogger.log('VIEWPORT_EFFECT', `Effect ${effectId} 2D -> 3D sync complete`)
         } else if (prevMode === '3d' && viewportMode === '2d') {
-          debugLogger.log('VIEWPORT_EFFECT', `Effect ${effectId} performing 3D -> 2D sync`)
+          // debugLogger.log('VIEWPORT_EFFECT', `Effect ${effectId} performing 3D -> 2D sync`)
           sync3DToGrid()
           // Save synced grid data
           useEditorStore.getState().debouncedAutoSave()
           isSyncingRef.current = false
-          debugLogger.log('VIEWPORT_EFFECT', `Effect ${effectId} 3D -> 2D sync complete`)
+          // debugLogger.log('VIEWPORT_EFFECT', `Effect ${effectId} 3D -> 2D sync complete`)
         } else {
           isSyncingRef.current = false
-          debugLogger.log('VIEWPORT_EFFECT', `Effect ${effectId} no sync needed`)
+          // debugLogger.log('VIEWPORT_EFFECT', `Effect ${effectId} no sync needed`)
         }
       } catch (error) {
         isSyncingRef.current = false
-        debugLogger.logError('VIEWPORT_EFFECT', `Effect ${effectId} sync failed`, error)
+        // debugLogger.logError('VIEWPORT_EFFECT', `Effect ${effectId} sync failed`, error)
       }
     } else {
       debugLogger.log('VIEWPORT_EFFECT', `Effect ${effectId} no mode change, updating ref`)
@@ -322,6 +322,8 @@ function App() {
   const [fileMenuPosition, setFileMenuPosition] = useState({ x: 0, y: 0 })
   const [showRecoveryDialog, setShowRecoveryDialog] = useState(false)
   const [showSaveIndicator, setShowSaveIndicator] = useState(false)
+  const [activeMenu, setActiveMenu] = useState<string | null>(null)
+  const [menuPosition, setMenuPosition] = useState({ x: 0, y: 0 })
   const lastViewportChangeRef = useRef(0)
 
   const { 
@@ -341,7 +343,14 @@ function App() {
     redoHistory,
     loadFromLocalStorage,
     clearLocalStorage,
-    saveToLocalStorage
+    clearScene,
+    saveToLocalStorage,
+    sceneObjects,
+    selectedObjects,
+    setSelectedObjects,
+    clearSelection,
+    removeObject,
+    duplicateObject
   } = useEditorStore()
 
   // Debounced viewport mode setter
@@ -388,6 +397,128 @@ function App() {
     setShowSaveIndicator(true)
     setTimeout(() => setShowSaveIndicator(false), 2000)
     setFileMenuOpen(false)
+  }
+
+  const handleMenuClick = (menu: string, event: React.MouseEvent) => {
+    if (menu === 'File') {
+      handleFileMenuClick(event)
+      return
+    }
+    
+    setMenuPosition({ x: event.clientX, y: event.clientY + 10 })
+    setActiveMenu(menu)
+  }
+
+  const closeMenus = () => {
+    setActiveMenu(null)
+    setFileMenuOpen(false)
+  }
+
+  // Menu action handlers
+  const handleEditAction = (action: string) => {
+    switch (action) {
+      case 'undo':
+        undo()
+        break
+      case 'redo':
+        redo()
+        break
+      case 'select-all':
+        const allObjectIds = Object.keys(sceneObjects)
+        setSelectedObjects(allObjectIds)
+        break
+      case 'deselect-all':
+        clearSelection()
+        break
+      case 'delete':
+        selectedObjects.forEach(id => removeObject(id))
+        break
+      case 'duplicate':
+        selectedObjects.forEach(id => duplicateObject(id))
+        break
+    }
+    closeMenus()
+  }
+
+  const handleViewAction = (action: string) => {
+    switch (action) {
+      case 'show-left-panel':
+        if (!panels.leftVisible) toggleLeftPanel()
+        break
+      case 'show-right-panel':
+        if (!panels.rightVisible) toggleRightPanel()
+        break
+      case 'hide-left-panel':
+        if (panels.leftVisible) toggleLeftPanel()
+        break
+      case 'hide-right-panel':
+        if (panels.rightVisible) toggleRightPanel()
+        break
+      case 'toggle-grid':
+        // Focus the viewport and toggle grid
+        document.querySelector('.viewport-container')?.focus()
+        break
+      case 'reset-camera':
+        cameraControlsRef.current?.resetView()
+        break
+      case 'focus-selection':
+        cameraControlsRef.current?.focusSelection()
+        break
+      case 'switch-3d':
+        debouncedSetViewportMode('3d')
+        break
+      case 'switch-2d':
+        debouncedSetViewportMode('2d')
+        break
+    }
+    closeMenus()
+  }
+
+  const handleGenerateAction = (action: string) => {
+    // Focus the Generation Panel
+    const generationPanel = document.querySelector('[data-panel="generation"]')
+    if (generationPanel) {
+      generationPanel.scrollIntoView({ behavior: 'smooth' })
+    }
+    closeMenus()
+  }
+
+  const handleToolsAction = (action: string) => {
+    switch (action) {
+      case 'transform-select':
+        setTransformMode('select')
+        break
+      case 'transform-move':
+        setTransformMode('translate')
+        break
+      case 'transform-rotate':
+        setTransformMode('rotate')
+        break
+      case 'transform-scale':
+        setTransformMode('scale')
+        break
+      case 'toggle-snap':
+        toggleSnapToGrid()
+        break
+      case 'grid-size':
+        // Focus grid size selector in toolbar
+        const gridSelect = document.querySelector('select[title="Grid Size"]') as HTMLSelectElement
+        gridSelect?.focus()
+        break
+    }
+    closeMenus()
+  }
+
+  const handleHelpAction = (action: string) => {
+    switch (action) {
+      case 'keyboard-shortcuts':
+        alert(`Keyboard Shortcuts:\n\nTransforms:\nW - Move Tool\nE - Rotate Tool\nR - Scale Tool\nQ - Select Tool\n\nEdit:\nCtrl+Z - Undo\nCtrl+Y - Redo\nDel - Delete Selected\nCtrl+D - Duplicate\n\nView:\n1 - Switch to 3D\n2 - Switch to 2D\nF - Focus Selection\nHome - Reset Camera`)
+        break
+      case 'about':
+        alert('Morgan-Bevy 3D Level Editor\n\nA hybrid Rust/TypeScript 3D level editor for Bevy game development that combines procedural generation with professional manual editing capabilities.')
+        break
+    }
+    closeMenus()
   }
 
   useEffect(() => {
@@ -444,16 +575,41 @@ function App() {
         <div className="text-sm font-semibold">Morgan-Bevy</div>
         <div className="flex space-x-4 text-sm">
           <span 
-            className="hover:text-editor-accent cursor-pointer" 
-            onClick={handleFileMenuClick}
+            className={`hover:text-editor-accent cursor-pointer px-2 py-1 rounded ${activeMenu === 'File' || fileMenuOpen ? 'bg-editor-accent text-white' : ''}`}
+            onClick={(e) => handleMenuClick('File', e)}
           >
             File
           </span>
-          <span className="hover:text-editor-accent cursor-pointer">Edit</span>
-          <span className="hover:text-editor-accent cursor-pointer">View</span>
-          <span className="hover:text-editor-accent cursor-pointer">Generate</span>
-          <span className="hover:text-editor-accent cursor-pointer">Tools</span>
-          <span className="hover:text-editor-accent cursor-pointer">Help</span>
+          <span 
+            className={`hover:text-editor-accent cursor-pointer px-2 py-1 rounded ${activeMenu === 'Edit' ? 'bg-editor-accent text-white' : ''}`}
+            onClick={(e) => handleMenuClick('Edit', e)}
+          >
+            Edit
+          </span>
+          <span 
+            className={`hover:text-editor-accent cursor-pointer px-2 py-1 rounded ${activeMenu === 'View' ? 'bg-editor-accent text-white' : ''}`}
+            onClick={(e) => handleMenuClick('View', e)}
+          >
+            View
+          </span>
+          <span 
+            className={`hover:text-editor-accent cursor-pointer px-2 py-1 rounded ${activeMenu === 'Generate' ? 'bg-editor-accent text-white' : ''}`}
+            onClick={(e) => handleMenuClick('Generate', e)}
+          >
+            Generate
+          </span>
+          <span 
+            className={`hover:text-editor-accent cursor-pointer px-2 py-1 rounded ${activeMenu === 'Tools' ? 'bg-editor-accent text-white' : ''}`}
+            onClick={(e) => handleMenuClick('Tools', e)}
+          >
+            Tools
+          </span>
+          <span 
+            className={`hover:text-editor-accent cursor-pointer px-2 py-1 rounded ${activeMenu === 'Help' ? 'bg-editor-accent text-white' : ''}`}
+            onClick={(e) => handleMenuClick('Help', e)}
+          >
+            Help
+          </span>
         </div>
       </div>
 
@@ -650,7 +806,7 @@ function App() {
                   <ActionsPanel />
                 </CollapsiblePanel>
                 <CollapsiblePanel title="Assets" enableScrollbarlessScrolling={true}>
-                  <AssetsPanel />
+                  <AssetBrowser hideHeader={true} />
                 </CollapsiblePanel>
                 <CollapsiblePanel title="Prefabs" enableScrollbarlessScrolling={true}>
                   <PrefabManager />
@@ -659,7 +815,7 @@ function App() {
                   <Layers hideHeader={true} />
                 </CollapsiblePanel>
                 <CollapsiblePanel title="Hierarchy" enableScrollbarlessScrolling={true}>
-                  <Hierarchy />
+                  <Hierarchy hideHeader={true} />
                 </CollapsiblePanel>
               </div>
             </div>
@@ -775,7 +931,9 @@ function App() {
                   <Inspector />
                 </CollapsiblePanel>
                 <CollapsiblePanel title="Procedural Generation" maxHeight="250px" enableScrollbarlessScrolling={true}>
-                  <GenerationPanel />
+                  <div data-panel="generation">
+                    <GenerationPanel />
+                  </div>
                 </CollapsiblePanel>
               </div>
             </div>
@@ -792,6 +950,83 @@ function App() {
         position={fileMenuPosition}
         onManualSave={handleManualSave}
       />
+
+      {/* Other Menu Dropdowns */}
+      {activeMenu && (
+        <div 
+          className="fixed inset-0 z-40" 
+          onClick={closeMenus}
+        >
+          <div 
+            className="absolute bg-editor-panel border border-editor-border rounded shadow-lg min-w-48 z-50"
+            style={{ left: menuPosition.x, top: menuPosition.y }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {activeMenu === 'Edit' && (
+              <div className="py-1">
+                <button className={`w-full text-left px-4 py-2 text-sm hover:bg-editor-hover ${!canUndo() ? 'text-gray-500' : ''}`} 
+                  disabled={!canUndo()} onClick={() => handleEditAction('undo')}>Undo</button>
+                <button className={`w-full text-left px-4 py-2 text-sm hover:bg-editor-hover ${!canRedo() ? 'text-gray-500' : ''}`}
+                  disabled={!canRedo()} onClick={() => handleEditAction('redo')}>Redo</button>
+                <div className="border-t border-editor-border my-1"></div>
+                <button className="w-full text-left px-4 py-2 text-sm hover:bg-editor-hover" onClick={() => handleEditAction('select-all')}>Select All</button>
+                <button className="w-full text-left px-4 py-2 text-sm hover:bg-editor-hover" onClick={() => handleEditAction('deselect-all')}>Deselect All</button>
+                <div className="border-t border-editor-border my-1"></div>
+                <button className={`w-full text-left px-4 py-2 text-sm hover:bg-editor-hover ${selectedObjects.length === 0 ? 'text-gray-500' : ''}`}
+                  disabled={selectedObjects.length === 0} onClick={() => handleEditAction('delete')}>Delete</button>
+                <button className={`w-full text-left px-4 py-2 text-sm hover:bg-editor-hover ${selectedObjects.length === 0 ? 'text-gray-500' : ''}`}
+                  disabled={selectedObjects.length === 0} onClick={() => handleEditAction('duplicate')}>Duplicate</button>
+              </div>
+            )}
+            
+            {activeMenu === 'View' && (
+              <div className="py-1">
+                <button className="w-full text-left px-4 py-2 text-sm hover:bg-editor-hover" onClick={() => handleViewAction('switch-3d')}>3D Viewport</button>
+                <button className="w-full text-left px-4 py-2 text-sm hover:bg-editor-hover" onClick={() => handleViewAction('switch-2d')}>2D Grid View</button>
+                <div className="border-t border-editor-border my-1"></div>
+                <button className="w-full text-left px-4 py-2 text-sm hover:bg-editor-hover" onClick={() => handleViewAction('reset-camera')}>Reset Camera</button>
+                <button className="w-full text-left px-4 py-2 text-sm hover:bg-editor-hover" onClick={() => handleViewAction('focus-selection')}>Focus Selection</button>
+                <div className="border-t border-editor-border my-1"></div>
+                <button className="w-full text-left px-4 py-2 text-sm hover:bg-editor-hover" 
+                  onClick={() => handleViewAction(panels.leftVisible ? 'hide-left-panel' : 'show-left-panel')}>
+                  {panels.leftVisible ? 'Hide' : 'Show'} Left Panel
+                </button>
+                <button className="w-full text-left px-4 py-2 text-sm hover:bg-editor-hover" 
+                  onClick={() => handleViewAction(panels.rightVisible ? 'hide-right-panel' : 'show-right-panel')}>
+                  {panels.rightVisible ? 'Hide' : 'Show'} Right Panel
+                </button>
+              </div>
+            )}
+            
+            {activeMenu === 'Generate' && (
+              <div className="py-1">
+                <button className="w-full text-left px-4 py-2 text-sm hover:bg-editor-hover" onClick={() => handleGenerateAction('focus-generation')}>Open Generation Panel</button>
+                <button className="w-full text-left px-4 py-2 text-sm hover:bg-editor-hover text-gray-500" disabled>BSP Algorithm (Coming Soon)</button>
+                <button className="w-full text-left px-4 py-2 text-sm hover:bg-editor-hover text-gray-500" disabled>WFC Algorithm (Coming Soon)</button>
+              </div>
+            )}
+            
+            {activeMenu === 'Tools' && (
+              <div className="py-1">
+                <button className={`w-full text-left px-4 py-2 text-sm hover:bg-editor-hover ${transformMode === 'select' ? 'bg-editor-accent/30' : ''}`} onClick={() => handleToolsAction('transform-select')}>Select Tool</button>
+                <button className={`w-full text-left px-4 py-2 text-sm hover:bg-editor-hover ${transformMode === 'translate' ? 'bg-editor-accent/30' : ''}`} onClick={() => handleToolsAction('transform-move')}>Move Tool</button>
+                <button className={`w-full text-left px-4 py-2 text-sm hover:bg-editor-hover ${transformMode === 'rotate' ? 'bg-editor-accent/30' : ''}`} onClick={() => handleToolsAction('transform-rotate')}>Rotate Tool</button>
+                <button className={`w-full text-left px-4 py-2 text-sm hover:bg-editor-hover ${transformMode === 'scale' ? 'bg-editor-accent/30' : ''}`} onClick={() => handleToolsAction('transform-scale')}>Scale Tool</button>
+                <div className="border-t border-editor-border my-1"></div>
+                <button className={`w-full text-left px-4 py-2 text-sm hover:bg-editor-hover ${snapToGrid ? 'bg-editor-accent/30' : ''}`} onClick={() => handleToolsAction('toggle-snap')}>Toggle Grid Snap</button>
+                <button className="w-full text-left px-4 py-2 text-sm hover:bg-editor-hover" onClick={() => handleToolsAction('grid-size')}>Grid Size Settings</button>
+              </div>
+            )}
+            
+            {activeMenu === 'Help' && (
+              <div className="py-1">
+                <button className="w-full text-left px-4 py-2 text-sm hover:bg-editor-hover" onClick={() => handleHelpAction('keyboard-shortcuts')}>Keyboard Shortcuts</button>
+                <button className="w-full text-left px-4 py-2 text-sm hover:bg-editor-hover" onClick={() => handleHelpAction('about')}>About Morgan-Bevy</button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
       
       {/* Recovery Dialog */}
       {showRecoveryDialog && (
@@ -806,7 +1041,10 @@ function App() {
                 onClick={() => {
                   // Add small delay to prevent accidental clearing during viewport switches
                   setTimeout(() => {
+                    clearScene()
                     clearLocalStorage()
+                    // Also clear the 2D grid view
+                    gridViewRef.current?.clearGrid()
                     setShowRecoveryDialog(false)
                   }, 100)
                 }}

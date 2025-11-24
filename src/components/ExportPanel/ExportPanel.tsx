@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Download, FolderOpen, FileText, Code, Box } from 'lucide-react'
-import { invoke } from '@tauri-apps/api/tauri'
-import { dialog } from '@tauri-apps/api'
+import { invoke } from '@tauri-apps/api/core'
+import { open } from '@tauri-apps/plugin-dialog'
 import { useEditorStore } from '@/store/editorStore'
 
 interface ExportFormat {
@@ -81,7 +81,7 @@ export default function ExportPanel() {
 
   const selectOutputPath = async () => {
     try {
-      const selected = await dialog.open({
+      const selected = await open({
         directory: true,
         title: 'Select Export Directory',
       })

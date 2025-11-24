@@ -375,9 +375,33 @@ export const useEditorStore = create<EditorState>()(
 
     clearScene: () => {
       set((state) => {
+        // Clear scene objects and selections
         state.sceneObjects = {}
         state.selectedObjects = []
         state.hoveredObject = null
+        
+        // Reset grid data
+        state.gridData = []
+        state.selectedTheme = null
+        
+        // Reset viewport to 3D
+        state.viewportMode = '3d'
+        
+        // Reset to default layer
+        state.activeLayer = 'default'
+        
+        // Reset layers to default set
+        state.layers = [
+          { id: 'default', name: 'Default', visible: true, locked: false, color: '#ffffff' },
+          { id: 'walls', name: 'Walls', visible: true, locked: false, color: '#8b5cf6' },
+          { id: 'floors', name: 'Floors', visible: true, locked: false, color: '#10b981' },
+          { id: 'doors', name: 'Doors', visible: true, locked: false, color: '#f59e0b' },
+          { id: 'lights', name: 'Lights', visible: true, locked: false, color: '#fbbf24' },
+        ]
+        
+        // Clear undo/redo history
+        state.undoHistory = []
+        state.redoHistory = []
       })
       // Trigger debounced auto-save after clearing scene
       useEditorStore.getState().debouncedAutoSave()
