@@ -1,5 +1,6 @@
 import React, { useRef, useEffect, useState, useCallback } from 'react'
 import { invoke } from '@tauri-apps/api/tauri'
+import { useEditorStore } from '@/store/editorStore'
 
 interface GridViewProps {
   className?: string
@@ -32,12 +33,12 @@ export interface GridViewRef {
   exportGrid: () => string
   importGrid: (gridString: string) => void
   clearGrid: () => void
+  getGridData: () => string[][]  // Add method to get current grid data
 }
 
 const GridView = React.forwardRef<GridViewRef, GridViewProps>(({ className = '' }, ref) => {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const [gridData, setGridData] = useState<string[][]>([])
-  const [selectedTheme, setSelectedTheme] = useState<Theme | null>(null)
   const [availableThemes, setAvailableThemes] = useState<Theme[]>([])
   const [isDrawing, setIsDrawing] = useState(false)
   const [selectedTile, setSelectedTile] = useState<string>('floor')
@@ -51,18 +52,51 @@ const GridView = React.forwardRef<GridViewRef, GridViewProps>(({ className = '' 
   } | null>(null)
   const [editMode, setEditMode] = useState<'paint' | 'select' | 'fill'>('paint')
   const [copiedData, setCopiedData] = useState<string[][] | null>(null)
+  const [dragMode, setDragMode] = useState<'paint' | 'erase' | null>(null)
+  const [lastPaintedPos, setLastPaintedPos] = useState<{ x: number; y: number } | null>(null)
+
+  // Access editor state for view mode and theme
+  const { selectedTheme, setSelectedTheme, setGridData: setStoreGridData } = useEditorStore()
+
+  // Sync grid data to store whenever it changes
+  useEffect(() => {
+    setStoreGridData(gridData)
+  }, [gridData, setStoreGridData])
 
   // Initialize grid and load themes
   useEffect(() => {
     initializeGrid()
     loadThemes()
-  }, [gridSize])
+  }, []) // Remove gridSize dependency to prevent re-initialization
 
-  // Initialize empty grid
+  // Initialize grid and sync with existing 3D scene objects when mounting in 2D mode
   const initializeGrid = () => {
-    const newGrid = Array(gridSize.height)
-      .fill(null)
-      .map(() => Array(gridSize.width).fill('empty'))
+    // Try to load from localStorage first (for view switches), then store data, then create empty
+    const { gridData: storeGridData, loadFromLocalStorage } = useEditorStore.getState()
+    
+    // Try loading from localStorage in case we're switching from 3D view
+    const wasLoaded = loadFromLocalStorage()
+    
+    let newGrid: string[][];
+    const currentStoreData = useEditorStore.getState().gridData
+    
+    if (wasLoaded && currentStoreData && currentStoreData.length > 0) {
+      const nonEmptyCount = currentStoreData.flat().filter(t => t !== 'empty').length
+      if (nonEmptyCount > 0) {
+        newGrid = currentStoreData.map(row => [...row]) // Deep copy
+      } else {
+        newGrid = Array(gridSize.height)
+          .fill(null)
+          .map(() => Array(gridSize.width).fill('empty'))
+      }
+    } else if (storeGridData && storeGridData.length > 0 && storeGridData.some(row => row.some(cell => cell !== 'empty'))) {
+      newGrid = storeGridData.map(row => [...row]) // Deep copy
+    } else {
+      newGrid = Array(gridSize.height)
+        .fill(null)
+        .map(() => Array(gridSize.width).fill('empty'))
+    }
+    
     setGridData(newGrid)
   }
 
@@ -71,7 +105,7 @@ const GridView = React.forwardRef<GridViewRef, GridViewProps>(({ className = '' 
     try {
       const themes: Theme[] = await invoke('get_available_themes')
       setAvailableThemes(themes)
-      if (themes.length > 0) {
+      if (themes.length > 0 && !selectedTheme) {
         setSelectedTheme(themes[0])
       }
     } catch (error) {
@@ -87,7 +121,7 @@ const GridView = React.forwardRef<GridViewRef, GridViewProps>(({ className = '' 
     return { x: Math.max(0, Math.min(x, gridSize.width - 1)), y: Math.max(0, Math.min(y, gridSize.height - 1)) }
   }
 
-  // Paint tile at position
+  // Paint tile at position (2D grid only - sync happens on view switch)
   const paintTile = (x: number, y: number, tileType: string) => {
     if (x < 0 || x >= gridSize.width || y < 0 || y >= gridSize.height) return
     
@@ -136,10 +170,21 @@ const GridView = React.forwardRef<GridViewRef, GridViewProps>(({ className = '' 
 
     const pos = getGridPosition(event.nativeEvent, canvas)
     setDragStart(pos)
+    setLastPaintedPos(pos) // Track this position to prevent repeated painting
 
     if (editMode === 'paint') {
       setIsDrawing(true)
-      paintTile(pos.x, pos.y, selectedTile)
+      
+      // Check if clicking on an existing tile (not empty) - remove it
+      const currentTile = gridData[pos.y]?.[pos.x]
+      if (currentTile && currentTile !== 'empty') {
+        setDragMode('erase')
+        paintTile(pos.x, pos.y, 'empty')
+      } else {
+        setDragMode('paint')
+        // Empty tile - paint with selected tile
+        paintTile(pos.x, pos.y, selectedTile)
+      }
     } else if (editMode === 'select') {
       setSelection({ start: pos, end: pos })
     } else if (editMode === 'fill') {
@@ -156,8 +201,18 @@ const GridView = React.forwardRef<GridViewRef, GridViewProps>(({ className = '' 
 
     const pos = getGridPosition(event.nativeEvent, canvas)
 
-    if (editMode === 'paint' && isDrawing) {
-      paintTile(pos.x, pos.y, selectedTile)
+    if (editMode === 'paint' && isDrawing && dragMode) {
+      // Only paint if we've moved to a different position
+      if (!lastPaintedPos || pos.x !== lastPaintedPos.x || pos.y !== lastPaintedPos.y) {
+        setLastPaintedPos(pos)
+        
+        // Use consistent drag mode throughout the drag operation
+        if (dragMode === 'erase') {
+          paintTile(pos.x, pos.y, 'empty')
+        } else {
+          paintTile(pos.x, pos.y, selectedTile)
+        }
+      }
     } else if (editMode === 'select') {
       setSelection({ start: dragStart, end: pos })
     }
@@ -166,6 +221,8 @@ const GridView = React.forwardRef<GridViewRef, GridViewProps>(({ className = '' 
   const handleMouseUp = () => {
     setIsDrawing(false)
     setDragStart(null)
+    setDragMode(null)
+    setLastPaintedPos(null) // Reset to prevent interference with next paint operation
   }
 
   // Keyboard handlers for copy/paste
@@ -264,7 +321,7 @@ const GridView = React.forwardRef<GridViewRef, GridViewProps>(({ className = '' 
         const tileType = gridData[y]?.[x] || 'empty'
         const tileDef = selectedTheme.tiles[tileType]
         
-        if (tileDef) {
+        if (tileDef && tileType !== 'empty') {
           // Background color
           if (tileDef.visual.background_color) {
             ctx.fillStyle = tileDef.visual.background_color
@@ -348,7 +405,8 @@ const GridView = React.forwardRef<GridViewRef, GridViewProps>(({ className = '' 
     clearGrid: () => {
       initializeGrid()
       setSelection(null)
-    }
+    },
+    getGridData: () => gridData  // Expose current grid data
   }))
 
   const getTileList = () => {
@@ -452,26 +510,32 @@ const GridView = React.forwardRef<GridViewRef, GridViewProps>(({ className = '' 
         <div className="w-48 bg-editor-panel border-r border-editor-border p-2 overflow-y-auto">
           <div className="text-sm font-medium text-editor-text mb-2">Tile Palette</div>
           <div className="space-y-1">
-            {getTileList().map(([tileKey, tileDef]) => (
+            {getTileList().map(([tileKey, tileDef]) => {
+              const tile = tileDef as TileDefinition
+              return (
               <button
                 key={tileKey}
-                onClick={() => setSelectedTile(tileKey)}
+                onClick={() => {
+
+                  setSelectedTile(tileKey)
+                }}
                 className={`w-full text-left px-2 py-1 rounded text-xs flex items-center space-x-2 ${
                   selectedTile === tileKey
                     ? 'bg-editor-accent text-white'
                     : 'bg-editor-bg text-editor-text hover:bg-gray-600'
                 }`}
-                title={tileDef.description}
+                title={tile.description}
               >
                 <span 
                   className="w-4 h-4 flex items-center justify-center font-mono text-xs"
-                  style={{ color: tileDef.visual.color, backgroundColor: tileDef.visual.background_color || 'transparent' }}
+                  style={{ color: tile.visual.color, backgroundColor: tile.visual.background_color || 'transparent' }}
                 >
-                  {tileDef.visual.icon}
+                  {tile.visual.icon}
                 </span>
-                <span className="truncate">{tileDef.name}</span>
+                <span className="truncate">{tile.name}</span>
               </button>
-            ))}
+              )
+            })}
           </div>
         </div>
 

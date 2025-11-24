@@ -2,10 +2,38 @@ import { create } from 'zustand'
 import { immer } from 'zustand/middleware/immer'
 import type { Command } from '@/utils/commands'
 
+// Simple debug logger for store operations
+class StoreDebugLogger {
+  static log(message: string, data?: any) {
+    const timestamp = Date.now()
+    const logEntry = `[STORE] ${message}`
+    console.log(`🔄 ${logEntry}`, data || '')
+    
+    // Also save to localStorage for persistence
+    try {
+      const existing = JSON.parse(localStorage.getItem('morgan-bevy-store-debug') || '[]')
+      existing.push({
+        timestamp,
+        message: logEntry,
+        data
+      })
+      // Keep only last 50 entries
+      if (existing.length > 50) existing.shift()
+      localStorage.setItem('morgan-bevy-store-debug', JSON.stringify(existing))
+    } catch (e) {
+      console.error('Failed to save store debug logs:', e)
+    }
+  }
+}
+
 export interface EditorState {
   // Selection
   selectedObjects: string[]
   hoveredObject: string | null
+  
+  // Grid data for 2D/3D sync
+  gridData: string[][]
+  selectedTheme: any | null
   
   // Transform
   transformMode: 'select' | 'translate' | 'rotate' | 'scale'
@@ -44,6 +72,16 @@ export interface EditorState {
     parentId?: string
     children: string[]
     meshType?: 'cube' | 'sphere' | 'pyramid' // For primitive shapes
+    material?: {
+      baseColor: string
+      metallic: number
+      roughness: number
+      texture?: string
+    }
+    collision?: boolean
+    walkable?: boolean
+    tags?: string[]
+    metadata?: any  // Allow for flexible metadata including gridPosition, tileType, etc.
   }>
   
   // UI state
@@ -68,16 +106,26 @@ export interface EditorState {
   setGridSize: (size: number) => void
   setViewportMode: (mode: '3d' | '2d') => void
   setCameraMode: (mode: 'orbit' | 'fly' | 'top-down') => void
+  setGridData: (data: string[][]) => void
+  setSelectedTheme: (theme: any) => void
   toggleGrid: () => void
   toggleStats: () => void
   
   // Object management
   addObject: (type: 'cube' | 'sphere' | 'pyramid', position?: [number, number, number]) => string
+  addObjectDirect: (objectData: any) => void
   removeObject: (id: string) => void
   duplicateObjects: (ids: string[]) => string[]
   updateObjectTransform: (id: string, transform: Partial<{ position: [number, number, number], rotation: [number, number, number], scale: [number, number, number] }>) => void
+  updateObjectName: (id: string, name: string) => void
+  updateObjectVisibility: (id: string, visible: boolean) => void
+  updateObjectLock: (id: string, locked: boolean) => void
+  updateObjectMaterial: (id: string, material: { baseColor: string, metallic: number, roughness: number, texture?: string }) => void
+  updateObjectMesh: (id: string, meshType: 'cube' | 'sphere' | 'pyramid') => void
+  updateObjectProperties: (id: string, properties: { collision?: boolean, walkable?: boolean, tags?: string[] }) => void
   groupObjects: (ids: string[]) => string
   ungroupObject: (groupId: string) => void
+  clearScene: () => void
   
   // Undo/Redo system
   executeCommand: (command: Command) => void
@@ -86,6 +134,12 @@ export interface EditorState {
   canUndo: () => boolean
   canRedo: () => boolean
   clearHistory: () => void
+  
+  // Auto-save functionality
+  saveToLocalStorage: () => void
+  debouncedAutoSave: () => void
+  loadFromLocalStorage: () => boolean
+  clearLocalStorage: () => void
 }
 
 export const useEditorStore = create<EditorState>()(
@@ -93,6 +147,8 @@ export const useEditorStore = create<EditorState>()(
       // Initial state  
       selectedObjects: [] as string[],
       hoveredObject: null as string | null,
+    gridData: [] as string[][],
+    selectedTheme: null as any | null,
     transformMode: 'select',
     coordinateSpace: 'world',
     gridSnapEnabled: true,
@@ -121,6 +177,15 @@ export const useEditorStore = create<EditorState>()(
       parentId?: string
       children: string[]
       meshType?: 'cube' | 'sphere' | 'pyramid'
+      material?: {
+        baseColor: string
+        metallic: number
+        roughness: number
+        texture?: string
+      }
+      collision?: boolean
+      walkable?: boolean
+      tags?: string[]
     }>,
     showGrid: true,
     showStats: false,
@@ -185,12 +250,53 @@ export const useEditorStore = create<EditorState>()(
       
       setViewportMode: (mode: '3d' | '2d') =>
       set((state) => {
+        // Add comprehensive logging with call stack
+        StoreDebugLogger.log(`setViewportMode called: ${state.viewportMode} -> ${mode}`, {
+          currentMode: state.viewportMode,
+          targetMode: mode,
+          timestamp: Date.now(),
+          callStack: new Error().stack?.split('\n').slice(0, 5).join('\n')
+        })
+        
+        // Save to localStorage for debugging
+        try {
+          const debugEntry = {
+            timestamp: Date.now(),
+            from: state.viewportMode,
+            to: mode,
+            stack: new Error().stack
+          }
+          const existing = JSON.parse(localStorage.getItem('morgan-bevy-setViewportMode-calls') || '[]')
+          existing.push(debugEntry)
+          // Keep only last 20 calls
+          if (existing.length > 20) existing.shift()
+          localStorage.setItem('morgan-bevy-setViewportMode-calls', JSON.stringify(existing))
+        } catch (e) {
+          console.error('Failed to save setViewportMode debug info:', e)
+        }
+        
+        if (state.viewportMode === mode) {
+          StoreDebugLogger.log(`Already in ${mode} mode, ignoring`)
+          return
+        }
+        
         state.viewportMode = mode
+        StoreDebugLogger.log(`Viewport mode changed to: ${mode}`)
       }),
       
       setCameraMode: (mode: 'orbit' | 'fly' | 'top-down') =>
       set((state) => {
         state.cameraMode = mode
+      }),
+      
+      setGridData: (data: string[][]) =>
+      set((state) => {
+        state.gridData = data
+      }),
+      
+      setSelectedTheme: (theme: any) =>
+      set((state) => {
+        state.selectedTheme = theme
       }),
       
     toggleGrid: () =>
@@ -218,17 +324,73 @@ export const useEditorStore = create<EditorState>()(
           locked: false,
           layerId: state.activeLayer,
           children: [],
-          meshType: type
+          meshType: type,
+          material: {
+            baseColor: '#ffffff',
+            metallic: 0.0,
+            roughness: 0.5
+          },
+          collision: false,
+          walkable: true,
+          tags: []
         }
       })
+      // Trigger debounced auto-save
+      useEditorStore.getState().debouncedAutoSave()
       return id
     },
+
+    addObjectDirect: (objectData: any) =>
+      set((state) => {
+        state.sceneObjects[objectData.id] = {
+          id: objectData.id,
+          name: objectData.name,
+          type: 'mesh',
+          position: objectData.position,
+          rotation: objectData.rotation,
+          scale: objectData.scale,
+          visible: objectData.visible,
+          locked: objectData.locked,
+          layerId: objectData.layerId,
+          children: [],
+          meshType: objectData.meshType,
+          material: objectData.material ? {
+            baseColor: objectData.material.baseColor || '#ffffff',
+            metallic: objectData.material.metallic || 0.0,
+            roughness: objectData.material.roughness || 0.5,
+            texture: objectData.material.texture
+          } : {
+            baseColor: '#ffffff',
+            metallic: 0.0,
+            roughness: 0.5
+          },
+          collision: objectData.collision,
+          walkable: objectData.walkable,
+          tags: objectData.tags,
+          metadata: objectData.metadata || {}
+        }
+        // Scene updated - trigger debounced auto-save
+        useEditorStore.getState().debouncedAutoSave()
+      }),
+
+    clearScene: () => {
+      set((state) => {
+        state.sceneObjects = {}
+        state.selectedObjects = []
+        state.hoveredObject = null
+      })
+      // Trigger debounced auto-save after clearing scene
+      useEditorStore.getState().debouncedAutoSave()
+    },
     
-    removeObject: (id: string) =>
+    removeObject: (id: string) => {
       set((state) => {
         delete state.sceneObjects[id]
         state.selectedObjects = state.selectedObjects.filter(objId => objId !== id)
-      }),
+      })
+      // Trigger debounced auto-save after removing object
+      useEditorStore.getState().debouncedAutoSave()
+    },
     
     duplicateObjects: (ids: string[]) => {
       const newIds: string[] = []
@@ -259,12 +421,75 @@ export const useEditorStore = create<EditorState>()(
         if (state.sceneObjects[id]) {
           if (transform.position) {
             state.sceneObjects[id].position = transform.position
+            
+            // Update grid position metadata for tile objects
+            if (state.sceneObjects[id].metadata?.fromGrid && transform.position) {
+              const [x3d, _, z3d] = transform.position
+              const newGridX = Math.round(x3d + 24) // 48/2 = 24 for grid centering
+              const newGridY = Math.round(z3d + 18) // 36/2 = 18 for grid centering
+              
+              // Update the grid position metadata
+              if (state.sceneObjects[id].metadata) {
+                state.sceneObjects[id].metadata.gridPosition = { x: newGridX, y: newGridY }
+              }
+            }
           }
           if (transform.rotation) {
             state.sceneObjects[id].rotation = transform.rotation
           }
           if (transform.scale) {
             state.sceneObjects[id].scale = transform.scale
+          }
+        }
+      }),
+    
+    updateObjectName: (id: string, name: string) =>
+      set((state) => {
+        if (state.sceneObjects[id]) {
+          state.sceneObjects[id].name = name
+        }
+      }),
+    
+    updateObjectVisibility: (id: string, visible: boolean) =>
+      set((state) => {
+        if (state.sceneObjects[id]) {
+          state.sceneObjects[id].visible = visible
+        }
+      }),
+    
+    updateObjectLock: (id: string, locked: boolean) =>
+      set((state) => {
+        if (state.sceneObjects[id]) {
+          state.sceneObjects[id].locked = locked
+        }
+      }),
+    
+    updateObjectMaterial: (id: string, material: { baseColor: string, metallic: number, roughness: number, texture?: string }) =>
+      set((state) => {
+        if (state.sceneObjects[id]) {
+          state.sceneObjects[id].material = material
+        }
+      }),
+    
+    updateObjectMesh: (id: string, meshType: 'cube' | 'sphere' | 'pyramid') =>
+      set((state) => {
+        if (state.sceneObjects[id]) {
+          state.sceneObjects[id].meshType = meshType
+          state.sceneObjects[id].name = `${meshType.charAt(0).toUpperCase() + meshType.slice(1)}_${state.sceneObjects[id].id.split('_')[1] || ''}`
+        }
+      }),
+    
+    updateObjectProperties: (id: string, properties: { collision?: boolean, walkable?: boolean, tags?: string[] }) =>
+      set((state) => {
+        if (state.sceneObjects[id]) {
+          if (properties.collision !== undefined) {
+            state.sceneObjects[id].collision = properties.collision
+          }
+          if (properties.walkable !== undefined) {
+            state.sceneObjects[id].walkable = properties.walkable
+          }
+          if (properties.tags !== undefined) {
+            state.sceneObjects[id].tags = properties.tags
           }
         }
       }),
@@ -384,5 +609,73 @@ export const useEditorStore = create<EditorState>()(
         state.undoHistory = []
         state.redoHistory = []
       }),
+      
+    // Auto-save functionality
+    saveToLocalStorage: () => {
+      const state = useEditorStore.getState()
+      const saveData = {
+        gridData: state.gridData,
+        selectedTheme: state.selectedTheme,
+        sceneObjects: state.sceneObjects,
+        viewportMode: state.viewportMode,
+        timestamp: new Date().toISOString()
+      }
+      try {
+        localStorage.setItem('morgan-bevy-autosave', JSON.stringify(saveData))
+      } catch (error) {
+        console.error('Failed to auto-save to localStorage:', error)
+      }
+    },
+    
+    // Debounced auto-save to prevent excessive saves
+    debouncedAutoSave: (() => {
+      let timeoutId: NodeJS.Timeout | null = null
+      return () => {
+        if (timeoutId) {
+          clearTimeout(timeoutId)
+        }
+        timeoutId = setTimeout(() => {
+          useEditorStore.getState().saveToLocalStorage()
+        }, 2000) // 2 second debounce
+      }
+    })(),
+    
+    loadFromLocalStorage: () => {
+      try {
+        const saved = localStorage.getItem('morgan-bevy-autosave')
+        if (saved) {
+          const saveData = JSON.parse(saved)
+          
+          set((state) => {
+            if (saveData.gridData) {
+              state.gridData = saveData.gridData
+            }
+            if (saveData.selectedTheme) {
+              state.selectedTheme = saveData.selectedTheme
+            }
+            if (saveData.sceneObjects) {
+              state.sceneObjects = saveData.sceneObjects
+            }
+            if (saveData.viewportMode) {
+              state.viewportMode = saveData.viewportMode
+            }
+          })
+          
+          return true
+        }
+      } catch (error) {
+        console.error('Failed to load from localStorage:', error)
+      }
+      return false
+    },
+    
+    clearLocalStorage: () => {
+      try {
+        localStorage.removeItem('morgan-bevy-autosave')
+        console.log('Cleared auto-save data from localStorage')
+      } catch (error) {
+        console.error('Failed to clear localStorage:', error)
+      }
+    },
   }))
 )

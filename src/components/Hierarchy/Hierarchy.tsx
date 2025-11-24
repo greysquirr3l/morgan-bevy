@@ -20,9 +20,14 @@ export default function Hierarchy() {
     sceneObjects, 
     setSelectedObjects, 
     addToSelection, 
-    removeFromSelection 
+    removeFromSelection,
+    updateObjectVisibility,
+    updateObjectLock,
+    updateObjectName
   } = useEditorStore()
   const [searchTerm, setSearchTerm] = useState('')
+  const [renamingId, setRenamingId] = useState<string | null>(null)
+  const [renameValue, setRenameValue] = useState('')
 
   const handleObjectClick = (id: string, event: React.MouseEvent) => {
     if (event.ctrlKey || event.metaKey) {
@@ -39,20 +44,38 @@ export default function Hierarchy() {
   }
 
   const handleObjectDoubleClick = (id: string) => {
-    // TODO: Rename functionality
-    console.log('Rename:', id)
+    // Start rename mode
+    setRenamingId(id)
+    setRenameValue(sceneObjects[id]?.name || '')
+  }
+
+  const handleRenameComplete = (id: string) => {
+    if (renameValue.trim()) {
+      updateObjectName(id, renameValue.trim())
+    }
+    setRenamingId(null)
+    setRenameValue('')
+  }
+
+  const handleRenameCancel = () => {
+    setRenamingId(null)
+    setRenameValue('')
   }
 
   const toggleObjectVisibility = (id: string, event: React.MouseEvent) => {
     event.stopPropagation()
-    console.log('Toggle visibility for:', id)
-    // TODO: Implement visibility toggle in store
+    const obj = sceneObjects[id]
+    if (obj) {
+      updateObjectVisibility(id, !obj.visible)
+    }
   }
 
   const toggleObjectLock = (id: string, event: React.MouseEvent) => {
     event.stopPropagation()
-    console.log('Toggle lock for:', id)
-    // TODO: Implement lock toggle in store
+    const obj = sceneObjects[id]
+    if (obj) {
+      updateObjectLock(id, !obj.locked)
+    }
   }
 
   const getObjectIcon = (type: string, meshType?: string) => {
@@ -88,12 +111,32 @@ export default function Hierarchy() {
             {getObjectIcon(obj.type, obj.meshType)}
           </span>
           
-          <span className="flex-1 truncate">{obj.name}</span>
+          {renamingId === obj.id ? (
+            <input
+              type="text"
+              value={renameValue}
+              onChange={(e) => setRenameValue(e.target.value)}
+              onBlur={() => handleRenameComplete(obj.id)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  handleRenameComplete(obj.id)
+                } else if (e.key === 'Escape') {
+                  handleRenameCancel()
+                }
+              }}
+              className="flex-1 px-1 text-sm bg-editor-bg border border-editor-accent rounded focus:outline-none"
+              autoFocus
+            />
+          ) : (
+            <span className="flex-1 truncate">{obj.name}</span>
+          )}
           
           {/* Visibility and lock buttons */}
           <div className="flex items-center space-x-1 ml-2">
             <button
-              className="w-4 h-4 flex items-center justify-center hover:bg-editor-bg rounded opacity-60 hover:opacity-100"
+              className={`w-4 h-4 flex items-center justify-center hover:bg-editor-bg rounded transition-opacity ${
+                obj.visible ? 'opacity-60 hover:opacity-100' : 'opacity-100 text-red-500'
+              }`}
               onClick={(e) => toggleObjectVisibility(obj.id, e)}
               title={obj.visible ? 'Hide' : 'Show'}
             >
@@ -104,7 +147,9 @@ export default function Hierarchy() {
               )}
             </button>
             <button
-              className="w-4 h-4 flex items-center justify-center hover:bg-editor-bg rounded opacity-60 hover:opacity-100"
+              className={`w-4 h-4 flex items-center justify-center hover:bg-editor-bg rounded transition-opacity ${
+                obj.locked ? 'opacity-100 text-yellow-500' : 'opacity-60 hover:opacity-100'
+              }`}
               onClick={(e) => toggleObjectLock(obj.id, e)}
               title={obj.locked ? 'Unlock' : 'Lock'}
             >

@@ -10,6 +10,7 @@ interface GenerationParams {
   height: number
   depth: number
   seed: number | null
+  theme: string
   
   // BSP-specific
   minRoomSize?: number
@@ -55,10 +56,11 @@ export default function GenerationPanel({}: GenerationPanelProps) {
   const [isGenerating, setIsGenerating] = useState(false)
   const [params, setParams] = useState<GenerationParams>({
     algorithm: 'BSP',
-    width: 48,
-    height: 36,
+    width: 24,
+    height: 18,
     depth: 1,
     seed: null,
+    theme: 'office',
     minRoomSize: 4,
     maxRoomSize: 12,
     splitIterations: 6,
@@ -71,7 +73,7 @@ export default function GenerationPanel({}: GenerationPanelProps) {
   const [lastGenerated, setLastGenerated] = useState<LevelData | null>(null)
   const [recentSeeds, setRecentSeeds] = useState<Array<{seed: number, algorithm: string, timestamp: string}>>([])
   
-  const { executeCommand, clearSelection, setSelectedObjects } = useEditorStore()
+  const { clearSelection, setSelectedObjects, executeCommand } = useEditorStore()
 
   const generateRandomSeed = () => {
     const seed = Math.floor(Math.random() * 1000000)
@@ -81,10 +83,13 @@ export default function GenerationPanel({}: GenerationPanelProps) {
   const handleGenerate = async () => {
     if (isGenerating) return
     
+    console.log('Starting generation with params:', params)
     setIsGenerating(true)
     try {
       const finalSeed = params.seed || Date.now()
       let levelData: LevelData
+      
+      console.log(`Generating with ${params.algorithm} algorithm, seed: ${finalSeed}`)
       
       if (params.algorithm === 'BSP') {
         const bspParams = {
@@ -93,11 +98,11 @@ export default function GenerationPanel({}: GenerationPanelProps) {
           depth: params.depth,
           min_room_size: params.minRoomSize || 4,
           max_room_size: params.maxRoomSize || 12,
-          split_iterations: params.splitIterations || 6,
-          large_room_probability: params.largeRoomProbability || 0.15,
           corridor_width: params.corridorWidth || 2,
+          theme: params.theme,
           seed: finalSeed
         }
+        console.log('BSP params:', bspParams)
         levelData = await invoke('generate_bsp_level', { params: bspParams })
       } else {
         const wfcParams = {
@@ -109,35 +114,50 @@ export default function GenerationPanel({}: GenerationPanelProps) {
           backtrack_limit: params.backtrackLimit || 100,
           seed: finalSeed
         }
+        console.log('WFC params:', wfcParams)
         levelData = await invoke('generate_wfc_level', { params: wfcParams })
       }
+      
+      console.log('Generated level data:', levelData)
       
       // Clear existing selection
       clearSelection()
       
-      // Add generated objects to scene
+      // Add generated objects to scene using command system
       const newObjectIds: string[] = []
       for (const obj of levelData.objects) {
-        const newId = `generated_${obj.id}`
-        const objectData = {
-          id: newId,
-          name: obj.name,
-          type: 'mesh' as const,
-          position: obj.transform.position,
-          rotation: obj.transform.rotation.slice(0, 3) as [number, number, number],
-          scale: obj.transform.scale,
-          visible: true,
-          locked: false,
-          layerId: 'Generated',
-          parentId: undefined,
-          children: [],
-          meshType: (obj.mesh || 'cube') as 'cube' | 'sphere' | 'pyramid'
+        // Convert mesh to primitive type
+        let meshType: 'cube' | 'sphere' | 'pyramid' = 'cube'
+        if (obj.mesh?.includes('sphere')) {
+          meshType = 'sphere'
+        } else if (obj.mesh?.includes('pyramid') || obj.mesh?.includes('cone')) {
+          meshType = 'pyramid'
         }
         
-        // Create using command system for undo support
-        const command = new CreateObjectCommand(objectData.meshType, objectData.position)
+        // Create using command system for proper object creation
+        const command = new CreateObjectCommand(meshType, obj.transform.position)
+        command.execute()
         executeCommand(command)
-        newObjectIds.push(newId)
+        
+        // Get the created object ID
+        const createdId = command.objectId
+        newObjectIds.push(createdId)
+        
+        // Update the object properties to match the generated data
+        const { updateObjectTransform, updateObjectName } = useEditorStore.getState()
+        updateObjectName(createdId, obj.name)
+        
+        // Convert quaternion to Euler angles
+        const quaternion = obj.transform.rotation
+        const [x, y, z, w] = quaternion
+        const yaw = Math.atan2(2.0 * (w * y + x * z), 1.0 - 2.0 * (y * y + z * z))
+        const rotation: [number, number, number] = [0, yaw * (180 / Math.PI), 0]
+        
+        updateObjectTransform(createdId, {
+          position: obj.transform.position,
+          rotation,
+          scale: obj.transform.scale
+        })
       }
       
       // Select all generated objects
@@ -253,6 +273,21 @@ export default function GenerationPanel({}: GenerationPanelProps) {
             />
           </div>
         </div>
+      </div>
+      
+      {/* Theme Selection */}
+      <div className="mb-3">
+        <label className="block text-xs text-editor-textMuted mb-1">Theme</label>
+        <select
+          value={params.theme}
+          onChange={(e) => setParams(prev => ({ ...prev, theme: e.target.value }))}
+          className="w-full px-2 py-1 text-xs bg-editor-bg border border-editor-border rounded"
+        >
+          <option value="office">Office</option>
+          <option value="dungeon">Dungeon</option>
+          <option value="scifi">Sci-Fi</option>
+          <option value="castle">Castle</option>
+        </select>
       </div>
       
       {/* Seed Management */}

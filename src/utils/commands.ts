@@ -54,7 +54,7 @@ export class TransformCommand implements Command {
 
 // Create object command
 export class CreateObjectCommand implements Command {
-  private objectId: string
+  public objectId: string
   private objectType: 'cube' | 'sphere' | 'pyramid'
   private position: [number, number, number]
   public description: string

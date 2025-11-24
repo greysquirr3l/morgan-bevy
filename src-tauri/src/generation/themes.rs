@@ -299,6 +299,523 @@ impl Theme {
             },
         );
 
+        // Wall variations
+        tiles.insert(
+            "wall_horizontal".to_string(),
+            TileDefinition {
+                tile_type: TileType::Wall,
+                name: "Horizontal Wall".to_string(),
+                description: "Horizontal wall segment".to_string(),
+                visual: TileVisual {
+                    icon: '═',
+                    color: "#E6E6E6".to_string(),
+                    background_color: Some("#F0F0F0".to_string()),
+                },
+                mesh: TileMesh {
+                    mesh_type: "cube".to_string(),
+                    material: "wall".to_string(),
+                    scale: (1.0, 3.0, 0.2),
+                    rotation: (0.0, 0.0, 0.0),
+                    offset: (0.0, 1.5, 0.0),
+                },
+                collision: true,
+                walkable: false,
+                tags: vec!["barrier".to_string(), "office".to_string()],
+            },
+        );
+        tiles.insert(
+            "wall_vertical".to_string(),
+            TileDefinition {
+                tile_type: TileType::Wall,
+                name: "Vertical Wall".to_string(),
+                description: "Vertical wall segment".to_string(),
+                visual: TileVisual {
+                    icon: '║',
+                    color: "#E6E6E6".to_string(),
+                    background_color: Some("#F0F0F0".to_string()),
+                },
+                mesh: TileMesh {
+                    mesh_type: "cube".to_string(),
+                    material: "wall".to_string(),
+                    scale: (0.2, 3.0, 1.0),
+                    rotation: (0.0, 0.0, 0.0),
+                    offset: (0.0, 1.5, 0.0),
+                },
+                collision: true,
+                walkable: false,
+                tags: vec!["barrier".to_string(), "office".to_string()],
+            },
+        );
+        tiles.insert(
+            "wall_corner_tl".to_string(),
+            TileDefinition {
+                tile_type: TileType::Wall,
+                name: "Top-Left Corner".to_string(),
+                description: "Top-left wall corner".to_string(),
+                visual: TileVisual {
+                    icon: '╔',
+                    color: "#E6E6E6".to_string(),
+                    background_color: Some("#F0F0F0".to_string()),
+                },
+                mesh: TileMesh {
+                    mesh_type: "corner".to_string(),
+                    material: "wall".to_string(),
+                    scale: (1.0, 3.0, 1.0),
+                    rotation: (0.0, 0.0, 0.0),
+                    offset: (0.0, 1.5, 0.0),
+                },
+                collision: true,
+                walkable: false,
+                tags: vec!["barrier".to_string(), "office".to_string()],
+            },
+        );
+        tiles.insert(
+            "wall_corner_tr".to_string(),
+            TileDefinition {
+                tile_type: TileType::Wall,
+                name: "Top-Right Corner".to_string(),
+                description: "Top-right wall corner".to_string(),
+                visual: TileVisual {
+                    icon: '╗',
+                    color: "#E6E6E6".to_string(),
+                    background_color: Some("#F0F0F0".to_string()),
+                },
+                mesh: TileMesh {
+                    mesh_type: "corner".to_string(),
+                    material: "wall".to_string(),
+                    scale: (1.0, 3.0, 1.0),
+                    rotation: (0.0, 90.0, 0.0),
+                    offset: (0.0, 1.5, 0.0),
+                },
+                collision: true,
+                walkable: false,
+                tags: vec!["barrier".to_string(), "office".to_string()],
+            },
+        );
+        tiles.insert(
+            "wall_corner_bl".to_string(),
+            TileDefinition {
+                tile_type: TileType::Wall,
+                name: "Bottom-Left Corner".to_string(),
+                description: "Bottom-left wall corner".to_string(),
+                visual: TileVisual {
+                    icon: '╚',
+                    color: "#E6E6E6".to_string(),
+                    background_color: Some("#F0F0F0".to_string()),
+                },
+                mesh: TileMesh {
+                    mesh_type: "corner".to_string(),
+                    material: "wall".to_string(),
+                    scale: (1.0, 3.0, 1.0),
+                    rotation: (0.0, 270.0, 0.0),
+                    offset: (0.0, 1.5, 0.0),
+                },
+                collision: true,
+                walkable: false,
+                tags: vec!["barrier".to_string(), "office".to_string()],
+            },
+        );
+        tiles.insert(
+            "wall_corner_br".to_string(),
+            TileDefinition {
+                tile_type: TileType::Wall,
+                name: "Bottom-Right Corner".to_string(),
+                description: "Bottom-right wall corner".to_string(),
+                visual: TileVisual {
+                    icon: '╝',
+                    color: "#E6E6E6".to_string(),
+                    background_color: Some("#F0F0F0".to_string()),
+                },
+                mesh: TileMesh {
+                    mesh_type: "corner".to_string(),
+                    material: "wall".to_string(),
+                    scale: (1.0, 3.0, 1.0),
+                    rotation: (0.0, 180.0, 0.0),
+                    offset: (0.0, 1.5, 0.0),
+                },
+                collision: true,
+                walkable: false,
+                tags: vec!["barrier".to_string(), "office".to_string()],
+            },
+        );
+        tiles.insert(
+            "wall_intersection".to_string(),
+            TileDefinition {
+                tile_type: TileType::Wall,
+                name: "Wall Intersection".to_string(),
+                description: "Four-way wall intersection".to_string(),
+                visual: TileVisual {
+                    icon: '╬',
+                    color: "#E6E6E6".to_string(),
+                    background_color: Some("#F0F0F0".to_string()),
+                },
+                mesh: TileMesh {
+                    mesh_type: "intersection".to_string(),
+                    material: "wall".to_string(),
+                    scale: (1.0, 3.0, 1.0),
+                    rotation: (0.0, 0.0, 0.0),
+                    offset: (0.0, 1.5, 0.0),
+                },
+                collision: true,
+                walkable: false,
+                tags: vec!["barrier".to_string(), "office".to_string()],
+            },
+        );
+
+        // Window variations
+        tiles.insert(
+            "window_closed".to_string(),
+            TileDefinition {
+                tile_type: TileType::Window,
+                name: "Closed Window".to_string(),
+                description: "Closed office window".to_string(),
+                visual: TileVisual {
+                    icon: '[',
+                    color: "#87CEEB".to_string(),
+                    background_color: Some("#E0F6FF".to_string()),
+                },
+                mesh: TileMesh {
+                    mesh_type: "window_frame".to_string(),
+                    material: "wall".to_string(),
+                    scale: (1.0, 2.0, 0.2),
+                    rotation: (0.0, 0.0, 0.0),
+                    offset: (0.0, 1.0, 0.0),
+                },
+                collision: true,
+                walkable: false,
+                tags: vec![
+                    "barrier".to_string(),
+                    "transparent".to_string(),
+                    "office".to_string(),
+                ],
+            },
+        );
+        tiles.insert(
+            "window_open".to_string(),
+            TileDefinition {
+                tile_type: TileType::Window,
+                name: "Open Window".to_string(),
+                description: "Open office window".to_string(),
+                visual: TileVisual {
+                    icon: ']',
+                    color: "#87CEEB".to_string(),
+                    background_color: Some("#E0F6FF".to_string()),
+                },
+                mesh: TileMesh {
+                    mesh_type: "window_frame".to_string(),
+                    material: "wall".to_string(),
+                    scale: (1.0, 2.0, 0.2),
+                    rotation: (0.0, 0.0, 0.0),
+                    offset: (0.0, 1.0, 0.0),
+                },
+                collision: false,
+                walkable: true,
+                tags: vec!["transparent".to_string(), "office".to_string()],
+            },
+        );
+
+        // Wall block variations
+        tiles.insert(
+            "wall_thick".to_string(),
+            TileDefinition {
+                tile_type: TileType::Wall,
+                name: "Thick Wall Block".to_string(),
+                description: "Reinforced thick wall".to_string(),
+                visual: TileVisual {
+                    icon: '▓',
+                    color: "#C0C0C0".to_string(),
+                    background_color: Some("#808080".to_string()),
+                },
+                mesh: TileMesh {
+                    mesh_type: "cube".to_string(),
+                    material: "wall".to_string(),
+                    scale: (1.0, 3.0, 0.5),
+                    rotation: (0.0, 0.0, 0.0),
+                    offset: (0.0, 1.5, 0.0),
+                },
+                collision: true,
+                walkable: false,
+                tags: vec!["barrier".to_string(), "office".to_string()],
+            },
+        );
+        tiles.insert(
+            "wall_quarter".to_string(),
+            TileDefinition {
+                tile_type: TileType::Wall,
+                name: "Quarter Wall".to_string(),
+                description: "Low partition wall".to_string(),
+                visual: TileVisual {
+                    icon: '▒',
+                    color: "#D3D3D3".to_string(),
+                    background_color: Some("#A9A9A9".to_string()),
+                },
+                mesh: TileMesh {
+                    mesh_type: "cube".to_string(),
+                    material: "wall".to_string(),
+                    scale: (1.0, 1.5, 0.2),
+                    rotation: (0.0, 0.0, 0.0),
+                    offset: (0.0, 0.75, 0.0),
+                },
+                collision: true,
+                walkable: false,
+                tags: vec!["barrier".to_string(), "office".to_string()],
+            },
+        );
+
+        // Room types
+        tiles.insert(
+            "room_large".to_string(),
+            TileDefinition {
+                tile_type: TileType::Room,
+                name: "Large Room".to_string(),
+                description: "Open office area".to_string(),
+                visual: TileVisual {
+                    icon: 'O',
+                    color: "#8B7355".to_string(),
+                    background_color: Some("#F5F5DC".to_string()),
+                },
+                mesh: TileMesh {
+                    mesh_type: "plane".to_string(),
+                    material: "floor".to_string(),
+                    scale: (1.0, 0.05, 1.0),
+                    rotation: (0.0, 0.0, 0.0),
+                    offset: (0.0, 0.0, 0.0),
+                },
+                collision: false,
+                walkable: true,
+                tags: vec![
+                    "ground".to_string(),
+                    "room".to_string(),
+                    "office".to_string(),
+                ],
+            },
+        );
+        tiles.insert(
+            "room_small".to_string(),
+            TileDefinition {
+                tile_type: TileType::Room,
+                name: "Small Room".to_string(),
+                description: "Private office".to_string(),
+                visual: TileVisual {
+                    icon: 'P',
+                    color: "#8B7355".to_string(),
+                    background_color: Some("#F0F8FF".to_string()),
+                },
+                mesh: TileMesh {
+                    mesh_type: "plane".to_string(),
+                    material: "floor".to_string(),
+                    scale: (1.0, 0.05, 1.0),
+                    rotation: (0.0, 0.0, 0.0),
+                    offset: (0.0, 0.0, 0.0),
+                },
+                collision: false,
+                walkable: true,
+                tags: vec![
+                    "ground".to_string(),
+                    "room".to_string(),
+                    "office".to_string(),
+                ],
+            },
+        );
+
+        // Special rooms
+        tiles.insert(
+            "special_1".to_string(),
+            TileDefinition {
+                tile_type: TileType::Special,
+                name: "Elevator".to_string(),
+                description: "Elevator shaft".to_string(),
+                visual: TileVisual {
+                    icon: 'E',
+                    color: "#FFD700".to_string(),
+                    background_color: Some("#4B0082".to_string()),
+                },
+                mesh: TileMesh {
+                    mesh_type: "elevator".to_string(),
+                    material: "special".to_string(),
+                    scale: (0.8, 3.0, 0.8),
+                    rotation: (0.0, 0.0, 0.0),
+                    offset: (0.0, 1.5, 0.0),
+                },
+                collision: true,
+                walkable: false,
+                tags: vec!["interactive".to_string(), "office".to_string()],
+            },
+        );
+        tiles.insert(
+            "special_2".to_string(),
+            TileDefinition {
+                tile_type: TileType::Special,
+                name: "Lobby".to_string(),
+                description: "Reception lobby area".to_string(),
+                visual: TileVisual {
+                    icon: 'L',
+                    color: "#DDA0DD".to_string(),
+                    background_color: Some("#FFB6C1".to_string()),
+                },
+                mesh: TileMesh {
+                    mesh_type: "plane".to_string(),
+                    material: "floor".to_string(),
+                    scale: (1.0, 0.05, 1.0),
+                    rotation: (0.0, 0.0, 0.0),
+                    offset: (0.0, 0.0, 0.0),
+                },
+                collision: false,
+                walkable: true,
+                tags: vec![
+                    "ground".to_string(),
+                    "special".to_string(),
+                    "office".to_string(),
+                ],
+            },
+        );
+
+        // Stairs variations
+        tiles.insert(
+            "stairs_up".to_string(),
+            TileDefinition {
+                tile_type: TileType::Stairs,
+                name: "Stairs Up".to_string(),
+                description: "Staircase going up".to_string(),
+                visual: TileVisual {
+                    icon: '^',
+                    color: "#696969".to_string(),
+                    background_color: Some("#D3D3D3".to_string()),
+                },
+                mesh: TileMesh {
+                    mesh_type: "stairs".to_string(),
+                    material: "floor".to_string(),
+                    scale: (1.0, 1.0, 1.0),
+                    rotation: (0.0, 0.0, 0.0),
+                    offset: (0.0, 0.5, 0.0),
+                },
+                collision: false,
+                walkable: true,
+                tags: vec!["vertical".to_string(), "office".to_string()],
+            },
+        );
+        tiles.insert(
+            "stairs_down".to_string(),
+            TileDefinition {
+                tile_type: TileType::Stairs,
+                name: "Stairs Down".to_string(),
+                description: "Staircase going down".to_string(),
+                visual: TileVisual {
+                    icon: 'v',
+                    color: "#696969".to_string(),
+                    background_color: Some("#A9A9A9".to_string()),
+                },
+                mesh: TileMesh {
+                    mesh_type: "stairs".to_string(),
+                    material: "floor".to_string(),
+                    scale: (1.0, 1.0, 1.0),
+                    rotation: (0.0, 180.0, 0.0),
+                    offset: (0.0, 0.5, 0.0),
+                },
+                collision: false,
+                walkable: true,
+                tags: vec!["vertical".to_string(), "office".to_string()],
+            },
+        );
+
+        // Special features
+        tiles.insert(
+            "water".to_string(),
+            TileDefinition {
+                tile_type: TileType::Special,
+                name: "Water".to_string(),
+                description: "Water feature".to_string(),
+                visual: TileVisual {
+                    icon: '~',
+                    color: "#0080FF".to_string(),
+                    background_color: Some("#00BFFF".to_string()),
+                },
+                mesh: TileMesh {
+                    mesh_type: "plane".to_string(),
+                    material: "water".to_string(),
+                    scale: (1.0, 0.02, 1.0),
+                    rotation: (0.0, 0.0, 0.0),
+                    offset: (0.0, 0.0, 0.0),
+                },
+                collision: false,
+                walkable: false,
+                tags: vec!["liquid".to_string(), "office".to_string()],
+            },
+        );
+        tiles.insert(
+            "secret".to_string(),
+            TileDefinition {
+                tile_type: TileType::Special,
+                name: "Secret Passage".to_string(),
+                description: "Hidden passage".to_string(),
+                visual: TileVisual {
+                    icon: '?',
+                    color: "#800080".to_string(),
+                    background_color: Some("#4B0082".to_string()),
+                },
+                mesh: TileMesh {
+                    mesh_type: "plane".to_string(),
+                    material: "floor".to_string(),
+                    scale: (1.0, 0.05, 1.0),
+                    rotation: (0.0, 0.0, 0.0),
+                    offset: (0.0, 0.0, 0.0),
+                },
+                collision: false,
+                walkable: true,
+                tags: vec![
+                    "ground".to_string(),
+                    "secret".to_string(),
+                    "office".to_string(),
+                ],
+            },
+        );
+        tiles.insert(
+            "tunnel".to_string(),
+            TileDefinition {
+                tile_type: TileType::Special,
+                name: "Underground Tunnel".to_string(),
+                description: "Underground passage".to_string(),
+                visual: TileVisual {
+                    icon: 'T',
+                    color: "#654321".to_string(),
+                    background_color: Some("#8B4513".to_string()),
+                },
+                mesh: TileMesh {
+                    mesh_type: "tunnel".to_string(),
+                    material: "floor".to_string(),
+                    scale: (1.0, 0.8, 1.0),
+                    rotation: (0.0, 0.0, 0.0),
+                    offset: (0.0, 0.4, 0.0),
+                },
+                collision: false,
+                walkable: true,
+                tags: vec!["underground".to_string(), "office".to_string()],
+            },
+        );
+        tiles.insert(
+            "bridge".to_string(),
+            TileDefinition {
+                tile_type: TileType::Special,
+                name: "Sky Bridge".to_string(),
+                description: "Elevated walkway".to_string(),
+                visual: TileVisual {
+                    icon: 'B',
+                    color: "#C0C0C0".to_string(),
+                    background_color: Some("#87CEEB".to_string()),
+                },
+                mesh: TileMesh {
+                    mesh_type: "bridge".to_string(),
+                    material: "floor".to_string(),
+                    scale: (1.0, 0.1, 1.0),
+                    rotation: (0.0, 0.0, 0.0),
+                    offset: (0.0, 2.0, 0.0),
+                },
+                collision: false,
+                walkable: true,
+                tags: vec!["elevated".to_string(), "office".to_string()],
+            },
+        );
+
         Self {
             id: "office".to_string(),
             name: "Office".to_string(),

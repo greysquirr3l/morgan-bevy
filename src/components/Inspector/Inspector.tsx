@@ -5,7 +5,7 @@ import { Search } from 'lucide-react'
 import { TransformCommand } from '@/utils/commands'
 
 export default function Inspector() {
-  const { selectedObjects, sceneObjects, executeCommand } = useEditorStore()
+  const { selectedObjects, sceneObjects, executeCommand, updateObjectMaterial, updateObjectMesh, updateObjectProperties } = useEditorStore()
 
   // Get data for the first selected object (for single selection)
   const primaryObject = selectedObjects.length > 0 ? sceneObjects[selectedObjects[0]] : null
@@ -228,14 +228,26 @@ export default function Inspector() {
           selectedObjects={selectedObjects}
           onMaterialChange={(materialProps) => {
             console.log('Material changed:', materialProps)
-            // TODO: Apply material to selected objects in the store/scene
+            // Apply material to selected objects in the store/scene
+            selectedObjects.forEach((objectId: string) => {
+              updateObjectMaterial(objectId, materialProps)
+            })
           }}
         />
 
         {/* Mesh */}
         <div className="space-y-2">
           <h4 className="text-sm font-medium border-b border-editor-border pb-1">Mesh</h4>
-          <select className="w-full px-2 py-1 text-sm bg-editor-bg border border-editor-border rounded focus:outline-none focus:border-editor-accent">
+          <select 
+            className="w-full px-2 py-1 text-sm bg-editor-bg border border-editor-border rounded focus:outline-none focus:border-editor-accent"
+            value={primaryObject?.meshType || 'cube'}
+            onChange={(e) => {
+              if (selectedCount === 1 && primaryObject) {
+                updateObjectMesh(primaryObject.id, e.target.value as 'cube' | 'sphere' | 'pyramid')
+              }
+            }}
+            disabled={selectedCount > 1}
+          >
             <option value="cube">Cube</option>
             <option value="sphere">Sphere</option>
             <option value="pyramid">Pyramid</option>
@@ -258,15 +270,42 @@ export default function Inspector() {
 
           <div className="space-y-2">
             <label className="flex items-center space-x-2">
-              <input type="checkbox" defaultChecked className="rounded" />
+              <input 
+                type="checkbox" 
+                checked={primaryObject?.collision || false}
+                onChange={(e) => {
+                  selectedObjects.forEach((objectId: string) => {
+                    updateObjectProperties(objectId, { collision: e.target.checked })
+                  })
+                }}
+                className="rounded" 
+              />
               <span className="text-xs">Blocks Movement</span>
             </label>
             <label className="flex items-center space-x-2">
-              <input type="checkbox" defaultChecked className="rounded" />
+              <input 
+                type="checkbox" 
+                checked={primaryObject?.collision || false}
+                onChange={(e) => {
+                  selectedObjects.forEach((objectId: string) => {
+                    updateObjectProperties(objectId, { collision: e.target.checked })
+                  })
+                }}
+                className="rounded" 
+              />
               <span className="text-xs">Blocks Vision</span>
             </label>
             <label className="flex items-center space-x-2">
-              <input type="checkbox" className="rounded" />
+              <input 
+                type="checkbox" 
+                checked={!(primaryObject?.walkable ?? true)}
+                onChange={(e) => {
+                  selectedObjects.forEach((objectId: string) => {
+                    updateObjectProperties(objectId, { walkable: !e.target.checked })
+                  })
+                }}
+                className="rounded" 
+              />
               <span className="text-xs">Destructible</span>
             </label>
           </div>
@@ -275,8 +314,15 @@ export default function Inspector() {
             <label className="block text-xs text-editor-textMuted mb-1">Tags</label>
             <input
               type="text"
-              value="structure, exterior"
+              value={primaryObject?.tags?.join(', ') || ''}
+              onChange={(e) => {
+                const tags = e.target.value.split(',').map(tag => tag.trim()).filter(tag => tag.length > 0)
+                selectedObjects.forEach((objectId: string) => {
+                  updateObjectProperties(objectId, { tags })
+                })
+              }}
               className="w-full px-2 py-1 text-xs bg-editor-bg border border-editor-border rounded focus:outline-none focus:border-editor-accent"
+              placeholder="structure, exterior"
             />
           </div>
         </div>

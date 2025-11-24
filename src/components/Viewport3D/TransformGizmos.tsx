@@ -2,6 +2,7 @@ import { useRef, useEffect } from 'react'
 import { TransformControls } from '@react-three/drei'
 import { useThree } from '@react-three/fiber'
 import { useEditorStore } from '@/store/editorStore'
+import { TransformCommand } from '@/utils/commands'
 import * as THREE from 'three'
 
 interface TransformGizmosProps {
@@ -14,7 +15,8 @@ export default function TransformGizmos({ selectedObjects }: TransformGizmosProp
     snapToGrid, 
     gridSize, 
     sceneObjects, 
-    updateObjectTransform 
+    updateObjectTransform,
+    executeCommand
   } = useEditorStore()
   const { scene, camera } = useThree()
   const transformRef = useRef<any>(null)
@@ -178,8 +180,30 @@ export default function TransformGizmos({ selectedObjects }: TransformGizmosProp
   }
 
   const handleMouseUp = () => {
-    // TODO: Add undo/redo command here
-    console.log('Transform completed - add to undo stack')
+    // Create undo/redo commands for the transform operations
+    selectedObjects.forEach(objectId => {
+      const obj = sceneObjects[objectId]
+      const initial = initialTransforms.current[objectId]
+      
+      if (obj && initial) {
+        // Check if transform actually changed
+        const positionChanged = !obj.position.every((val, i) => Math.abs(val - initial.position[i]) < 0.001)
+        const rotationChanged = !obj.rotation.every((val, i) => Math.abs(val - initial.rotation[i]) < 0.001)
+        const scaleChanged = !obj.scale.every((val, i) => Math.abs(val - initial.scale[i]) < 0.001)
+        
+        if (positionChanged || rotationChanged || scaleChanged) {
+          const command = new TransformCommand(objectId, initial, {
+            position: [...obj.position] as [number, number, number],
+            rotation: [...obj.rotation] as [number, number, number],
+            scale: [...obj.scale] as [number, number, number]
+          })
+          executeCommand(command)
+        }
+      }
+    })
+    
+    // Clear initial transforms
+    initialTransforms.current = {}
     
     // Reset group transform for next operation
     if (selectedObjects.length > 1 && groupRef.current) {

@@ -1,5 +1,5 @@
 import { useEditorStore } from '@/store/editorStore'
-import { Plus, Save, FolderOpen, Download, Triangle } from 'lucide-react'
+import { Plus, Triangle } from 'lucide-react'
 import { DeleteObjectCommand, DuplicateCommand } from '@/utils/commands'
 
 export default function ActionsPanel() {
@@ -29,21 +29,6 @@ export default function ActionsPanel() {
         executeCommand(command)
       })
     }
-  }
-
-  const exportLevel = () => {
-    console.log('Export level dialog')
-    // TODO: Open export dialog
-  }
-
-  const saveProject = () => {
-    console.log('Save project')
-    // TODO: Save current project
-  }
-
-  const openProject = () => {
-    console.log('Open project dialog')
-    // TODO: Open file dialog
   }
 
   return (
@@ -109,36 +94,6 @@ export default function ActionsPanel() {
           </div>
         </div>
 
-        {/* File Operations */}
-        <div>
-          <h3 className="text-sm font-medium text-editor-text mb-2">Project</h3>
-          <div className="space-y-2">
-            <button 
-              className="w-full flex items-center justify-center p-2 bg-editor-bg hover:bg-editor-hover text-editor-text rounded text-sm"
-              onClick={saveProject}
-              title="Save Project (Ctrl+S)"
-            >
-              <Save className="w-4 h-4 mr-2" />
-              Save
-            </button>
-            <button 
-              className="w-full flex items-center justify-center p-2 bg-editor-bg hover:bg-editor-hover text-editor-text rounded text-sm"
-              onClick={openProject}
-              title="Open Project (Ctrl+O)"
-            >
-              <FolderOpen className="w-4 h-4 mr-2" />
-              Open
-            </button>
-            <button 
-              className="w-full flex items-center justify-center p-2 bg-green-600 hover:bg-green-700 text-white rounded text-sm"
-              onClick={exportLevel}
-              title="Export Level"
-            >
-              <Download className="w-4 h-4 mr-2" />
-              Export
-            </button>
-          </div>
-        </div>
       </div>
     </div>
   )

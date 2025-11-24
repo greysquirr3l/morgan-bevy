@@ -40,6 +40,9 @@ csv = "1.2"
 anyhow = "1.0"
 thiserror = "1.0"
 
+# Date/time handling
+chrono = { version = "0.4", features = ["serde"] }
+
 # Logging
 log = "0.4"
 env_logger = "0.10"
@@ -47,6 +50,9 @@ env_logger = "0.10"
 # Performance and math
 nalgebra = "0.32"
 glam = "0.24"
+
+[dev-dependencies]
+tokio-test = "0.4"
 
 [features]
 default = ["custom-protocol"]

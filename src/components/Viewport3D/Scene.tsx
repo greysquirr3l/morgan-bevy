@@ -31,7 +31,8 @@ function SceneObject({
   position, 
   rotation, 
   scale, 
-  visible 
+  visible,
+  material 
 }: { 
   id: string
   meshType: 'cube' | 'sphere' | 'pyramid'
@@ -39,6 +40,12 @@ function SceneObject({
   rotation: [number, number, number]
   scale: [number, number, number]
   visible: boolean
+  material?: {
+    baseColor: string
+    metallic: number
+    roughness: number
+    texture?: string
+  }
 }) {
   const meshRef = useRef<Mesh>(null)
   const { selectedObjects, setSelectedObjects, addToSelection, hoveredObject, setHoveredObject } = useEditorStore()
@@ -87,11 +94,23 @@ function SceneObject({
     }
   }
   
-  // Material color based on state
+  // Material color based on state and tile type
   const getColor = () => {
     if (isSelected) return '#60a5fa' // Blue when selected
     if (isHovered) return '#fbbf24' // Yellow when hovered
-    return '#9ca3af' // Default gray
+    const color = material?.baseColor || '#9ca3af'
+    return color // Use tile color or default gray
+  }
+
+  // Get material properties
+  const getMaterialProps = () => {
+    return {
+      color: getColor(),
+      metalness: material?.metallic || 0.0,
+      roughness: material?.roughness || 0.5,
+      transparent: isHovered,
+      opacity: isHovered ? 0.8 : 1.0
+    }
   }
   
   if (!visible) return null
@@ -111,11 +130,7 @@ function SceneObject({
       userData={{ objectId: id, meshType }}
     >
       {renderGeometry()}
-      <meshStandardMaterial 
-        color={getColor()}
-        transparent={isHovered}
-        opacity={isHovered ? 0.8 : 1.0}
-      />
+      <meshStandardMaterial {...getMaterialProps()} />
     </mesh>
   )
 }
@@ -145,6 +160,7 @@ export default function Scene() {
             rotation={obj.rotation}
             scale={obj.scale}
             visible={isObjectVisible(obj)}
+            material={obj.material}
           />
         ) : null
       ))}

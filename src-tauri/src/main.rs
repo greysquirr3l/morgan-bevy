@@ -14,6 +14,7 @@ use export::{ExportFormat, LevelExporter};
 use generation::bsp::BSPGenerator;
 use generation::wfc::{WFCGenerationParams, WFCGenerator};
 use spatial::{BoundingBox, SpatialIndex};
+use std::path::PathBuf;
 
 use generation::themes::{Theme, ThemeLibrary};
 
@@ -46,6 +47,13 @@ pub struct LevelData {
     pub generation_seed: Option<u64>,
     pub generation_params: Option<serde_json::Value>,
     pub bounds: BoundingBox,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ProjectData {
+    pub version: String,
+    pub timestamp: String,
+    pub scene: serde_json::Value,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -187,7 +195,7 @@ async fn export_level(
     level_data: LevelData,
     formats: Vec<ExportFormat>,
     output_path: String,
-) -> Result<String, String> {
+) -> Result<export::exporters::ExportResult, String> {
     info!(
         "Exporting level to {:?} formats at path: {}",
         formats, output_path
@@ -198,10 +206,20 @@ async fn export_level(
         .export_multi_format(&level_data, &formats, &output_path)
         .await
     {
-        Ok(export_paths) => {
-            let paths_str = export_paths.join(", ");
-            info!("Successfully exported to: {}", paths_str);
-            Ok(paths_str)
+        Ok(export_result) => {
+            info!(
+                "Successfully exported {} objects in {}ms",
+                export_result.total_objects, export_result.export_time_ms
+            );
+            for file in &export_result.exported_files {
+                if file.success {
+                    info!(
+                        "Exported {:?} to: {} ({} bytes)",
+                        file.format, file.file_path, file.file_size
+                    );
+                }
+            }
+            Ok(export_result)
         }
         Err(e) => {
             error!("Failed to export level: {}", e);
@@ -291,6 +309,109 @@ async fn load_level_from_file(
     Ok(level_data)
 }
 
+#[tauri::command]
+async fn export_level_simple(
+    level_data: LevelData,
+    format: String,
+    output_path: Option<String>,
+) -> Result<String, String> {
+    info!("Exporting level in format: {}", format);
+
+    let export_format = match format.as_str() {
+        "json" => ExportFormat::JSON,
+        "ron" => ExportFormat::RON,
+        "rust" => ExportFormat::RustCode,
+        _ => return Err(format!("Unsupported export format: {}", format)),
+    };
+
+    // Use file dialog if no output path provided
+    let base_path = if let Some(p) = output_path {
+        PathBuf::from(p)
+    } else {
+        // Show save dialog
+        use rfd::FileDialog;
+        let extension = export_format.file_extension();
+
+        match FileDialog::new()
+            .add_filter(&format!("{} files", format.to_uppercase()), &[extension])
+            .set_file_name(&format!("level.{}", extension))
+            .save_file()
+        {
+            Some(path) => path,
+            None => return Err("Export cancelled by user".to_string()),
+        }
+    };
+
+    let exporter = LevelExporter::new();
+    match exporter
+        .export_multi_format(&level_data, &[export_format], &base_path.to_string_lossy())
+        .await
+    {
+        Ok(result) => {
+            if let Some(file) = result.exported_files.first() {
+                if file.success {
+                    info!("Successfully exported level to: {}", file.file_path);
+                    Ok(file.file_path.clone())
+                } else {
+                    Err("Export failed".to_string())
+                }
+            } else {
+                Err("No files exported".to_string())
+            }
+        }
+        Err(e) => {
+            error!("Failed to export level: {}", e);
+            Err(e.to_string())
+        }
+    }
+}
+
+#[tauri::command]
+async fn save_project(project_data: ProjectData) -> Result<String, String> {
+    info!("Saving project");
+
+    use rfd::FileDialog;
+    let path = match FileDialog::new()
+        .add_filter("Morgan-Bevy Project", &["mbp"])
+        .set_file_name("project.mbp")
+        .save_file()
+    {
+        Some(path) => path,
+        None => return Err("Save cancelled by user".to_string()),
+    };
+
+    let json_data = serde_json::to_string_pretty(&project_data)
+        .map_err(|e| format!("Failed to serialize project: {}", e))?;
+
+    std::fs::write(&path, json_data).map_err(|e| format!("Failed to write project file: {}", e))?;
+
+    info!("Successfully saved project to: {:?}", path);
+    Ok(path.to_string_lossy().to_string())
+}
+
+#[tauri::command]
+async fn load_project() -> Result<ProjectData, String> {
+    info!("Loading project");
+
+    use rfd::FileDialog;
+    let path = match FileDialog::new()
+        .add_filter("Morgan-Bevy Project", &["mbp"])
+        .pick_file()
+    {
+        Some(path) => path,
+        None => return Err("Load cancelled by user".to_string()),
+    };
+
+    let json_data = std::fs::read_to_string(&path)
+        .map_err(|e| format!("Failed to read project file: {}", e))?;
+
+    let project_data: ProjectData = serde_json::from_str(&json_data)
+        .map_err(|e| format!("Failed to parse project file: {}", e))?;
+
+    info!("Successfully loaded project from: {:?}", path);
+    Ok(project_data)
+}
+
 fn main() {
     env_logger::init();
     info!("Starting Morgan-Bevy Level Editor");
@@ -306,6 +427,9 @@ fn main() {
             generate_bsp_level,
             generate_wfc_level,
             export_level,
+            export_level_simple,
+            save_project,
+            load_project,
             query_objects_in_bounds,
             update_object_transform,
             get_current_level,
