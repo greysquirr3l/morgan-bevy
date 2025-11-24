@@ -136,7 +136,10 @@ class ClipboardManager {
     }
   }
 
-  // Check if clipboard has data
+  // Get clipboard data for commands
+  getData(): ClipboardData | null {
+    return this.data
+  }
   hasData(): boolean {
     return this.data !== null
   }

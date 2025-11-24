@@ -244,3 +244,68 @@ export class UngroupCommand implements Command {
     })
   }
 }
+
+// Paste objects command
+export class PasteCommand implements Command {
+  private pastedObjects: Array<{
+    id: string
+    objectData: any
+  }> = []
+  public description: string
+
+  constructor(private clipboardData: any, private position?: [number, number, number]) {
+    this.description = `Paste ${clipboardData?.objects?.length || 0} object(s)`
+  }
+
+  execute(): void {
+    if (!this.clipboardData || !this.clipboardData.objects) {
+      return
+    }
+
+    // Calculate offset for pasted objects
+    const offset = this.position || [2, 0, 0]
+    
+    // Find center of copied objects to offset from
+    let centerX = 0, centerY = 0, centerZ = 0
+    this.clipboardData.objects.forEach((obj: any) => {
+      centerX += obj.position[0]
+      centerY += obj.position[1]
+      centerZ += obj.position[2]
+    })
+    centerX /= this.clipboardData.objects.length
+    centerY /= this.clipboardData.objects.length
+    centerZ /= this.clipboardData.objects.length
+
+    // Create new objects at offset positions
+    useEditorStore.setState((state: any) => {
+      for (const objData of this.clipboardData.objects) {
+        const newId = `${objData.name}_paste_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`
+        const newPosition: [number, number, number] = [
+          objData.position[0] - centerX + offset[0],
+          objData.position[1] - centerY + offset[1],
+          objData.position[2] - centerZ + offset[2]
+        ]
+
+        const newObjectData = {
+          ...objData,
+          id: newId,
+          name: `${objData.name}_paste`,
+          position: newPosition,
+          parentId: undefined,
+          children: []
+        }
+
+        state.sceneObjects[newId] = newObjectData
+        this.pastedObjects.push({ id: newId, objectData: newObjectData })
+      }
+    })
+  }
+
+  undo(): void {
+    useEditorStore.setState((state: any) => {
+      this.pastedObjects.forEach(({ id }) => {
+        delete state.sceneObjects[id]
+      })
+    })
+  }
+}

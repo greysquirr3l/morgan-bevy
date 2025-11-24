@@ -1,12 +1,12 @@
 import { useEditorStore } from '@/store/editorStore'
 import { Plus, Save, FolderOpen, Download, Triangle } from 'lucide-react'
+import { DeleteObjectCommand, DuplicateCommand } from '@/utils/commands'
 
 export default function ActionsPanel() {
   const { 
     selectedObjects, 
     addObject, 
-    removeObject, 
-    duplicateObjects 
+    executeCommand
   } = useEditorStore()
 
   const createPrimitive = (type: 'cube' | 'sphere' | 'pyramid') => {
@@ -15,13 +15,19 @@ export default function ActionsPanel() {
 
   const duplicateSelected = () => {
     if (selectedObjects.length > 0) {
-      duplicateObjects(selectedObjects)
+      const command = new DuplicateCommand(selectedObjects)
+      command.execute()
+      executeCommand(command)
     }
   }
 
   const deleteSelected = () => {
     if (selectedObjects.length > 0) {
-      selectedObjects.forEach((id: string) => removeObject(id))
+      selectedObjects.forEach((id: string) => {
+        const command = new DeleteObjectCommand(id)
+        command.execute()
+        executeCommand(command)
+      })
     }
   }
 

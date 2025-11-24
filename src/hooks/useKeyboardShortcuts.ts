@@ -1,7 +1,8 @@
 import { useEffect } from 'react'
 import { useEditorStore } from '@/store/editorStore'
-import { copySelectedObjects, pasteFromClipboard } from '@/utils/clipboard'
+import { copySelectedObjects, clipboard } from '@/utils/clipboard'
 import { transformConstraints } from '@/utils/transformConstraints'
+import { DeleteObjectCommand, DuplicateCommand, PasteCommand, GroupCommand, UngroupCommand } from '@/utils/commands'
 
 export function useKeyboardShortcuts() {
   const { 
@@ -12,14 +13,11 @@ export function useKeyboardShortcuts() {
     toggleStats,
     setCameraMode,
     transformMode,
-    removeObject,
-    duplicateObjects,
+    executeCommand,
     undo,
     redo,
     canUndo,
     canRedo,
-    groupObjects,
-    ungroupObject,
     sceneObjects
   } = useEditorStore()
 
@@ -58,7 +56,12 @@ export function useKeyboardShortcuts() {
         case 'backspace':
           if (selectedObjects.length > 0) {
             event.preventDefault()
-            selectedObjects.forEach((id: string) => removeObject(id))
+            // Use command system for undoable delete operations
+            selectedObjects.forEach((id: string) => {
+              const command = new DeleteObjectCommand(id)
+              command.execute()
+              executeCommand(command)
+            })
           }
           break
         case '1':
@@ -125,7 +128,10 @@ export function useKeyboardShortcuts() {
           case 'd':
             event.preventDefault()
             if (selectedObjects.length > 0) {
-              duplicateObjects(selectedObjects)
+              // Use command system for undoable duplicate operation
+              const command = new DuplicateCommand(selectedObjects)
+              command.execute()
+              executeCommand(command)
             }
             break
           case 'c':
@@ -137,14 +143,15 @@ export function useKeyboardShortcuts() {
             break
           case 'v':
             event.preventDefault()
-            // Paste at origin by default, could be enhanced to paste at cursor/camera position
-            pasteFromClipboard([0, 0, 0]).then(pastedIds => {
-              if (pastedIds.length > 0) {
-                const { setSelectedObjects } = useEditorStore.getState()
-                setSelectedObjects(pastedIds)
-                console.log('Pasted objects from clipboard:', pastedIds.length)
+            // Use command system for undoable paste operation
+            if (clipboard.hasData()) {
+              const clipboardData = clipboard.getData()
+              if (clipboardData) {
+                const command = new PasteCommand(clipboardData, [0, 0, 0])
+                command.execute()
+                executeCommand(command)
               }
-            })
+            }
             break
           case 'g':
             event.preventDefault()
@@ -153,15 +160,19 @@ export function useKeyboardShortcuts() {
               if (selectedObjects.length === 1) {
                 const obj = sceneObjects[selectedObjects[0]]
                 if (obj && obj.type === 'group') {
-                  ungroupObject(obj.id)
+                  const command = new UngroupCommand(obj.id)
+                  command.execute()
+                  executeCommand(command)
                   console.log('Ungrouped objects')
                 }
               }
             } else {
               // Ctrl+G: Group
               if (selectedObjects.length > 1) {
-                const groupId = groupObjects(selectedObjects)
-                console.log('Grouped objects into:', groupId)
+                const command = new GroupCommand(selectedObjects)
+                command.execute()
+                executeCommand(command)
+                console.log('Grouped objects')
               }
             }
             break
@@ -195,7 +206,7 @@ export function useKeyboardShortcuts() {
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [selectedObjects, setTransformMode, toggleGrid, toggleStats, setCameraMode, clearSelection, removeObject, duplicateObjects, undo, redo, canUndo, canRedo, groupObjects, ungroupObject, sceneObjects, transformMode])
+  }, [selectedObjects, setTransformMode, toggleGrid, toggleStats, setCameraMode, clearSelection, executeCommand, undo, redo, canUndo, canRedo, sceneObjects, transformMode])
 
   return { transformMode }
 }
