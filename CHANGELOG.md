@@ -5,6 +5,90 @@ All notable changes to the Morgan-Bevy 3D Level Editor project will be documente
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.0] - 2025-11-24 - "Testing Infrastructure & Enhanced UI Release"
+
+### Added
+
+- **Comprehensive Testing Infrastructure**
+  - Complete Vitest testing framework with jsdom environment for React component testing
+  - Professional test setup with Tauri API mocking, localStorage, and clipboard mocking
+  - Three.js WebGL context mocking for headless testing environment
+  - Lucide React icon mocking system for component isolation
+  - 30+ passing tests covering utilities, store management, and UI components
+  - MaterialEditor component test suite with user interaction testing
+  - Editor store test suite covering object management, selection, and transforms
+  - Automated test execution with npm test script integration
+
+- **Enhanced Inspector Panel System**
+  - Advanced tile properties management with comprehensive metadata support
+  - Emoji icon integration for tile types (🟫🚪🪟🧱📦🌟🎯⚡) with visual categorization
+  - ASCII character mapping system for tile representation
+  - Movement and vision property controls with checkbox interfaces
+  - Tag preset system for rapid tile configuration
+  - Grid position tracking with coordinate display
+  - Metadata persistence and synchronization with editor store
+
+- **Professional Material Editor Component**
+  - Complete PBR material property editing with metallic/roughness workflow
+  - Material preset library with basic materials (Metal, Plastic, Wood, Glass, Concrete)
+  - Advanced material presets with emissive properties (Neon, LED, Gold, Copper, Chrome)
+  - Texture browsing and management with file system integration
+  - Material preview system with visual representation
+  - Copy/paste material functionality with clipboard integration
+  - Custom material saving and preset management with localStorage persistence
+  - Multi-object material application with batch editing support
+
+### Enhanced
+
+- **Editor Store Architecture**
+  - Enhanced metadata support in object properties for complex tile data
+  - Improved type safety with explicit parameter annotations
+  - Fixed Zustand 5.0.8 compatibility issues with proper type inference
+  - Better state management for complex UI interactions
+  - Resolved compilation errors and warnings across all store methods
+
+- **Component Testing Framework**
+  - Complete mock infrastructure for isolated component testing
+  - Testing utilities for user interactions and state verification
+  - Professional test organization with describe/it structure
+  - Coverage for critical UI workflows and edge cases
+
+- **Code Quality Improvements**
+  - Fixed all TypeScript compilation errors and warnings
+  - Resolved 21+ compilation errors in MaterialEditor tests
+  - Enhanced import management and dependency resolution
+  - Improved error handling and debugging infrastructure
+  - Professional logging and development workflow optimization
+
+### Fixed
+
+- **Testing Infrastructure Issues**
+  - Resolved MaterialEditor test compilation errors with proper mock setup
+  - Fixed localStorage and clipboard mocking for component tests
+  - Corrected Three.js WebGL context mocking for headless environments
+  - Fixed Lucide React icon mocking with comprehensive icon coverage
+  - Resolved store test issues with proper state management verification
+
+- **Component Architecture Fixes**
+  - Fixed Inspector Panel integration with enhanced metadata support
+  - Corrected MaterialEditor component rendering and interaction issues
+  - Resolved prop passing and component composition problems
+  - Fixed test setup and configuration for reliable test execution
+
+- **Build and Development Issues**
+  - Resolved all npm test execution errors and failures
+  - Fixed import statements and dependency management
+  - Corrected TypeScript configuration for testing environment
+  - Enhanced development workflow with reliable testing pipeline
+
+### Technical Achievements
+
+- **Test Coverage**: 30 tests passing across 3 test suites (utilities, store, components)
+- **Code Quality**: Zero compilation errors and warnings in test environment
+- **Component Reliability**: Comprehensive testing for critical UI components
+- **Development Workflow**: Robust testing infrastructure for continued development
+- **User Experience**: Enhanced Inspector Panel and Material Editor for professional workflows
+
 ## [0.3.5] - 2025-11-24 - "Professional Asset Management Release"
 
 ### Added

@@ -483,6 +483,38 @@ async fn load_project() -> Result<ProjectData, String> {
     Ok(project_data)
 }
 
+#[tauri::command]
+async fn browse_for_texture() -> Result<Vec<String>, String> {
+    info!("Browsing for texture files");
+
+    use rfd::FileDialog;
+    let paths = FileDialog::new()
+        .add_filter(
+            "Image Files",
+            &["png", "jpg", "jpeg", "bmp", "tga", "ktx", "dds", "hdr"],
+        )
+        .add_filter("PNG", &["png"])
+        .add_filter("JPEG", &["jpg", "jpeg"])
+        .add_filter("All Files", &["*"])
+        .set_title("Select Texture Files")
+        .pick_files();
+
+    match paths {
+        Some(file_paths) => {
+            let path_strings: Vec<String> = file_paths
+                .iter()
+                .map(|p| p.to_string_lossy().to_string())
+                .collect();
+            info!("Selected {} texture file(s)", path_strings.len());
+            Ok(path_strings)
+        }
+        None => {
+            info!("Texture selection cancelled by user");
+            Ok(vec![])
+        }
+    }
+}
+
 fn main() {
     env_logger::init();
     info!("Starting Morgan-Bevy Level Editor");
@@ -509,6 +541,8 @@ fn main() {
             // Project Management
             save_project,
             load_project,
+            // File Operations
+            browse_for_texture,
             // Spatial Queries
             query_objects_in_bounds,
             update_object_transform,

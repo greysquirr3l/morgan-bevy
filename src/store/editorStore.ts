@@ -122,7 +122,7 @@ export interface EditorState {
   updateObjectLock: (id: string, locked: boolean) => void
   updateObjectMaterial: (id: string, material: { baseColor: string, metallic: number, roughness: number, texture?: string }) => void
   updateObjectMesh: (id: string, meshType: 'cube' | 'sphere' | 'pyramid') => void
-  updateObjectProperties: (id: string, properties: { collision?: boolean, walkable?: boolean, tags?: string[] }) => void
+  updateObjectProperties: (id: string, properties: { collision?: boolean, walkable?: boolean, tags?: string[], metadata?: any }) => void
   groupObjects: (ids: string[]) => string
   ungroupObject: (groupId: string) => void
   clearScene: () => void
@@ -504,7 +504,7 @@ export const useEditorStore = create<EditorState>()(
         }
       }),
     
-    updateObjectProperties: (id: string, properties: { collision?: boolean, walkable?: boolean, tags?: string[] }) =>
+    updateObjectProperties: (id: string, properties: { collision?: boolean, walkable?: boolean, tags?: string[], metadata?: any }) =>
       set((state) => {
         if (state.sceneObjects[id]) {
           if (properties.collision !== undefined) {
@@ -515,6 +515,12 @@ export const useEditorStore = create<EditorState>()(
           }
           if (properties.tags !== undefined) {
             state.sceneObjects[id].tags = properties.tags
+          }
+          if (properties.metadata !== undefined) {
+            state.sceneObjects[id].metadata = {
+              ...state.sceneObjects[id].metadata,
+              ...properties.metadata
+            }
           }
         }
       }),

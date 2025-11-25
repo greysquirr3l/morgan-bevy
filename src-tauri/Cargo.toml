@@ -1,6 +1,6 @@
 [package]
 name = "morgan-bevy"
-version = "0.3.5"
+version = "0.4.0"
 description = "Visual 3D Level Editor & Procedural Generator for Bevy"
 authors = ["Nick Campbell <s0ma@protonmail.com>"]
 license = "MIT OR Apache-2.0"

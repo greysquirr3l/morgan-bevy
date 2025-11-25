@@ -4,6 +4,21 @@ import MaterialEditor from '../MaterialEditor'
 import { Search } from 'lucide-react'
 import { TransformCommand } from '@/utils/commands'
 
+// Helper function to get default tile character for tile types
+const getTileChar = (tileType: string): string => {
+  const tileChars: Record<string, string> = {
+    '1': '.',  // FLOOR
+    '2': '+',  // DOOR
+    '3': '=',  // WINDOW
+    '4': '#',  // WALL
+    '5': 'F',  // FURNITURE
+    '6': 'S',  // SPAWN
+    '7': 'O',  // OBJECTIVE
+    '8': 'X',  // HAZARD
+  }
+  return tileChars[tileType] || '#'
+}
+
 export default function Inspector() {
   const { selectedObjects, sceneObjects, executeCommand, updateObjectMaterial, updateObjectMesh, updateObjectProperties } = useEditorStore()
 
@@ -255,76 +270,254 @@ export default function Inspector() {
         </div>
 
         {/* Tile Properties */}
-        <div className="space-y-2">
-          <h4 className="text-sm font-medium border-b border-editor-border pb-1">Tile Properties</h4>
+        <div className="space-y-3">
+          <h4 className="text-sm font-medium text-editor-accent border-b border-editor-border/30 pb-1">Tile Properties</h4>
           
+          {/* Tile Type Selection */}
           <div>
-            <label className="block text-xs text-editor-textMuted mb-1">Type</label>
-            <select className="w-full px-2 py-1 text-xs bg-editor-bg border border-editor-border rounded focus:outline-none focus:border-editor-accent">
-              <option value="4">WALL (4)</option>
-              <option value="1">FLOOR (1)</option>
-              <option value="2">DOOR (2)</option>
-              <option value="3">WINDOW (3)</option>
+            <label className="block text-xs text-editor-textMuted mb-1">Tile Type</label>
+            <select 
+              className="w-full px-2 py-1 text-xs bg-editor-bg border border-editor-border rounded focus:outline-none focus:border-editor-accent"
+              value={primaryObject?.metadata?.tileType || '1'}
+              onChange={(e) => {
+                const tileType = e.target.value
+                selectedObjects.forEach((objectId: string) => {
+                  const obj = sceneObjects[objectId]
+                  if (obj) {
+                    updateObjectProperties(objectId, { 
+                      metadata: { 
+                        ...obj.metadata, 
+                        tileType,
+                        tileChar: getTileChar(tileType)
+                      } 
+                    })
+                  }
+                })
+              }}
+              disabled={selectedCount > 1}
+            >
+              <option value="1">🟫 FLOOR (1) - Walkable surface</option>
+              <option value="2">🚪 DOOR (2) - Passage between rooms</option>
+              <option value="3">🪟 WINDOW (3) - Light source, partial vision</option>
+              <option value="4">🧱 WALL (4) - Solid barrier</option>
+              <option value="5">📦 FURNITURE (5) - Decorative object</option>
+              <option value="6">🌟 SPAWN (6) - Player/entity spawn point</option>
+              <option value="7">🎯 OBJECTIVE (7) - Mission objective</option>
+              <option value="8">⚡ HAZARD (8) - Dangerous area</option>
             </select>
           </div>
 
-          <div className="space-y-2">
-            <label className="flex items-center space-x-2">
-              <input 
-                type="checkbox" 
-                checked={primaryObject?.collision || false}
+          {/* Tile Character Representation */}
+          <div>
+            <label className="block text-xs text-editor-textMuted mb-1">ASCII Character</label>
+            <div className="flex items-center space-x-2">
+              <div className="w-8 h-8 bg-editor-bg border border-editor-border rounded flex items-center justify-center font-mono text-sm">
+                {getTileChar(primaryObject?.metadata?.tileType || '1')}
+              </div>
+              <input
+                type="text"
+                maxLength={1}
+                value={primaryObject?.metadata?.tileChar || getTileChar(primaryObject?.metadata?.tileType || '1')}
                 onChange={(e) => {
+                  const char = e.target.value.slice(0, 1)
                   selectedObjects.forEach((objectId: string) => {
-                    updateObjectProperties(objectId, { collision: e.target.checked })
+                    const obj = sceneObjects[objectId]
+                    if (obj) {
+                      updateObjectProperties(objectId, { 
+                        metadata: { 
+                          ...obj.metadata, 
+                          tileChar: char 
+                        } 
+                      })
+                    }
                   })
                 }}
-                className="rounded" 
+                className="flex-1 px-2 py-1 text-xs bg-editor-bg border border-editor-border rounded focus:outline-none focus:border-editor-accent font-mono text-center"
+                placeholder="#"
               />
-              <span className="text-xs">Blocks Movement</span>
-            </label>
-            <label className="flex items-center space-x-2">
-              <input 
-                type="checkbox" 
-                checked={primaryObject?.collision || false}
-                onChange={(e) => {
-                  selectedObjects.forEach((objectId: string) => {
-                    updateObjectProperties(objectId, { collision: e.target.checked })
-                  })
-                }}
-                className="rounded" 
-              />
-              <span className="text-xs">Blocks Vision</span>
-            </label>
-            <label className="flex items-center space-x-2">
-              <input 
-                type="checkbox" 
-                checked={!(primaryObject?.walkable ?? true)}
-                onChange={(e) => {
-                  selectedObjects.forEach((objectId: string) => {
-                    updateObjectProperties(objectId, { walkable: !e.target.checked })
-                  })
-                }}
-                className="rounded" 
-              />
-              <span className="text-xs">Destructible</span>
-            </label>
+            </div>
+            <div className="text-xs text-editor-textMuted mt-1">
+              Character used in 2D grid view
+            </div>
           </div>
 
+          {/* Movement and Vision Properties */}
+          <div className="space-y-2">
+            <div className="text-xs font-medium text-editor-textMuted">Movement & Vision</div>
+            <div className="grid grid-cols-2 gap-2">
+              <label className="flex items-center space-x-2 p-2 bg-editor-panel rounded border border-editor-border/50">
+                <input 
+                  type="checkbox" 
+                  checked={primaryObject?.collision || false}
+                  onChange={(e) => {
+                    selectedObjects.forEach((objectId: string) => {
+                      updateObjectProperties(objectId, { collision: e.target.checked })
+                    })
+                  }}
+                  className="rounded accent-editor-accent" 
+                />
+                <span className="text-xs">🚫 Blocks Movement</span>
+              </label>
+              
+              <label className="flex items-center space-x-2 p-2 bg-editor-panel rounded border border-editor-border/50">
+                <input 
+                  type="checkbox" 
+                  checked={primaryObject?.metadata?.blocksVision || false}
+                  onChange={(e) => {
+                    selectedObjects.forEach((objectId: string) => {
+                      const obj = sceneObjects[objectId]
+                      if (obj) {
+                        updateObjectProperties(objectId, { 
+                          metadata: { 
+                            ...obj.metadata, 
+                            blocksVision: e.target.checked 
+                          } 
+                        })
+                      }
+                    })
+                  }}
+                  className="rounded accent-editor-accent" 
+                />
+                <span className="text-xs">👁️ Blocks Vision</span>
+              </label>
+
+              <label className="flex items-center space-x-2 p-2 bg-editor-panel rounded border border-editor-border/50">
+                <input 
+                  type="checkbox" 
+                  checked={!(primaryObject?.walkable ?? true)}
+                  onChange={(e) => {
+                    selectedObjects.forEach((objectId: string) => {
+                      updateObjectProperties(objectId, { walkable: !e.target.checked })
+                    })
+                  }}
+                  className="rounded accent-editor-accent" 
+                />
+                <span className="text-xs">💥 Destructible</span>
+              </label>
+
+              <label className="flex items-center space-x-2 p-2 bg-editor-panel rounded border border-editor-border/50">
+                <input 
+                  type="checkbox" 
+                  checked={primaryObject?.metadata?.interactive || false}
+                  onChange={(e) => {
+                    selectedObjects.forEach((objectId: string) => {
+                      const obj = sceneObjects[objectId]
+                      if (obj) {
+                        updateObjectProperties(objectId, { 
+                          metadata: { 
+                            ...obj.metadata, 
+                            interactive: e.target.checked 
+                          } 
+                        })
+                      }
+                    })
+                  }}
+                  className="rounded accent-editor-accent" 
+                />
+                <span className="text-xs">🖱️ Interactive</span>
+              </label>
+            </div>
+          </div>
+
+          {/* Tags with Better UI */}
           <div>
             <label className="block text-xs text-editor-textMuted mb-1">Tags</label>
-            <input
-              type="text"
-              value={primaryObject?.tags?.join(', ') || ''}
-              onChange={(e) => {
-                const tags = e.target.value.split(',').map(tag => tag.trim()).filter(tag => tag.length > 0)
-                selectedObjects.forEach((objectId: string) => {
-                  updateObjectProperties(objectId, { tags })
-                })
-              }}
-              className="w-full px-2 py-1 text-xs bg-editor-bg border border-editor-border rounded focus:outline-none focus:border-editor-accent"
-              placeholder="structure, exterior"
-            />
+            <div className="space-y-2">
+              <input
+                type="text"
+                value={primaryObject?.tags?.join(', ') || ''}
+                onChange={(e) => {
+                  const tags = e.target.value.split(',').map(tag => tag.trim()).filter(tag => tag.length > 0)
+                  selectedObjects.forEach((objectId: string) => {
+                    updateObjectProperties(objectId, { tags })
+                  })
+                }}
+                className="w-full px-2 py-1 text-xs bg-editor-bg border border-editor-border rounded focus:outline-none focus:border-editor-accent"
+                placeholder="structure, exterior, decorative"
+              />
+              
+              {/* Tag Presets */}
+              <div className="flex flex-wrap gap-1">
+                {['structure', 'exterior', 'interior', 'decorative', 'functional', 'temporary'].map(preset => (
+                  <button
+                    key={preset}
+                    onClick={() => {
+                      const currentTags = primaryObject?.tags || []
+                      const newTags = currentTags.includes(preset) 
+                        ? currentTags.filter(tag => tag !== preset)
+                        : [...currentTags, preset]
+                      
+                      selectedObjects.forEach((objectId: string) => {
+                        updateObjectProperties(objectId, { tags: newTags })
+                      })
+                    }}
+                    className={`px-2 py-1 text-xs rounded border transition-colors ${
+                      (primaryObject?.tags || []).includes(preset)
+                        ? 'bg-editor-accent text-white border-editor-accent'
+                        : 'bg-editor-panel border-editor-border text-editor-textMuted hover:border-editor-accent'
+                    }`}
+                  >
+                    {preset}
+                  </button>
+                ))}
+              </div>
+            </div>
           </div>
+
+          {/* Grid Position (if applicable) */}
+          {primaryObject?.metadata?.gridPosition && (
+            <div>
+              <label className="block text-xs text-editor-textMuted mb-1">Grid Position</label>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="block text-xs text-editor-textMuted">X</label>
+                  <input
+                    type="number"
+                    value={primaryObject.metadata.gridPosition.x || 0}
+                    onChange={(e) => {
+                      const newX = parseInt(e.target.value) || 0
+                      selectedObjects.forEach((objectId: string) => {
+                        const obj = sceneObjects[objectId]
+                        if (obj && obj.metadata?.gridPosition) {
+                          updateObjectProperties(objectId, { 
+                            metadata: { 
+                              ...obj.metadata, 
+                              gridPosition: { ...obj.metadata.gridPosition, x: newX } 
+                            } 
+                          })
+                        }
+                      })
+                    }}
+                    className="w-full px-2 py-1 text-xs bg-editor-bg border border-editor-border rounded focus:outline-none focus:border-editor-accent"
+                    step="1"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs text-editor-textMuted">Y</label>
+                  <input
+                    type="number"
+                    value={primaryObject.metadata.gridPosition.y || 0}
+                    onChange={(e) => {
+                      const newY = parseInt(e.target.value) || 0
+                      selectedObjects.forEach((objectId: string) => {
+                        const obj = sceneObjects[objectId]
+                        if (obj && obj.metadata?.gridPosition) {
+                          updateObjectProperties(objectId, { 
+                            metadata: { 
+                              ...obj.metadata, 
+                              gridPosition: { ...obj.metadata.gridPosition, y: newY } 
+                            } 
+                          })
+                        }
+                      })
+                    }}
+                    className="w-full px-2 py-1 text-xs bg-editor-bg border border-editor-border rounded focus:outline-none focus:border-editor-accent"
+                    step="1"
+                  />
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>
