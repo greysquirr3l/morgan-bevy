@@ -36,7 +36,7 @@ export default function ActionsPanel() {
       <div className="space-y-4">
         {/* Primitive Creation */}
         <div>
-          <h3 className="text-sm font-medium text-editor-text mb-2">Create Objects</h3>
+          <h3 className="text-sm font-semibold text-editor-accent mb-2 border-b border-editor-border/30 pb-1">Create Objects</h3>
           <div className="grid grid-cols-3 gap-2">
             <button 
               className="flex flex-col items-center p-2 bg-editor-bg hover:bg-editor-hover rounded text-xs"
@@ -67,7 +67,7 @@ export default function ActionsPanel() {
 
         {/* Object Actions */}
         <div>
-          <h3 className="text-sm font-medium text-editor-text mb-2">
+          <h3 className="text-sm font-semibold text-editor-accent mb-2 border-b border-editor-border/30 pb-1">
             Object Actions 
             {selectedObjects.length > 0 && (
               <span className="text-editor-accent">({selectedObjects.length} selected)</span>

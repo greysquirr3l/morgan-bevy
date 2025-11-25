@@ -52,7 +52,7 @@ interface LevelData {
 
 interface GenerationPanelProps {}
 
-export default function GenerationPanel({}: GenerationPanelProps) {
+export default function GenerationPanel(_props: GenerationPanelProps) {
   const [isGenerating, setIsGenerating] = useState(false)
   const [params, setParams] = useState<GenerationParams>({
     algorithm: 'BSP',

@@ -3,8 +3,6 @@ import { invoke } from '@tauri-apps/api/core';
 import {
   Search,
   Filter,
-  Grid3X3,
-  List,
   RefreshCw,
   Folder,
   FileText,
@@ -83,7 +81,6 @@ interface AssetSearchParams {
   limit?: number;
 }
 
-type ViewMode = 'grid' | 'list';
 type SortMode = 'name' | 'type' | 'size' | 'date';
 
 interface AssetBrowserProps {
@@ -103,7 +100,6 @@ export default function AssetBrowser({ hideHeader = false }: AssetBrowserProps) 
   });
   
   // UI state
-  const [viewMode, setViewMode] = useState<ViewMode>('grid');
   const [sortMode, setSortMode] = useState<SortMode>('name');
   const [selectedAssets, setSelectedAssets] = useState<Set<number>>(new Set());
   const [isLoading, setIsLoading] = useState(false);
@@ -116,9 +112,10 @@ export default function AssetBrowser({ hideHeader = false }: AssetBrowserProps) 
   // Initialize database and load initial data
   useEffect(() => {
     initializeDatabase();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const initializeDatabase = async () => {
+  const initializeDatabase = useCallback(async () => {
     try {
       setIsLoading(true);
       setError(null);
@@ -139,7 +136,8 @@ export default function AssetBrowser({ hideHeader = false }: AssetBrowserProps) 
     } finally {
       setIsLoading(false);
     }
-  };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const loadAssets = useCallback(async () => {
     try {
@@ -443,28 +441,12 @@ export default function AssetBrowser({ hideHeader = false }: AssetBrowserProps) 
                   <option value="date">Sort by Date</option>
                 </select>
 
-                {/* View mode */}
-                <div className="flex bg-editor-bg border border-editor-border rounded overflow-hidden">
-                  <button
-                    onClick={() => setViewMode('grid')}
-                    className={`p-1 ${viewMode === 'grid' ? 'bg-editor-accent text-white' : 'hover:bg-editor-hover'}`}
-                  >
-                    <Grid3X3 className="w-4 h-4" />
-                  </button>
-                  <button
-                    onClick={() => setViewMode('list')}
-                    className={`p-1 ${viewMode === 'list' ? 'bg-editor-accent text-white' : 'hover:bg-editor-hover'}`}
-                  >
-                    <List className="w-4 h-4" />
-                  </button>
-                </div>
-
                 {/* Clear filters */}
                 <button
                   onClick={clearFilters}
                   className="px-3 py-1 text-sm text-editor-textMuted hover:text-editor-text"
                 >
-                  Clear Filters
+                  Clear
                 </button>
               </div>
             )}
@@ -524,61 +506,50 @@ export default function AssetBrowser({ hideHeader = false }: AssetBrowserProps) 
             </button>
           </div>
         ) : (
-          <div className={`p-4 ${
-            viewMode === 'grid' 
-              ? 'grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-3' 
-              : 'space-y-1'
-          }`}>
-            {assets.map(result => (
-              <div
-                key={result.asset.id}
-                draggable
-                onDragStart={(e) => handleAssetDragStart(result.asset, e)}
-                onClick={(e) => handleAssetSelection(result.asset.id, e.ctrlKey || e.metaKey)}
-                className={[
-                  viewMode === 'grid' 
-                    ? 'p-3 rounded border-2 cursor-grab hover:border-editor-accent/50 flex flex-col items-center text-center' 
-                    : 'p-2 rounded border cursor-pointer hover:bg-editor-hover flex items-center space-x-3',
-                  selectedAssets.has(result.asset.id) 
-                    ? 'border-editor-accent bg-editor-accent/10' 
-                    : 'border-editor-border',
-                  'transition-all duration-150 hover:shadow-lg'
-                ].join(' ')}
-                title={`${result.asset.name}\n${result.asset.file_path}\nSize: ${formatFileSize(result.asset.file_size)}\nType: ${result.asset.asset_type}\nCollection: ${result.asset.collection}`}
-              >
-                {viewMode === 'grid' ? (
-                  <>
-                    <div className={`text-2xl mb-2 ${getTypeColor(result.asset.asset_type)}`}>
-                      {getAssetIcon(result.asset.asset_type)}
-                    </div>
-                    <div className="text-xs font-medium truncate w-full mb-1">
+          <div className="p-2">
+            {/* Compact list view optimized for panels */}
+            <div className="space-y-1">
+              {assets.map(result => (
+                <div
+                  key={result.asset.id}
+                  draggable
+                  onDragStart={(e) => handleAssetDragStart(result.asset, e)}
+                  onClick={(e) => handleAssetSelection(result.asset.id, e.ctrlKey || e.metaKey)}
+                  className={[
+                    'p-2 rounded cursor-grab hover:bg-editor-hover flex items-center space-x-2 text-sm',
+                    selectedAssets.has(result.asset.id) 
+                      ? 'bg-editor-accent/20 border border-editor-accent' 
+                      : 'border border-transparent hover:border-editor-border',
+                    'transition-all duration-150'
+                  ].join(' ')}
+                  title={`${result.asset.name}\nPath: ${result.asset.file_path}\nSize: ${formatFileSize(result.asset.file_size)}\nType: ${result.asset.asset_type}\nCollection: ${result.asset.collection}`}
+                >
+                  {/* Asset icon */}
+                  <div className={`flex-shrink-0 ${getTypeColor(result.asset.asset_type)}`}>
+                    {getAssetIcon(result.asset.asset_type)}
+                  </div>
+                  
+                  {/* Asset info */}
+                  <div className="flex-1 min-w-0">
+                    <div className="font-medium truncate text-editor-text">
                       {result.asset.name}
                     </div>
-                    <div className="text-xs text-editor-textMuted">
-                      {formatFileSize(result.asset.file_size)}
+                    <div className="text-xs text-editor-textMuted truncate flex items-center space-x-2">
+                      <span className={`px-1 py-0.5 rounded text-xs ${getTypeColor(result.asset.asset_type)} bg-current/10`}>
+                        {result.asset.asset_type}
+                      </span>
+                      <span>•</span>
+                      <span>{formatFileSize(result.asset.file_size)}</span>
                     </div>
-                    <div className={`text-xs ${getTypeColor(result.asset.asset_type)}`}>
-                      {result.asset.asset_type}
-                    </div>
-                  </>
-                ) : (
-                  <>
-                    <div className={`${getTypeColor(result.asset.asset_type)}`}>
-                      {getAssetIcon(result.asset.asset_type)}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="font-medium truncate">{result.asset.name}</div>
-                      <div className="text-xs text-editor-textMuted truncate">
-                        {result.asset.collection} • {formatFileSize(result.asset.file_size)} • {formatDate(result.asset.updated_at)}
-                      </div>
-                    </div>
-                    <div className={`text-xs px-2 py-1 rounded ${getTypeColor(result.asset.asset_type)} bg-current/10`}>
-                      {result.asset.asset_type}
-                    </div>
-                  </>
-                )}
-              </div>
-            ))}
+                  </div>
+                  
+                  {/* Quick info */}
+                  <div className="flex-shrink-0 text-xs text-editor-textMuted">
+                    {result.asset.collection}
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         )}
       </div>

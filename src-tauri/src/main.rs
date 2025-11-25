@@ -1,3 +1,15 @@
+//! Morgan-Bevy 3D Level Editor & Procedural Generator
+//!
+//! A hybrid Rust/TypeScript 3D level editor for Bevy game development that combines
+//! procedural generation (BSP, WFC) with professional manual editing capabilities.
+//!
+//! This crate provides the Tauri backend for the Morgan-Bevy editor, handling:
+//! - Asset management and scanning
+//! - Spatial indexing for 3D operations  
+//! - BSP and WFC procedural generation algorithms
+//! - Export system for multiple formats (JSON, RON, Rust code)
+//! - File I/O and project management
+
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 use log::{error, info};
@@ -20,60 +32,118 @@ use std::path::PathBuf;
 use generation::themes::{Theme, ThemeLibrary};
 
 // Core data structures for level editing
+/// 3D transformation data for positioning, rotating, and scaling objects in 3D space.
+///
+/// Uses standard 3D graphics conventions with Y-up coordinate system.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Transform3D {
+    /// Position coordinates in 3D space [x, y, z] in world units
     pub position: [f32; 3],
+    /// Rotation as quaternion [x, y, z, w] for smooth interpolation
     pub rotation: [f32; 4], // quaternion [x, y, z, w]
+    /// Scale factors [x, y, z] for non-uniform scaling support
     pub scale: [f32; 3],
 }
 
+/// Represents a 3D object in the editor with transform, material, and metadata.
+///
+/// GameObjects are the fundamental building blocks of levels in Morgan-Bevy.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GameObject {
+    /// Unique identifier for the object within the level
     pub id: String,
+    /// Human-readable name displayed in the editor hierarchy
     pub name: String,
+    /// 3D transformation (position, rotation, scale) data
     pub transform: Transform3D,
+    /// Optional material reference for rendering
     pub material: Option<String>,
+    /// Optional mesh reference for geometry
     pub mesh: Option<String>,
+    /// Layer assignment for organization and visibility control
     pub layer: String,
+    /// Tags for categorization and scripting hooks
     pub tags: Vec<String>,
+    /// Additional metadata for custom properties and game logic
     pub metadata: HashMap<String, serde_json::Value>,
 }
 
+/// Complete level data containing all objects, layers, and generation information.
+///
+/// This is the main data structure for saving and loading levels in Morgan-Bevy.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LevelData {
+    /// Unique identifier for the level
     pub id: String,
+    /// Human-readable level name
     pub name: String,
+    /// All game objects contained in this level
     pub objects: Vec<GameObject>,
+    /// Layer names for organization and visibility control
     pub layers: Vec<String>,
+    /// Random seed used for procedural generation (if applicable)
     pub generation_seed: Option<u64>,
+    /// Parameters used for procedural generation algorithms
     pub generation_params: Option<serde_json::Value>,
+    /// 3D bounding box defining the level's spatial extent
     pub bounds: BoundingBox,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+/// Project data for saving and loading complete editor sessions.
+///
+/// Contains versioning information and scene state for persistence.
+#[derive(Debug, Serialize, Deserialize)]
 pub struct ProjectData {
+    /// Morgan-Bevy version used to create this project
     pub version: String,
+    /// ISO timestamp of when the project was last saved
     pub timestamp: String,
+    /// Complete scene data including objects, settings, and editor state
     pub scene: serde_json::Value,
 }
 
+/// Parameters for Binary Space Partitioning (BSP) level generation.
+///
+/// Controls the procedural generation of rooms and corridors using BSP algorithm.
 #[derive(Debug, Serialize, Deserialize)]
 pub struct BSPGenerationParams {
+    /// Level width in grid units
     pub width: u32,
+    /// Level height in grid units
     pub height: u32,
+    /// Level depth/floors for multi-story generation
     pub depth: u32,
+    /// Minimum room size to prevent tiny rooms
     pub min_room_size: u32,
+    /// Maximum room size to prevent oversized rooms
     pub max_room_size: u32,
+    /// Width of corridors connecting rooms
     pub corridor_width: u32,
+    /// Theme name determining tiles, materials, and styling
     pub theme: String,
+    /// Optional random seed for reproducible generation
     pub seed: Option<u64>,
 }
 
 // Application state
-#[derive(Default)]
+/// Global application state managed by Tauri for the Morgan-Bevy editor.
+///
+/// Maintains the current level data and spatial indexing for efficient 3D operations.
+#[derive(Debug)]
 pub struct AppState {
+    /// Currently loaded level data, None if no level is open
     pub current_level: Option<LevelData>,
+    /// Spatial index for fast 3D queries (selection, collision, etc.)
     pub spatial_index: SpatialIndex,
+}
+
+impl Default for AppState {
+    fn default() -> Self {
+        Self {
+            current_level: None,
+            spatial_index: SpatialIndex::new(),
+        }
+    }
 }
 
 // Tauri Commands

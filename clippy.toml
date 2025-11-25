@@ -1,0 +1,8 @@
+# Clippy configuration for Morgan-Bevy
+# Runs additional lints to improve code quality
+
+# Allow some pedantic lints that may be too restrictive
+too-many-lines-threshold = 200        # Allow longer functions for complex algorithms
+cognitive-complexity-threshold = 25   # Allow complex algorithms
+type-complexity-threshold = 500       # Allow complex types for 3D math
+max-struct-bools = 5                  # Allow multiple bools in config structs

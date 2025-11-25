@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useRef } from 'react'
 import { Mesh, BoxGeometry, MeshStandardMaterial } from 'three'
 import { useFrame, ThreeEvent } from '@react-three/fiber'
 import { useEditorStore } from '@/store/editorStore'
@@ -11,7 +11,6 @@ interface SelectableCubeProps {
 
 export default function SelectableCube({ position, color, id }: SelectableCubeProps) {
   const meshRef = useRef<Mesh>(null!)
-  const [_hovered, setHovered] = useState(false)
   
   const { 
     selectedObjects, 
@@ -61,14 +60,12 @@ export default function SelectableCube({ position, color, id }: SelectableCubePr
 
   const handlePointerOver = (event: ThreeEvent<PointerEvent>) => {
     event.stopPropagation()
-    setHovered(true)
     setHoveredObject(id)
     document.body.style.cursor = 'pointer'
   }
 
   const handlePointerOut = (event: ThreeEvent<PointerEvent>) => {
     event.stopPropagation()
-    setHovered(false)
     setHoveredObject(null)
     document.body.style.cursor = 'default'
   }

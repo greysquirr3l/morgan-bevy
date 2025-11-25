@@ -55,9 +55,59 @@ export const useCameraControls = () => {
     controlsRef.current.update()
   }
 
+  const frameAll = () => {
+    if (!controlsRef.current) return
+
+    // Calculate bounding box of all visible objects
+    const box = new THREE.Box3()
+    const sphere = new THREE.Sphere()
+    let hasObjects = false
+
+    Object.values(sceneObjects).forEach((obj: any) => {
+      if (obj.type === 'mesh' && obj.visible) {
+        const center = new THREE.Vector3(...obj.position)
+        const size = new THREE.Vector3(...obj.scale)
+        
+        // Create a bounding box for this object
+        const objBox = new THREE.Box3()
+        objBox.setFromCenterAndSize(center, size)
+        box.union(objBox)
+        hasObjects = true
+      }
+    })
+
+    // If no objects, frame the origin with a default view
+    if (!hasObjects) {
+      resetView()
+      return
+    }
+
+    // Expand box slightly to avoid objects at screen edges
+    box.expandByScalar(2)
+
+    // Get bounding sphere and adjust camera
+    box.getBoundingSphere(sphere)
+    const center = sphere.center
+    const radius = sphere.radius
+
+    // Position camera to see all objects
+    const distance = radius / Math.sin(Math.PI / 6) // Assuming 60 degree FOV
+    const direction = camera.position.clone().sub(center).normalize()
+    
+    // If camera is too close to center, use a default direction
+    if (direction.length() < 0.1) {
+      direction.set(1, 1, 1).normalize()
+    }
+    
+    camera.position.copy(center).add(direction.multiplyScalar(Math.max(distance * 1.5, 10)))
+    controlsRef.current.target.copy(center)
+    controlsRef.current.update()
+  }
+
   return {
     controlsRef,
     resetView,
-    focusSelection
+    focusSelection,
+    frameAll
   }
 }

@@ -67,6 +67,14 @@ export default function ExportPanel() {
       fileExtension: 'gltf',
       enabled: false,
     },
+    {
+      id: 'FBX',
+      name: 'FBX',
+      description: 'Autodesk FBX format for 3D software',
+      icon: <Box className="w-4 h-4" />,
+      fileExtension: 'fbx',
+      enabled: false,
+    },
   ])
 
   const toggleFormat = (formatId: ExportFormat['id']) => {

@@ -1,53 +1,123 @@
 import { Canvas } from '@react-three/fiber'
-import { OrbitControls, Grid, Stats } from '@react-three/drei'
+import { Grid, Stats } from '@react-three/drei'
 import Scene from './Scene'
+import OptimizedScene, { PerformanceOverlay } from './OptimizedScene'
 import BoxSelection, { BoxSelectionOverlay } from './BoxSelection'
 import TransformGizmos from '../TransformGizmos'
 import TransformConstraintIndicator from '../TransformConstraintIndicator'
+import CameraSystem from './CameraSystem'
 import { useEditorStore } from '@/store/editorStore'
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts'
 import { useBoxSelection } from '@/hooks/useBoxSelection'
 import { useCameraControls } from '@/hooks/useCameraControls'
-import { useCallback, useState, forwardRef, useImperativeHandle } from 'react'
-
+import { usePerformanceManager, PerformanceObject } from '@/performance'
+import { useCallback, useState, forwardRef, useImperativeHandle, useMemo } from 'react'
+import React from 'react'
 // Camera controls interface
 export interface CameraControlsRef {
   resetView: () => void
   focusSelection: () => void
+  frameAll: () => void
+}
+
+// Performance context component that handles R3F hooks within Canvas
+function PerformanceContext({ 
+  performanceObjects, 
+  setMetrics, 
+  setQualityInfo
+}: {
+  performanceObjects: PerformanceObject[]
+  setMetrics: (metrics: any) => void
+  setQualityInfo: (quality: any) => void
+}) {
+  const { metrics } = usePerformanceManager(
+    performanceObjects,
+    5000 // max render budget
+  )
+  
+  // Update parent component with metrics
+  React.useEffect(() => {
+    setMetrics(metrics)
+  }, [metrics, setMetrics])
+  
+  // Simple quality management without useFrame for now
+  React.useEffect(() => {
+    setQualityInfo({
+      qualityMultiplier: metrics.frameRate > 30 ? 1.0 : 0.6,
+      lodDistance: metrics.frameRate > 30 ? 50 : 30,
+      instanceThreshold: 10
+    })
+  }, [metrics.frameRate, setQualityInfo])
+  
+  return null
 }
 
 // Camera controls component that provides the controls within Canvas context
 function CameraControls({ cameraControlsRef }: { cameraControlsRef: React.ForwardedRef<CameraControlsRef> }) {
-  const { controlsRef, resetView, focusSelection } = useCameraControls()
-  const { cameraMode } = useEditorStore()
+  const { resetView, focusSelection, frameAll } = useCameraControls()
+  const { cameraMode, setCameraMode } = useEditorStore()
   
   useImperativeHandle(cameraControlsRef, () => ({
     resetView,
-    focusSelection
-  }), [resetView, focusSelection])
-
-  if (cameraMode !== 'orbit') return null
+    focusSelection,
+    frameAll
+  }), [resetView, focusSelection, frameAll])
 
   return (
-    <OrbitControls
-      ref={controlsRef}
-      enablePan={true}
-      enableZoom={true}
-      enableRotate={true}
-      panSpeed={1}
-      zoomSpeed={1}
-      rotateSpeed={1}
-      minDistance={1}
-      maxDistance={100}
+    <CameraSystem 
+      mode={cameraMode} 
+      onModeChange={setCameraMode}
     />
   )
 }
 
 export default forwardRef<CameraControlsRef, object>((_props, ref) => {
-  const { showGrid, showStats, transformMode, addObject, cameraMode } = useEditorStore()
+  const { showGrid, showStats, transformMode, addObject, cameraMode, sceneObjects, layers } = useEditorStore()
   const [isDragOver, setIsDragOver] = useState(false)
+  const [useOptimizedRendering, setUseOptimizedRendering] = useState(true)
   const { boxState } = useBoxSelection()
   useKeyboardShortcuts()
+
+  // Performance state managed locally
+  const [metrics, setMetrics] = useState({
+    totalObjects: 0,
+    renderedObjects: 0,
+    culledObjects: 0,
+    instancedObjects: 0,
+    frameRate: 60,
+    memoryUsage: 0
+  })
+  
+  const [qualityInfo, setQualityInfo] = useState({
+    qualityMultiplier: 1.0,
+    lodDistance: 50,
+    instanceThreshold: 10
+  })
+  
+  // Convert scene objects to performance objects for metrics
+  const performanceObjects: PerformanceObject[] = useMemo(() => {
+    return Object.values(sceneObjects).map((obj: any) => {
+      if (obj.type !== 'mesh' || !obj.meshType) return null
+      
+      let importance = 0.5
+      if (obj.id.includes('selected')) importance = 1.0
+      if (obj.layerId === 'walls') importance = 0.8
+      if (obj.layerId === 'floors') importance = 0.6
+      if (obj.metadata?.fromGrid) importance = 0.4
+      
+      return {
+        id: obj.id,
+        meshType: obj.meshType,
+        position: obj.position,
+        rotation: obj.rotation,
+        scale: obj.scale,
+        color: obj.material?.baseColor || '#9ca3af',
+        visible: obj.visible && (layers.find(l => l.id === obj.layerId)?.visible ?? true),
+        importance,
+        boundingRadius: Math.max(...obj.scale) * 0.5
+      }
+    }).filter(Boolean) as PerformanceObject[]
+  }, [sceneObjects, layers])
 
   // Handle drag and drop from assets panel
   const handleDragOver = useCallback((event: React.DragEvent) => {
@@ -150,6 +220,13 @@ export default forwardRef<CameraControlsRef, object>((_props, ref) => {
           gl.setSize(window.innerWidth, window.innerHeight)
         }}
       >
+        {/* Performance context to handle R3F hooks */}
+        <PerformanceContext 
+          performanceObjects={performanceObjects}
+          setMetrics={setMetrics}
+          setQualityInfo={setQualityInfo}
+        />
+        
         {/* Lighting */}
         <ambientLight intensity={0.4} />
         <directionalLight
@@ -187,7 +264,11 @@ export default forwardRef<CameraControlsRef, object>((_props, ref) => {
         )}
 
         {/* Scene Content */}
-        <Scene />
+        {useOptimizedRendering ? (
+          <OptimizedScene />
+        ) : (
+          <Scene />
+        )}
 
         {/* Transform Gizmos - needs to be inside Canvas for R3F hooks */}
         <TransformGizmos />
@@ -204,6 +285,22 @@ export default forwardRef<CameraControlsRef, object>((_props, ref) => {
         <div>Camera: {cameraMode}</div>
         <div>Grid: {showGrid ? 'On' : 'Off'}</div>
         <div>Transform: {transformMode}</div>
+        <div>Rendering: {useOptimizedRendering ? 'Optimized' : 'Standard'}</div>
+      </div>
+
+      {/* Performance Controls */}
+      <div className="absolute top-2 right-2 flex space-x-2">
+        <button 
+          className={`px-2 py-1 text-xs rounded ${
+            useOptimizedRendering 
+              ? 'bg-green-600 text-white' 
+              : 'bg-black bg-opacity-50 text-white hover:bg-opacity-75'
+          }`}
+          onClick={() => setUseOptimizedRendering(!useOptimizedRendering)}
+          title="Toggle performance optimization"
+        >
+          {useOptimizedRendering ? '⚡ Optimized' : '🐌 Standard'}
+        </button>
       </div>
 
       {/* Camera Mode Controls */}
@@ -230,13 +327,13 @@ export default forwardRef<CameraControlsRef, object>((_props, ref) => {
         </button>
         <button 
           className={`px-2 py-1 text-xs rounded ${
-            cameraMode === 'top-down' 
+            cameraMode === 'orthographic' 
               ? 'bg-editor-accent text-white' 
               : 'bg-black bg-opacity-50 text-white hover:bg-opacity-75'
           }`}
-          onClick={() => useEditorStore.getState().setCameraMode('top-down')}
+          onClick={() => useEditorStore.getState().setCameraMode('orthographic')}
         >
-          Top
+          Ortho
         </button>
       </div>
 
@@ -244,6 +341,14 @@ export default forwardRef<CameraControlsRef, object>((_props, ref) => {
       <div className="absolute bottom-2 right-2 bg-black bg-opacity-50 text-white text-xs p-2 rounded font-mono">
         <div>X: 0.0 Y: 0.0 Z: 0.0</div>
       </div>
+
+      {/* Performance Overlay */}
+      {useOptimizedRendering && (
+        <PerformanceOverlay 
+          metrics={metrics} 
+          qualityInfo={qualityInfo} 
+        />
+      )}
     </div>
   )
 })

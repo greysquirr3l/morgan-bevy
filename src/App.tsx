@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { PanelLeft, PanelRight } from 'lucide-react'
-import Viewport3D, { CameraControlsRef } from '@/components/Viewport3D/Viewport3D'
+import Viewport3D from '@/components/Viewport3D/Viewport3D'
 import GridView, { GridViewRef } from '@/components/GridView/GridView'
 import Hierarchy from '@/components/Hierarchy/Hierarchy'
 import Inspector from './components/Inspector/Inspector'
@@ -8,9 +8,13 @@ import Layers from '@/components/Layers'
 import FileMenu from '@/components/FileMenu/FileMenu'
 import PrefabManager from '@/components/PrefabManager/PrefabManager'
 import GenerationPanel from '@/components/GenerationPanel/GenerationPanel'
+import ExportPanel from '@/components/ExportPanel/ExportPanel'
+import PerformanceTestPanel from '@/components/PerformanceTestPanel'
 import { ActionsPanel } from '@/components/ActionsPanel'
 import AssetBrowser from '@/components/AssetBrowser'
 import CollapsiblePanel from '@/components/CollapsiblePanel'
+import KeyboardShortcutsModal, { useKeyboardShortcutsModal } from '@/components/KeyboardShortcutsModal'
+import { CameraProvider, useCameraContext } from '@/contexts/CameraContext'
 import { useEditorStore } from '@/store/editorStore'
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts'
 import { useResizablePanels } from '@/hooks/useResizablePanels'
@@ -184,10 +188,10 @@ function useViewportSync() {
       })
     })
     
-    // debugLogger.log('SYNC_GRID_TO_SCENE', 'Sync completed', {
-    //   objectsCreated,
-    //   removedObjects: objectsToRemove.length
-    // })
+    debugLogger.log('SYNC_GRID_TO_SCENE', 'Sync completed', {
+      objectsCreated,
+      removedObjects: objectsToRemove.length
+    })
   }, [])  // CRITICAL FIX: Remove dependencies to prevent re-creation during sync operations
 
   // Sync 3D scene objects back to 2D grid (when switching from 3D to 2D)
@@ -237,10 +241,10 @@ function useViewportSync() {
       }
     })
     
-    // debugLogger.log('SYNC_3D_TO_GRID', 'Sync completed', {
-    //   tilesConverted,
-    //   gridObjectsProcessed: gridObjects.length
-    // })
+    debugLogger.log('SYNC_3D_TO_GRID', 'Sync completed', {
+      tilesConverted,
+      gridObjectsProcessed: gridObjects.length
+    })
     
     setGridData(newGrid)
   }, []) // No dependencies needed, [])  // No dependencies needed as it uses getState()
@@ -304,7 +308,7 @@ function useViewportSync() {
         }
       } catch (error) {
         isSyncingRef.current = false
-        // debugLogger.logError('VIEWPORT_EFFECT', `Effect ${effectId} sync failed`, error)
+        debugLogger.logError('VIEWPORT_EFFECT', `Effect ${effectId} sync failed`, error)
       }
     } else {
       debugLogger.log('VIEWPORT_EFFECT', `Effect ${effectId} no mode change, updating ref`)
@@ -316,7 +320,7 @@ function useViewportSync() {
   return { syncGridToScene, sync3DToGrid }
 }
 
-function App() {
+function AppContent() {
   const [isReady, setIsReady] = useState(false)
   const [fileMenuOpen, setFileMenuOpen] = useState(false)
   const [fileMenuPosition, setFileMenuPosition] = useState({ x: 0, y: 0 })
@@ -325,6 +329,9 @@ function App() {
   const [activeMenu, setActiveMenu] = useState<string | null>(null)
   const [menuPosition, setMenuPosition] = useState({ x: 0, y: 0 })
   const lastViewportChangeRef = useRef(0)
+  
+  // Keyboard shortcuts modal
+  const { isOpen: keyboardShortcutsOpen, openModal: openKeyboardShortcuts, closeModal: closeKeyboardShortcuts } = useKeyboardShortcutsModal()
 
   const { 
     transformMode, 
@@ -333,6 +340,8 @@ function App() {
     toggleSnapToGrid,
     gridSize,
     setGridSize,
+    coordinateSpace,
+    toggleCoordinateSpace,
     viewportMode,
     setViewportMode,
     undo,
@@ -350,8 +359,11 @@ function App() {
     setSelectedObjects,
     clearSelection,
     removeObject,
-    duplicateObject
+    duplicateObjects
   } = useEditorStore()
+
+  // Get camera controls ref from context
+  const { cameraControlsRef } = useCameraContext()
 
   // Debounced viewport mode setter
   const debouncedSetViewportMode = useCallback((mode: '2d' | '3d') => {
@@ -374,8 +386,7 @@ function App() {
     setViewportMode(mode)
   }, [setViewportMode])
   
-  // Camera controls and grid view refs
-  const cameraControlsRef = useRef<CameraControlsRef>(null)
+  // Grid view ref
   const gridViewRef = useRef<GridViewRef>(null)
   
   // Initialize viewport synchronization
@@ -434,7 +445,7 @@ function App() {
         selectedObjects.forEach(id => removeObject(id))
         break
       case 'duplicate':
-        selectedObjects.forEach(id => duplicateObject(id))
+        duplicateObjects(selectedObjects)
         break
     }
     closeMenus()
@@ -456,7 +467,7 @@ function App() {
         break
       case 'toggle-grid':
         // Focus the viewport and toggle grid
-        document.querySelector('.viewport-container')?.focus()
+        (document.querySelector('.viewport-container') as HTMLElement)?.focus()
         break
       case 'reset-camera':
         cameraControlsRef.current?.resetView()
@@ -474,7 +485,7 @@ function App() {
     closeMenus()
   }
 
-  const handleGenerateAction = (action: string) => {
+  const handleGenerateAction = (_action: string) => {
     // Focus the Generation Panel
     const generationPanel = document.querySelector('[data-panel="generation"]')
     if (generationPanel) {
@@ -512,7 +523,7 @@ function App() {
   const handleHelpAction = (action: string) => {
     switch (action) {
       case 'keyboard-shortcuts':
-        alert(`Keyboard Shortcuts:\n\nTransforms:\nW - Move Tool\nE - Rotate Tool\nR - Scale Tool\nQ - Select Tool\n\nEdit:\nCtrl+Z - Undo\nCtrl+Y - Redo\nDel - Delete Selected\nCtrl+D - Duplicate\n\nView:\n1 - Switch to 3D\n2 - Switch to 2D\nF - Focus Selection\nHome - Reset Camera`)
+        openKeyboardShortcuts()
         break
       case 'about':
         alert('Morgan-Bevy 3D Level Editor\n\nA hybrid Rust/TypeScript 3D level editor for Bevy game development that combines procedural generation with professional manual editing capabilities.')
@@ -558,7 +569,7 @@ function App() {
     return () => {
       window.removeEventListener('beforeunload', handleBeforeUnload)
     }
-  }, [])
+  }, [saveToLocalStorage])
 
   if (!isReady) {
     return (
@@ -748,6 +759,17 @@ function App() {
           >
             Snap: {snapToGrid ? 'On' : 'Off'}
           </button>
+          <button
+            className={`px-2 py-1 text-sm rounded transition-colors ${
+              coordinateSpace === 'local' 
+                ? 'bg-editor-accent text-white' 
+                : 'bg-editor-bg text-editor-text hover:bg-gray-600'
+            }`}
+            onClick={toggleCoordinateSpace}
+            title="Transform Coordinate Space (T)"
+          >
+            {coordinateSpace === 'world' ? 'World' : 'Local'}
+          </button>
           <select 
             className="bg-editor-bg text-editor-text text-sm px-2 py-1 rounded border border-editor-border"
             value={gridSize}
@@ -770,6 +792,13 @@ function App() {
         )}
         
         <div className="flex space-x-2">
+          <button
+            className="px-2 py-1 text-sm rounded transition-colors bg-editor-bg text-editor-text hover:bg-gray-600"
+            onClick={openKeyboardShortcuts}
+            title="Keyboard Shortcuts (?)"
+          >
+            ?
+          </button>
           <button
             className={`px-2 py-1 text-sm rounded transition-colors ${
               panels.leftVisible
@@ -848,7 +877,7 @@ function App() {
             
             {/* Camera Controls */}
             <div className="absolute top-4 left-4 bg-editor-panel/90 border border-editor-border rounded p-2 space-y-1">
-              <div className="text-xs font-medium text-editor-text mb-2">Camera</div>
+              <div className="text-xs font-semibold text-editor-accent mb-2 border-b border-editor-border/30 pb-1">Camera</div>
               <button 
                 className="w-full text-xs px-2 py-1 bg-editor-bg hover:bg-editor-border rounded text-left" 
                 title="Reset camera to default position"
@@ -883,7 +912,7 @@ function App() {
             
             {/* Grid View Controls */}
             <div className="absolute bottom-4 right-4 bg-editor-panel/90 border border-editor-border rounded p-2 space-y-1">
-              <div className="text-xs font-medium text-editor-text mb-2">Grid Tools</div>
+              <div className="text-xs font-semibold text-editor-accent mb-2 border-b border-editor-border/30 pb-1">Grid Tools</div>
               <button 
                 className="w-full text-xs px-2 py-1 bg-editor-bg hover:bg-editor-border rounded text-left" 
                 title="Clear entire grid"
@@ -929,6 +958,12 @@ function App() {
               <div className="flex-1 overflow-y-auto scrollbar-hide">
                 <CollapsiblePanel title="Inspector" enableScrollbarlessScrolling={true}>
                   <Inspector />
+                </CollapsiblePanel>
+                <CollapsiblePanel title="Export System" maxHeight="350px" enableScrollbarlessScrolling={true}>
+                  <ExportPanel />
+                </CollapsiblePanel>
+                <CollapsiblePanel title="Performance Test" maxHeight="400px" enableScrollbarlessScrolling={true}>
+                  <PerformanceTestPanel />
                 </CollapsiblePanel>
                 <CollapsiblePanel title="Procedural Generation" maxHeight="250px" enableScrollbarlessScrolling={true}>
                   <div data-panel="generation">
@@ -1065,7 +1100,21 @@ function App() {
           </div>
         </div>
       )}
+      
+      {/* Keyboard Shortcuts Modal */}
+      <KeyboardShortcutsModal 
+        isOpen={keyboardShortcutsOpen} 
+        onClose={closeKeyboardShortcuts}
+      />
     </div>
+  )
+}
+
+function App() {
+  return (
+    <CameraProvider>
+      <AppContent />
+    </CameraProvider>
   )
 }
 

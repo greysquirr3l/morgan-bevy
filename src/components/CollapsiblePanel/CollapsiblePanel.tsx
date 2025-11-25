@@ -76,7 +76,7 @@ export default function CollapsiblePanel({
     return (
       <div className={`bg-editor-panel border-b border-editor-border ${className}`}>
         <div className="px-4 py-2 flex justify-between items-center hover:bg-editor-border/50 cursor-pointer" onClick={() => setIsExpanded(true)}>
-          <div className="text-sm font-medium text-editor-text">{title}</div>
+        <div className="text-sm font-semibold text-editor-accent">{title}</div>
           <ChevronDown className="w-4 h-4 text-editor-textMuted" />
         </div>
       </div>
@@ -86,7 +86,7 @@ export default function CollapsiblePanel({
   return (
     <div className={`bg-editor-panel border-b border-editor-border ${className}`}>
       <div className="px-4 py-2 flex justify-between items-center hover:bg-editor-border/50 cursor-pointer" onClick={() => setIsExpanded(false)}>
-        <div className="text-sm font-medium text-editor-text">{title}</div>
+        <div className="text-sm font-semibold text-editor-accent">{title}</div>
         <ChevronUp className="w-4 h-4 text-editor-textMuted" />
       </div>
       <div 

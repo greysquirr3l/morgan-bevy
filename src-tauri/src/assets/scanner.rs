@@ -187,9 +187,10 @@ impl AssetScanner {
         }
 
         match path.extension().and_then(|ext| ext.to_str()) {
-            Some("fbx") | Some("FBX") | Some("png") | Some("PNG") | Some("jpg") | Some("JPG")
-            | Some("jpeg") | Some("JPEG") | Some("wav") | Some("WAV") | Some("mp3")
-            | Some("MP3") | Some("ogg") | Some("OGG") | Some("mat") | Some("MAT") => true,
+            Some(
+                "fbx" | "FBX" | "png" | "PNG" | "jpg" | "JPG" | "jpeg" | "JPEG" | "wav" | "WAV"
+                | "mp3" | "MP3" | "ogg" | "OGG" | "mat" | "MAT",
+            ) => true,
             _ => false,
         }
     }

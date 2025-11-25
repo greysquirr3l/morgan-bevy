@@ -384,9 +384,8 @@ impl WFCGenerator {
                             self.backtrack(&mut backtrack_stack);
                             backtrack_count += 1;
                             continue;
-                        } else {
-                            return Err(anyhow::anyhow!("WFC failed: too many backtracks"));
                         }
+                        return Err(anyhow::anyhow!("WFC failed: too many backtracks"));
                     }
                 } else {
                     // No valid tiles - backtrack
@@ -394,9 +393,8 @@ impl WFCGenerator {
                         self.backtrack(&mut backtrack_stack);
                         backtrack_count += 1;
                         continue;
-                    } else {
-                        return Err(anyhow::anyhow!("WFC failed: no valid tiles"));
                     }
+                    return Err(anyhow::anyhow!("WFC failed: no valid tiles"));
                 }
             } else {
                 // All cells collapsed - success!

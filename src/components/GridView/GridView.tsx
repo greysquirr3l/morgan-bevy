@@ -65,12 +65,29 @@ const GridView = React.forwardRef<GridViewRef, GridViewProps>(({ className = '' 
 
   // Initialize grid and load themes
   useEffect(() => {
+    console.log('=== GridView useEffect START ===')
+    console.log('GridView useEffect running - initializing grid and loading themes')
     initializeGrid()
     loadThemes()
+    console.log('=== GridView useEffect END ===')
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []) // Remove gridSize dependency to prevent re-initialization
 
+  // Handle grid size changes
+  useEffect(() => {
+    setGridData(prev => {
+      // If grid is empty or size changed, reinitialize
+      if (prev.length !== gridSize.height || (prev[0] && prev[0].length !== gridSize.width)) {
+        return Array(gridSize.height)
+          .fill(null)
+          .map(() => Array(gridSize.width).fill('empty'))
+      }
+      return prev
+    })
+  }, [gridSize.width, gridSize.height])
+
   // Initialize grid and sync with existing 3D scene objects when mounting in 2D mode
-  const initializeGrid = () => {
+  const initializeGrid = useCallback(() => {
     // Try to load from localStorage first (for view switches), then store data, then create empty
     const { gridData: storeGridData, loadFromLocalStorage } = useEditorStore.getState()
     
@@ -80,8 +97,9 @@ const GridView = React.forwardRef<GridViewRef, GridViewProps>(({ className = '' 
     let newGrid: string[][];
     const currentStoreData = useEditorStore.getState().gridData
     
+    // Check if we have meaningful data to restore
     if (wasLoaded && currentStoreData && currentStoreData.length > 0) {
-      const nonEmptyCount = currentStoreData.flat().filter(t => t !== 'empty').length
+      const nonEmptyCount = currentStoreData.flat().filter(t => t && t !== 'empty').length
       if (nonEmptyCount > 0) {
         newGrid = currentStoreData.map(row => [...row]) // Deep copy
       } else {
@@ -89,7 +107,7 @@ const GridView = React.forwardRef<GridViewRef, GridViewProps>(({ className = '' 
           .fill(null)
           .map(() => Array(gridSize.width).fill('empty'))
       }
-    } else if (storeGridData && storeGridData.length > 0 && storeGridData.some(row => row.some(cell => cell !== 'empty'))) {
+    } else if (storeGridData && storeGridData.length > 0 && storeGridData.some(row => row.some(cell => cell && cell !== 'empty'))) {
       newGrid = storeGridData.map(row => [...row]) // Deep copy
     } else {
       newGrid = Array(gridSize.height)
@@ -98,20 +116,75 @@ const GridView = React.forwardRef<GridViewRef, GridViewProps>(({ className = '' 
     }
     
     setGridData(newGrid)
-  }
+  }, [gridSize.width, gridSize.height])
 
   // Load available themes from backend
-  const loadThemes = async () => {
+  const loadThemes = useCallback(async () => {
+    console.log('=== loadThemes START ===')
+    console.log('loadThemes called, selectedTheme from store:', selectedTheme)
     try {
+      console.log('Attempting to invoke get_available_themes')
       const themes: Theme[] = await invoke('get_available_themes')
+      console.log('Successfully loaded themes:', themes)
       setAvailableThemes(themes)
       if (themes.length > 0 && !selectedTheme) {
+        console.log('Setting first theme as selected:', themes[0])
         setSelectedTheme(themes[0])
       }
     } catch (error) {
-      console.error('Failed to load themes:', error)
+      console.log('=== FALLBACK THEME CREATION ===')
+      console.error('Failed to load themes, using fallback:', error)
+      // Fallback to a basic theme for development
+      const fallbackTheme: Theme = {
+        id: 'office',
+        name: 'Office',
+        description: 'Basic office theme',
+        tiles: {
+          floor: {
+            tile_type: 'floor',
+            name: 'Floor',
+            description: 'Basic floor tile',
+            visual: { icon: '.', color: '#888888', background_color: null },
+            mesh: null,
+            collision: false,
+            walkable: true,
+            tags: []
+          },
+          wall: {
+            tile_type: 'wall',
+            name: 'Wall', 
+            description: 'Basic wall tile',
+            visual: { icon: '#', color: '#444444', background_color: null },
+            mesh: null,
+            collision: true,
+            walkable: false,
+            tags: []
+          },
+          door: {
+            tile_type: 'door',
+            name: 'Door',
+            description: 'Basic door tile', 
+            visual: { icon: 'D', color: '#8B4513', background_color: null },
+            mesh: null,
+            collision: false,
+            walkable: true,
+            tags: []
+          }
+        }
+      }
+      console.log('Created fallback theme:', fallbackTheme)
+      setAvailableThemes([fallbackTheme])
+      console.log('Setting fallback theme as selected')
+      setSelectedTheme(fallbackTheme)
+      
+      // Force a re-render by logging the theme state
+      setTimeout(() => {
+        console.log('After fallback - selectedTheme:', selectedTheme)
+        console.log('After fallback - availableThemes:', availableThemes)
+      }, 100)
     }
-  }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   // Convert mouse position to grid coordinates
   const getGridPosition = (event: MouseEvent, canvas: HTMLCanvasElement) => {
@@ -127,10 +200,12 @@ const GridView = React.forwardRef<GridViewRef, GridViewProps>(({ className = '' 
     
     setGridData(prev => {
       const newGrid = [...prev]
-      if (newGrid[y]) {
-        newGrid[y] = [...newGrid[y]]
-        newGrid[y][x] = tileType
+      // Ensure the row exists
+      if (!newGrid[y]) {
+        newGrid[y] = Array(gridSize.width).fill('empty')
       }
+      newGrid[y] = [...newGrid[y]]
+      newGrid[y][x] = tileType
       return newGrid
     })
   }
@@ -182,14 +257,14 @@ const GridView = React.forwardRef<GridViewRef, GridViewProps>(({ className = '' 
         paintTile(pos.x, pos.y, 'empty')
       } else {
         setDragMode('paint')
-        // Empty tile - paint with selected tile
+        // Empty tile or null/undefined - paint with selected tile
         paintTile(pos.x, pos.y, selectedTile)
       }
     } else if (editMode === 'select') {
       setSelection({ start: pos, end: pos })
     } else if (editMode === 'fill') {
-      if (gridData[pos.y] && gridData[pos.y][pos.x]) {
-        const targetTile = gridData[pos.y][pos.x]
+      if (gridData[pos.y] && gridData[pos.y][pos.x] !== undefined) {
+        const targetTile = gridData[pos.y][pos.x] || 'empty'
         floodFill(pos.x, pos.y, targetTile, selectedTile)
       }
     }
@@ -302,8 +377,15 @@ const GridView = React.forwardRef<GridViewRef, GridViewProps>(({ className = '' 
 
   // Render the grid
   const renderGrid = useCallback(() => {
+    console.log('=== RENDER GRID CALLED ===')
+    console.log('renderGrid - selectedTheme:', selectedTheme)
+    console.log('renderGrid - availableThemes length:', availableThemes.length)
+    
     const canvas = canvasRef.current
-    if (!canvas || !selectedTheme) return
+    if (!canvas || !selectedTheme) {
+      console.log('renderGrid - Early return: canvas exists?', !!canvas, 'selectedTheme exists?', !!selectedTheme)
+      return
+    }
 
     const ctx = canvas.getContext('2d')
     if (!ctx) return
@@ -403,8 +485,22 @@ const GridView = React.forwardRef<GridViewRef, GridViewProps>(({ className = '' 
       }
     },
     clearGrid: () => {
-      initializeGrid()
+      console.log('=== CLEAR GRID CALLED ===')
+      console.log('Before clear - selectedTheme:', selectedTheme)
+      console.log('Before clear - availableThemes:', availableThemes)
+      
+      // Create a completely fresh empty grid
+      const newGrid = Array(gridSize.height)
+        .fill(null)
+        .map(() => Array(gridSize.width).fill('empty'))
+      setGridData(newGrid)
       setSelection(null)
+      // Also clear the store
+      setStoreGridData(newGrid)
+      
+      console.log('After clear - selectedTheme:', selectedTheme)
+      console.log('After clear - availableThemes:', availableThemes)
+      console.log('=== CLEAR GRID COMPLETE ===')
     },
     getGridData: () => gridData  // Expose current grid data
   }))
@@ -508,34 +604,38 @@ const GridView = React.forwardRef<GridViewRef, GridViewProps>(({ className = '' 
       <div className="flex flex-1 overflow-hidden">
         {/* Tile Palette */}
         <div className="w-48 bg-editor-panel border-r border-editor-border p-2 overflow-y-auto">
-          <div className="text-sm font-medium text-editor-text mb-2">Tile Palette</div>
+          <div className="text-sm font-semibold text-editor-accent mb-2 border-b border-editor-border/30 pb-1">Tile Palette</div>
           <div className="space-y-1">
-            {getTileList().map(([tileKey, tileDef]) => {
-              const tile = tileDef as TileDefinition
-              return (
-              <button
-                key={tileKey}
-                onClick={() => {
-
-                  setSelectedTile(tileKey)
-                }}
-                className={`w-full text-left px-2 py-1 rounded text-xs flex items-center space-x-2 ${
-                  selectedTile === tileKey
-                    ? 'bg-editor-accent text-white'
-                    : 'bg-editor-bg text-editor-text hover:bg-gray-600'
-                }`}
-                title={tile.description}
-              >
-                <span 
-                  className="w-4 h-4 flex items-center justify-center font-mono text-xs"
-                  style={{ color: tile.visual.color, backgroundColor: tile.visual.background_color || 'transparent' }}
+            {!selectedTheme ? (
+              <div className="text-xs text-editor-textMuted">Loading themes... (selectedTheme is null)</div>
+            ) : getTileList().length === 0 ? (
+              <div className="text-xs text-editor-textMuted">No tiles available</div>
+            ) : (
+              getTileList().map(([tileKey, tileDef]) => {
+                const tile = tileDef as TileDefinition
+                console.log('Rendering tile button:', tileKey, tile)
+                return (
+                <button
+                  key={tileKey}
+                  onClick={() => setSelectedTile(tileKey)}
+                  className={`w-full text-left px-2 py-1 rounded text-xs flex items-center space-x-2 ${
+                    selectedTile === tileKey
+                      ? 'bg-editor-accent text-white'
+                      : 'bg-editor-bg text-editor-text hover:bg-gray-600'
+                  }`}
+                  title={tile.description}
                 >
-                  {tile.visual.icon}
-                </span>
-                <span className="truncate">{tile.name}</span>
-              </button>
-              )
-            })}
+                  <span 
+                    className="w-4 h-4 flex items-center justify-center font-mono text-xs"
+                    style={{ color: tile.visual.color, backgroundColor: tile.visual.background_color || 'transparent' }}
+                  >
+                    {tile.visual.icon}
+                  </span>
+                  <span className="truncate">{tile.name}</span>
+                </button>
+                )
+              })
+            )}
           </div>
         </div>
 

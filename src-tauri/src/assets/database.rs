@@ -274,14 +274,14 @@ impl AssetDatabase {
 
     pub fn determine_asset_type(&self, file_path: &Path) -> String {
         match file_path.extension().and_then(|ext| ext.to_str()) {
-            Some("fbx") | Some("FBX") => "Model",
-            Some("png") | Some("PNG") | Some("jpg") | Some("JPG") | Some("jpeg") | Some("JPEG") => {
+            Some("fbx" | "FBX") => "Model",
+            Some("png" | "PNG" | "jpg" | "JPG" | "jpeg" | "JPEG") => {
                 "Texture"
             }
-            Some("wav") | Some("WAV") | Some("mp3") | Some("MP3") | Some("ogg") | Some("OGG") => {
+            Some("wav" | "WAV" | "mp3" | "MP3" | "ogg" | "OGG") => {
                 "Audio"
             }
-            Some("mat") | Some("MAT") => "Material",
+            Some("mat" | "MAT") => "Material",
             _ => "Unknown",
         }
         .to_string()

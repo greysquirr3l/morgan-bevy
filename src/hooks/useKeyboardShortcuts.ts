@@ -2,6 +2,7 @@ import { useEffect } from 'react'
 import { useEditorStore } from '@/store/editorStore'
 import { copySelectedObjects, clipboard } from '@/utils/clipboard'
 import { transformConstraints } from '@/utils/transformConstraints'
+import { useCameraContext } from '@/contexts/CameraContext'
 import { DeleteObjectCommand, DuplicateCommand, PasteCommand, GroupCommand, UngroupCommand, SaveCommand, LoadCommand } from '@/utils/commands'
 
 export function useKeyboardShortcuts() {
@@ -18,8 +19,12 @@ export function useKeyboardShortcuts() {
     redo,
     canUndo,
     canRedo,
-    sceneObjects
+    sceneObjects,
+    toggleCoordinateSpace
   } = useEditorStore()
+
+  // Get camera controls from context
+  const { cameraControlsRef } = useCameraContext()
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -79,7 +84,7 @@ export function useKeyboardShortcuts() {
         case '3':
           if (!event.ctrlKey && !event.metaKey) {
             event.preventDefault()
-            setCameraMode('top-down')
+            setCameraMode('orthographic')
           }
           break
         case 'x':
@@ -110,6 +115,23 @@ export function useKeyboardShortcuts() {
             } else {
               transformConstraints.setConstraint('z') // Z-axis only
             }
+          }
+          break
+        case 'f':
+          event.preventDefault()
+          if (event.altKey) {
+            // Alt+F: Frame all objects
+            cameraControlsRef.current?.frameAll()
+          } else {
+            // F: Focus on selected objects
+            cameraControlsRef.current?.focusSelection()
+          }
+          break
+        case 't':
+          if (!event.ctrlKey && !event.metaKey) {
+            event.preventDefault()
+            // T: Toggle local/world coordinate space
+            toggleCoordinateSpace()
           }
           break
       }
@@ -299,7 +321,7 @@ export function useKeyboardShortcuts() {
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [selectedObjects, setTransformMode, toggleGrid, toggleStats, setCameraMode, clearSelection, executeCommand, undo, redo, canUndo, canRedo, sceneObjects, transformMode])
+  }, [selectedObjects, setTransformMode, toggleGrid, toggleStats, setCameraMode, clearSelection, executeCommand, undo, redo, canUndo, canRedo, sceneObjects, transformMode, toggleCoordinateSpace, cameraControlsRef])
 
   return { transformMode }
 }

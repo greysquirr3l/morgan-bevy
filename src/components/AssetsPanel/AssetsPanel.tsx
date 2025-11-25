@@ -114,7 +114,7 @@ export default function AssetsPanel() {
   // Load local assets when component mounts
   useEffect(() => {
     loadLocalAssets()
-  }, [])
+  }, [loadLocalAssets])
 
   const handleDragStart = useCallback((asset: AssetFile, event: React.DragEvent) => {
     setDraggedAsset(asset)
@@ -175,7 +175,7 @@ export default function AssetsPanel() {
           >
             {isCollapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
           </button>
-          <h3 className="text-sm font-medium text-editor-text">Assets</h3>
+          <h3 className="text-sm font-semibold text-editor-accent border-b border-editor-border/30 pb-1 mb-2">Assets</h3>
         </div>
         <div className="flex space-x-1">
           <button

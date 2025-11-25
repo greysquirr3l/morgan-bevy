@@ -65,3 +65,67 @@ tempfile = "3.8"
 [features]
 default = ["custom-protocol"]
 custom-protocol = ["tauri/custom-protocol"]
+
+# Linting configuration
+[lints.clippy]
+# Enable pedantic lints for better code quality with lower priority to allow overrides
+pedantic = { level = "warn", priority = -1 }
+nursery = { level = "warn", priority = -1 }
+cargo = { level = "warn", priority = -1 }
+
+# Allow some pedantic lints that may be too restrictive for 3D editor development
+module_name_repetitions = "allow"
+missing_panics_doc = "allow"
+missing_errors_doc = "allow"
+cast_precision_loss = "allow"    # Common in 3D math
+cast_possible_truncation = "allow"
+cast_sign_loss = "allow"
+similar_names = "allow"          # x, y, z variables
+too_many_lines = "allow"         # Complex algorithms
+struct_excessive_bools = "allow" # Config structures
+cargo_common_metadata = "allow"  # Disable metadata requirements for now
+
+# Allow formatting-related lints for development workflow
+uninlined_format_args = "allow"          # Not critical for functionality
+needless_pass_by_ref_mut = "allow"       # Database interface design
+unused_async = "allow"                   # Future async operations planned
+unnecessary_debug_formatting = "allow"   # Logging preferences
+derivable_impls = "allow"                # Custom Default implementations
+doc_markdown = "allow"                   # Documentation style preferences
+manual_let_else = "allow"                # Code style preferences
+items_after_statements = "allow"         # Import organization
+option_if_let_else = "allow"             # Readability preferences
+needless_borrows_for_generic_args = "allow" # API design choices
+significant_drop_tightening = "allow"    # Performance micro-optimizations
+redundant_else = "allow"                 # Control flow clarity
+large_stack_frames = "allow"             # Tauri framework limitation
+map_unwrap_or = "allow"                  # Readability preferences
+format_push_string = "allow"            # String building style
+unnested_or_patterns = "allow"           # Pattern matching style
+missing_const_for_fn = "allow"           # Function design choices
+
+# Additional style and API design preferences
+use_self = "allow"                      # Explicit type names for clarity
+match_same_arms = "allow"               # Sometimes intentional for extensibility
+unused_self = "allow"                   # Interface consistency
+unnecessary_wraps = "allow"             # Future error handling planned
+comparison_chain = "allow"              # if-else chains can be clearer
+collapsible_if = "allow"                # Nested conditions for clarity
+used_underscore_binding = "allow"       # Explicit parameter unused marking
+only_used_in_recursion = "allow"        # Recursive algorithms
+trivially_copy_pass_by_ref = "allow"    # Interface consistency
+redundant_closure_for_method_calls = "allow"  # Sometimes clearer
+inefficient_to_string = "allow"        # Performance not critical
+
+# Dependency and safety-related allows
+multiple_crate_versions = "allow"        # Common in complex dependency trees
+cast_possible_wrap = "allow"             # Database file size handling
+needless_pass_by_value = "allow"         # API design preferences
+case_sensitive_file_extension_comparisons = "allow"  # Explicit file handling
+match_like_matches_macro = "allow"       # Pattern matching style
+redundant_clone = "allow"                # Sometimes clearer
+upper_case_acronyms = "allow"            # Standard format names (JSON, RON, etc.)
+
+[lints.rust]
+unsafe_code = "forbid"           # No unsafe code allowed
+# missing_docs = "warn"          # Temporarily disabled - too strict for current codebase

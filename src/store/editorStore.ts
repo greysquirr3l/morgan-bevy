@@ -46,7 +46,7 @@ export interface EditorState {
   viewportMode: '3d' | '2d'
   
   // Camera
-  cameraMode: 'orbit' | 'fly' | 'top-down'
+  cameraMode: 'orbit' | 'fly' | 'orthographic'
   
   // Layers
   activeLayer: string
@@ -105,7 +105,7 @@ export interface EditorState {
   toggleSnapToGrid: () => void
   setGridSize: (size: number) => void
   setViewportMode: (mode: '3d' | '2d') => void
-  setCameraMode: (mode: 'orbit' | 'fly' | 'top-down') => void
+  setCameraMode: (mode: 'orbit' | 'fly' | 'orthographic') => void
   setGridData: (data: string[][]) => void
   setSelectedTheme: (theme: any) => void
   toggleGrid: () => void
@@ -284,7 +284,7 @@ export const useEditorStore = create<EditorState>()(
         StoreDebugLogger.log(`Viewport mode changed to: ${mode}`)
       }),
       
-      setCameraMode: (mode: 'orbit' | 'fly' | 'top-down') =>
+      setCameraMode: (mode: 'orbit' | 'fly' | 'orthographic') =>
       set((state) => {
         state.cameraMode = mode
       }),
@@ -380,9 +380,10 @@ export const useEditorStore = create<EditorState>()(
         state.selectedObjects = []
         state.hoveredObject = null
         
-        // Reset grid data
+        // Reset grid data but PRESERVE selectedTheme
         state.gridData = []
-        state.selectedTheme = null
+        // DON'T reset selectedTheme - keep it so tile palette works
+        // state.selectedTheme = null
         
         // Reset viewport to 3D
         state.viewportMode = '3d'
@@ -448,7 +449,7 @@ export const useEditorStore = create<EditorState>()(
             
             // Update grid position metadata for tile objects
             if (state.sceneObjects[id].metadata?.fromGrid && transform.position) {
-              const [x3d, _, z3d] = transform.position
+              const [x3d, , z3d] = transform.position
               const newGridX = Math.round(x3d + 24) // 48/2 = 24 for grid centering
               const newGridY = Math.round(z3d + 18) // 36/2 = 18 for grid centering
               

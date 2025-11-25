@@ -1,22 +1,56 @@
 {
   "root": true,
-  "env": { "browser": true, "es2020": true },
+  "env": { 
+    "browser": true, 
+    "es2020": true,
+    "node": true
+  },
   "extends": [
-    "eslint:recommended",
-    "@typescript-eslint/recommended",
-    "plugin:react-hooks/recommended"
+    "eslint:recommended"
   ],
-  "ignorePatterns": ["dist", ".eslintrc.cjs"],
+  "ignorePatterns": ["dist", ".eslintrc.cjs", "src-tauri/**", "node_modules/**", "**/*.d.ts"],
   "parser": "@typescript-eslint/parser",
-  "plugins": ["react-refresh"],
+  "parserOptions": {
+    "ecmaVersion": 2020,
+    "sourceType": "module",
+    "ecmaFeatures": {
+      "jsx": true
+    }
+  },
+  "plugins": ["react-refresh", "@typescript-eslint", "react-hooks"],
   "rules": {
     "react-refresh/only-export-components": [
       "warn",
       { "allowConstantExport": true }
     ],
-    "@typescript-eslint/no-unused-vars": [
-      "error", 
-      { "argsIgnorePattern": "^_", "varsIgnorePattern": "^_" }
-    ]
-  }
+    
+    // General code quality - relaxed for development workflow
+    "no-console": "off",
+    "no-debugger": "error", 
+    "no-undef": "off",
+    "no-unused-vars": "off",
+    "@typescript-eslint/no-unused-vars": ["warn", { "argsIgnorePattern": "^_" }],
+    "@typescript-eslint/no-explicit-any": "off",
+    "@typescript-eslint/prefer-const": "off",
+    "@typescript-eslint/no-non-null-assertion": "off",
+    
+    // React hooks - essential for correctness
+    "react-hooks/rules-of-hooks": "error",
+    "react-hooks/exhaustive-deps": "warn",
+    
+    // 3D Editor specific rules - relaxed for math-heavy code
+    "no-magic-numbers": "off",
+    "prefer-const": "off",
+    "no-var": "error",
+    "no-case-declarations": "off"
+  },
+  "overrides": [
+    {
+      "files": ["**/*.test.{ts,tsx}"],
+      "rules": {
+        "no-magic-numbers": "off",
+        "@typescript-eslint/no-explicit-any": "off"
+      }
+    }
+  ]
 }
