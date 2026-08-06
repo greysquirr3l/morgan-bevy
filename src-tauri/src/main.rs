@@ -161,7 +161,10 @@ async fn get_theme_legend(theme_id: String) -> Result<String, String> {
     info!("Getting theme legend for: {theme_id}");
     ThemeLibrary::get_theme(&theme_id).map_or_else(
         || Err(format!("Theme not found: {theme_id}")),
-        |theme| Ok(generation::themes::generate_theme_legend(&theme)),
+        |theme| {
+            generation::themes::generate_theme_legend(&theme)
+                .map_err(|e| format!("Failed to format theme legend: {e}"))
+        },
     )
 }
 

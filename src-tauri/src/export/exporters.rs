@@ -86,7 +86,7 @@ impl LevelExporter {
             }
         }
 
-        result.export_time_ms = start_time.elapsed().as_millis() as u64;
+        result.export_time_ms = u64::try_from(start_time.elapsed().as_millis()).unwrap_or(u64::MAX);
         Ok(result)
     }
 
@@ -485,7 +485,7 @@ impl LevelExporter {
                 '\n' => out.push_str("\\n"),
                 '\r' => out.push_str("\\r"),
                 '\t' => out.push_str("\\t"),
-                c if (c as u32) < 0x20 => out.push_str(&format!("\\u{{{:04X}}}", c as u32)),
+                c if (c as u32) < 0x20 => write!(out, "\\u{{{:04X}}}", c as u32).unwrap_or(()),
                 c => out.push(c),
             }
         }

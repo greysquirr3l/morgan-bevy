@@ -120,7 +120,7 @@ impl AssetScanner {
             }
         }
 
-        scan_result.scan_duration_ms = start_time.elapsed().as_millis() as u64;
+        scan_result.scan_duration_ms = u64::try_from(start_time.elapsed().as_millis()).unwrap_or(u64::MAX);
 
         info!(
             "Asset scan completed in {}ms. Processed {} assets with {} errors",

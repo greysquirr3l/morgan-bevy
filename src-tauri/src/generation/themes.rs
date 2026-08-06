@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::fmt::Write as _;
 
 /// Represents different tile types in the level
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
@@ -1641,17 +1642,18 @@ pub fn char_to_tile(theme: &Theme, ch: char) -> Option<String> {
 }
 
 /// Generate a legend for a theme showing all available tiles
-pub fn generate_theme_legend(theme: &Theme) -> String {
+pub fn generate_theme_legend(theme: &Theme) -> Result<String, std::fmt::Error> {
     let mut legend = format!("Legend for {} Theme:\n", theme.name);
 
     for (key, tile) in &theme.tiles {
-        legend.push_str(&format!(
-            "  {} = {} ({})\n",
+        writeln!(
+            legend,
+            "  {} = {} ({})",
             tile.visual.icon, tile.name, key
-        ));
+        )?;
     }
 
-    legend
+    Ok(legend)
 }
 
 /// Convert a 2D grid string to tile map using theme
