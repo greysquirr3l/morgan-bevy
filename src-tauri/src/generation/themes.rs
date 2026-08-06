@@ -84,6 +84,10 @@ pub struct Theme {
 
 #[allow(dead_code)]
 impl Theme {
+    #[expect(
+        clippy::too_many_lines,
+        reason = "office() defines a full theme palette; data-driven refactor would obscure intent"
+    )]
     pub fn office() -> Self {
         let mut materials = HashMap::new();
         materials.insert(
@@ -839,6 +843,10 @@ impl Theme {
         }
     }
 
+    #[expect(
+        clippy::too_many_lines,
+        reason = "theme palettes are large by design; data-driven refactor would obscure intent"
+    )]
     pub fn dungeon() -> Self {
         let mut materials = HashMap::new();
         materials.insert(
@@ -1073,6 +1081,10 @@ impl Theme {
         }
     }
 
+    #[expect(
+        clippy::too_many_lines,
+        reason = "theme palettes are large by design; data-driven refactor would obscure intent"
+    )]
     pub fn scifi() -> Self {
         let mut materials = HashMap::new();
         materials.insert(
