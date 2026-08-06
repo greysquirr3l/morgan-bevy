@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import {
   Search,
@@ -109,28 +109,51 @@ export default function AssetBrowser({ hideHeader = false }: AssetBrowserProps) 
   const [showFilters, setShowFilters] = useState(false);
   const [showStats, setShowStats] = useState(true);
 
+  // Track in-flight async work so unmount cancels via AbortController.
+  // Tauri `invoke` doesn't (yet) accept a signal, so cancellation here
+  // means "stop awaiting the result and avoid setting state on an
+  // unmounted component". The long-running Rust commands already bail
+  // on their own when the user switches tools.
+  const inFlightRef = useRef<AbortController | null>(null);
+
   // Initialize database and load initial data
   useEffect(() => {
-    initializeDatabase();
+    const ctrl = new AbortController();
+    inFlightRef.current = ctrl;
+    initializeDatabase(ctrl.signal);
+    return () => {
+      ctrl.abort();
+      inFlightRef.current = null;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const initializeDatabase = useCallback(async () => {
+  const initializeDatabase = useCallback(async (signal?: AbortSignal) => {
     try {
       setIsLoading(true);
       setError(null);
-      
+
       // Initialize the database
       await invoke('initialize_asset_database');
-      
-      // Load initial data
-      await Promise.all([
+
+      // Load initial data in parallel; allSettled so a single failing
+      // request doesn't sink the others (T81).
+      const results = await Promise.allSettled([
         loadAssets(),
         loadCollections(),
-        loadStats()
+        loadStats(),
       ]);
-      
+      if (signal?.aborted) return;
+      const failures = results.filter(r => r.status === 'rejected');
+      if (failures.length > 0) {
+        console.warn(
+          `${failures.length} initial-load request(s) failed`,
+          failures,
+        );
+      }
+
     } catch (error) {
+      if (signal?.aborted) return;
       console.error('Failed to initialize asset database:', error);
       setError(error instanceof Error ? error.message : 'Failed to initialize database');
     } finally {
@@ -187,29 +210,41 @@ export default function AssetBrowser({ hideHeader = false }: AssetBrowserProps) 
     }
   };
 
-  const scanAssets = async () => {
+  const scanAssets = async (signal?: AbortSignal) => {
     try {
       setIsScanning(true);
       setError(null);
       setScanProgress(null);
-      
+
       // Listen for progress updates
       // In a real implementation, you'd set up event listeners for scan progress
-      
+
       const result: ScanResult = await invoke('scan_assets_database');
-      
-      // Refresh data after scan
-      await Promise.all([
+
+      // Refresh data after scan in parallel; allSettled so a failing
+      // load doesn't sink the others.
+      const results = await Promise.allSettled([
         loadAssets(),
         loadCollections(),
-        loadStats()
+        loadStats(),
       ]);
-      
+      if (signal?.aborted) return;
+
+      const failures = results.filter(r => r.status === 'rejected');
+      if (failures.length > 0) {
+        console.warn(
+          `${failures.length} post-scan reload request(s) failed`,
+          failures,
+        );
+      }
+
       console.log('Scan completed:', result);
     } catch (error) {
+      if (signal?.aborted) return;
       console.error('Asset scan failed:', error);
       setError(error instanceof Error ? error.message : 'Asset scan failed');
     } finally {
+      if (signal?.aborted) return;
       setIsScanning(false);
       setScanProgress(null);
     }
@@ -350,7 +385,7 @@ export default function AssetBrowser({ hideHeader = false }: AssetBrowserProps) 
                 <Filter className="w-4 h-4" />
               </button>
               <button
-                onClick={scanAssets}
+                onClick={() => scanAssets()}
                 disabled={isScanning}
                 className="p-2 bg-editor-accent hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed rounded text-white flex items-center"
                 title="Rescan Assets"
@@ -499,7 +534,7 @@ export default function AssetBrowser({ hideHeader = false }: AssetBrowserProps) 
               }
             </div>
             <button
-              onClick={scanAssets}
+              onClick={() => scanAssets()}
               className="px-4 py-2 bg-editor-accent hover:bg-blue-600 rounded text-white"
             >
               Scan Assets
