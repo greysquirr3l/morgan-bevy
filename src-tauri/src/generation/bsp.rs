@@ -414,28 +414,28 @@ impl BSPGenerator {
                             (x as f64) as f32,
                             (y as f64) as f32,
                             &params.theme,
-                        )?);
+                        ));
                     }
                     TileType::Wall => {
                         objects.push(Self::create_wall_object(
                             (x as f64) as f32,
                             (y as f64) as f32,
                             &params.theme,
-                        )?);
+                        ));
                     }
                     TileType::Corridor => {
                         objects.push(Self::create_corridor_object(
                             (x as f64) as f32,
                             (y as f64) as f32,
                             &params.theme,
-                        )?);
+                        ));
                     }
                     TileType::Door => {
                         objects.push(Self::create_door_object(
                             (x as f64) as f32,
                             (y as f64) as f32,
                             &params.theme,
-                        )?);
+                        ));
                     }
                     TileType::Empty => {} // Skip empty tiles
                 }
@@ -453,8 +453,8 @@ impl BSPGenerator {
         clippy::cast_possible_truncation,
         reason = "grid coordinates are non-negative integers in f32"
     )]
-    fn create_floor_object(x: f32, y: f32, theme: &str) -> Result<GameObject> {
-        Ok(GameObject {
+    fn create_floor_object(x: f32, y: f32, theme: &str) -> GameObject {
+        GameObject {
             id: Uuid::new_v4().to_string(),
             name: format!("floor_{}_{}", x as u32, y as u32),
             transform: Transform3D {
@@ -467,7 +467,7 @@ impl BSPGenerator {
             layer: "Floors".to_string(),
             tags: vec!["floor".to_string(), theme.to_string()],
             metadata: HashMap::new(),
-        })
+        }
     }
 
     #[expect(
@@ -478,8 +478,8 @@ impl BSPGenerator {
         clippy::cast_possible_truncation,
         reason = "grid coordinates are non-negative integers in f32"
     )]
-    fn create_wall_object(x: f32, y: f32, theme: &str) -> Result<GameObject> {
-        Ok(GameObject {
+    fn create_wall_object(x: f32, y: f32, theme: &str) -> GameObject {
+        GameObject {
             id: Uuid::new_v4().to_string(),
             name: format!("wall_{}_{}", x as u32, y as u32),
             transform: Transform3D {
@@ -496,7 +496,7 @@ impl BSPGenerator {
                 theme.to_string(),
             ],
             metadata: HashMap::new(),
-        })
+        }
     }
 
     #[expect(
@@ -507,8 +507,8 @@ impl BSPGenerator {
         clippy::cast_possible_truncation,
         reason = "grid coordinates are non-negative integers in f32"
     )]
-    fn create_corridor_object(x: f32, y: f32, theme: &str) -> Result<GameObject> {
-        Ok(GameObject {
+    fn create_corridor_object(x: f32, y: f32, theme: &str) -> GameObject {
+        GameObject {
             id: Uuid::new_v4().to_string(),
             name: format!("corridor_{}_{}", x as u32, y as u32),
             transform: Transform3D {
@@ -521,7 +521,7 @@ impl BSPGenerator {
             layer: "Floors".to_string(),
             tags: vec!["corridor".to_string(), theme.to_string()],
             metadata: HashMap::new(),
-        })
+        }
     }
 
     #[expect(
@@ -532,8 +532,8 @@ impl BSPGenerator {
         clippy::cast_possible_truncation,
         reason = "grid coordinates are non-negative integers in f32"
     )]
-    fn create_door_object(x: f32, y: f32, theme: &str) -> Result<GameObject> {
-        Ok(GameObject {
+    fn create_door_object(x: f32, y: f32, theme: &str) -> GameObject {
+        GameObject {
             id: Uuid::new_v4().to_string(),
             name: format!("door_{}_{}", x as u32, y as u32),
             transform: Transform3D {
@@ -558,6 +558,6 @@ impl BSPGenerator {
                 );
                 meta
             },
-        })
+        }
     }
 }

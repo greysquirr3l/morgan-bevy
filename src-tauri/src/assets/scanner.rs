@@ -34,22 +34,23 @@ impl AssetScanner {
     }
 
     /// Scan a directory for assets and populate the database
-    pub fn scan_directory<P: AsRef<Path>>(
+    pub fn scan_directory(
         &mut self,
-        assets_dir: P,
+        assets_dir: &Path,
         progress_callback: Option<Box<dyn Fn(ScanProgress) + Send + Sync>>,
     ) -> Result<ScanResult, Box<dyn std::error::Error>> {
         let start_time = std::time::Instant::now();
-        let assets_path = assets_dir.as_ref();
+        let assets_path = assets_dir;
 
-        info!("Starting asset scan of directory: {}", assets_path.display());
+        info!(
+            "Starting asset scan of directory: {}",
+            assets_path.display()
+        );
 
         if !assets_path.exists() {
-            return Err(format!(
-                "Assets directory does not exist: {}",
-                assets_path.display()
-            )
-            .into());
+            return Err(
+                format!("Assets directory does not exist: {}", assets_path.display()).into(),
+            );
         }
 
         // Discover all asset files first
@@ -267,7 +268,7 @@ impl AssetScanner {
         // 2. Update assets that have changed
         // 3. Add new assets
 
-        self.scan_directory(collection_path, progress_callback)
+        self.scan_directory(&collection_path, progress_callback)
     }
 
     /// Get database statistics

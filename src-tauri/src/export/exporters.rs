@@ -30,10 +30,6 @@ pub struct ExportedFile {
 pub struct LevelExporter;
 
 impl LevelExporter {
-    pub const fn new() -> Self {
-        Self
-    }
-
     pub fn export_multi_format(
         level_data: &LevelData,
         formats: &[ExportFormat],
@@ -55,7 +51,7 @@ impl LevelExporter {
         }
 
         for format in formats {
-            let file_path = Self::get_export_file_path(base_path, format, &level_data.name)?;
+            let file_path = Self::get_export_file_path(base_path, format, &level_data.name);
 
             let export_result = match format {
                 ExportFormat::JSON => Self::export_json(level_data, &file_path),
@@ -94,11 +90,7 @@ impl LevelExporter {
         Ok(result)
     }
 
-    fn get_export_file_path(
-        base_path: &Path,
-        format: &ExportFormat,
-        level_name: &str,
-    ) -> Result<PathBuf> {
+    fn get_export_file_path(base_path: &Path, format: &ExportFormat, level_name: &str) -> PathBuf {
         let timestamp = Utc::now().format("%Y%m%d_%H%M%S");
         let safe_level_name = level_name
             .chars()
@@ -119,7 +111,7 @@ impl LevelExporter {
             timestamp,
             format.file_extension()
         );
-        Ok(parent.join(file_name))
+        parent.join(file_name)
     }
 
     fn export_json(level_data: &LevelData, file_path: &PathBuf) -> Result<()> {
@@ -140,7 +132,7 @@ impl LevelExporter {
 
     fn export_ron(level_data: &LevelData, file_path: &PathBuf) -> Result<()> {
         // Convert to Bevy-compatible RON format
-        let bevy_level = Self::convert_to_bevy_format(level_data)?;
+        let bevy_level = Self::convert_to_bevy_format(level_data);
         let ron_data = ron::ser::to_string_pretty(&bevy_level, ron::ser::PrettyConfig::default())?;
         fs::write(file_path, ron_data)?;
         Ok(())
@@ -300,7 +292,7 @@ impl LevelExporter {
         Ok(bytes)
     }
 
-    fn convert_to_bevy_format(level_data: &LevelData) -> Result<BevyLevelData> {
+    fn convert_to_bevy_format(level_data: &LevelData) -> BevyLevelData {
         let mut bevy_entities = Vec::new();
 
         for obj in &level_data.objects {
@@ -318,7 +310,7 @@ impl LevelExporter {
             });
         }
 
-        Ok(BevyLevelData {
+        BevyLevelData {
             name: level_data.name.clone(),
             entities: bevy_entities,
             bounds: level_data.bounds.clone(),
@@ -327,7 +319,7 @@ impl LevelExporter {
                 generator: "BSP".to_string(),
                 version: "0.1.0".to_string(),
             },
-        })
+        }
     }
 
     fn generate_rust_code(level_data: &LevelData) -> Result<String> {
@@ -526,11 +518,11 @@ impl LevelExporter {
             });
 
             // Create basic primitive mesh based on object type
-            let mesh = Self::create_gltf_mesh_for_object(obj)?;
+            let mesh = Self::create_gltf_mesh_for_object(obj);
             gltf.meshes.push(mesh);
 
             // Create material for the object
-            let material = Self::create_gltf_material_for_object(obj)?;
+            let material = Self::create_gltf_material_for_object(obj);
             gltf.materials.push(material);
         }
 
@@ -560,8 +552,8 @@ impl LevelExporter {
         ]
     }
 
-    fn create_gltf_mesh_for_object(obj: &GameObject) -> Result<GltfMesh> {
-        Ok(GltfMesh {
+    fn create_gltf_mesh_for_object(obj: &GameObject) -> GltfMesh {
+        GltfMesh {
             name: Some(obj.name.clone()),
             primitives: vec![GltfPrimitive {
                 mode: 4,           // TRIANGLES
@@ -570,18 +562,18 @@ impl LevelExporter {
                     position: 0, // Reference to position buffer
                 },
             }],
-        })
+        }
     }
 
-    fn create_gltf_material_for_object(obj: &GameObject) -> Result<GltfMaterial> {
-        Ok(GltfMaterial {
+    fn create_gltf_material_for_object(obj: &GameObject) -> GltfMaterial {
+        GltfMaterial {
             name: obj.material.clone().or_else(|| Some("default".to_string())),
             pbr_metallic_roughness: GltfPbrMetallicRoughness {
                 base_color_factor: [1.0, 1.0, 1.0, 1.0], // Default white
                 metallic_factor: 0.0,
                 roughness_factor: 0.9,
             },
-        })
+        }
     }
 }
 

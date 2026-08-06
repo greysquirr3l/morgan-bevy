@@ -205,8 +205,11 @@ async fn generate_bsp_level(
         Ok(level_data) => {
             // Update application state
             let __lock_result = state.lock();
-            let mut app_state = match __lock_result { Ok(g) => g, Err(e) => e.into_inner() };
-                        app_state.spatial_index.clear();
+            let mut app_state = match __lock_result {
+                Ok(g) => g,
+                Err(e) => e.into_inner(),
+            };
+            app_state.spatial_index.clear();
             for obj in &level_data.objects {
                 app_state.spatial_index.insert(&obj.id, &obj.transform);
             }
@@ -241,8 +244,11 @@ async fn generate_wfc_level(
         Ok(level_data) => {
             // Update application state
             let __lock_result = state.lock();
-            let mut app_state = match __lock_result { Ok(g) => g, Err(e) => e.into_inner() };
-                        app_state.spatial_index.clear();
+            let mut app_state = match __lock_result {
+                Ok(g) => g,
+                Err(e) => e.into_inner(),
+            };
+            app_state.spatial_index.clear();
             for obj in &level_data.objects {
                 app_state.spatial_index.insert(&obj.id, &obj.transform);
             }
@@ -302,7 +308,10 @@ async fn query_objects_in_bounds(
     state: State<'_, std::sync::Mutex<AppState>>,
 ) -> Result<Vec<String>, String> {
     let __lock_result = state.lock();
-    let app_state = match __lock_result { Ok(g) => g, Err(e) => e.into_inner() };
+    let app_state = match __lock_result {
+        Ok(g) => g,
+        Err(e) => e.into_inner(),
+    };
     let object_ids = app_state.spatial_index.query_bounds(&bounds);
     Ok(object_ids)
 }
@@ -318,7 +327,10 @@ async fn update_object_transform(
     state: State<'_, std::sync::Mutex<AppState>>,
 ) -> Result<(), String> {
     let __lock_result = state.lock();
-    let mut app_state = match __lock_result { Ok(g) => g, Err(e) => e.into_inner() };
+    let mut app_state = match __lock_result {
+        Ok(g) => g,
+        Err(e) => e.into_inner(),
+    };
     if let Some(ref mut level) = app_state.current_level {
         if let Some(obj) = level.objects.iter_mut().find(|o| o.id == object_id) {
             obj.transform = transform.clone();
@@ -342,7 +354,10 @@ async fn get_current_level(
     state: State<'_, std::sync::Mutex<AppState>>,
 ) -> Result<Option<LevelData>, String> {
     let __lock_result = state.lock();
-    let app_state = match __lock_result { Ok(g) => g, Err(e) => e.into_inner() };
+    let app_state = match __lock_result {
+        Ok(g) => g,
+        Err(e) => e.into_inner(),
+    };
     Ok(app_state.current_level.clone())
 }
 
@@ -378,7 +393,10 @@ async fn load_level_from_file(
 
     // Update application state
     let __lock_result = state.lock();
-    let mut app_state = match __lock_result { Ok(g) => g, Err(e) => e.into_inner() };
+    let mut app_state = match __lock_result {
+        Ok(g) => g,
+        Err(e) => e.into_inner(),
+    };
     app_state.spatial_index.clear();
     for obj in &level_data.objects {
         app_state.spatial_index.insert(&obj.id, &obj.transform);
@@ -425,7 +443,11 @@ async fn export_level_simple(
         }
     };
 
-    match LevelExporter::export_multi_format(&level_data, &[export_format], &base_path.to_string_lossy()) {
+    match LevelExporter::export_multi_format(
+        &level_data,
+        &[export_format],
+        &base_path.to_string_lossy(),
+    ) {
         Ok(result) => {
             if let Some(file) = result.exported_files.first() {
                 if file.success {
