@@ -266,10 +266,6 @@ impl BSPGenerator {
         Ok(())
     }
 
-    fn find_room(&self, node: &BSPNode) -> Option<Room> {
-        Self::find_room_in(node)
-    }
-
     fn find_room_in(node: &BSPNode) -> Option<Room> {
         if let Some(ref room) = node.room {
             Some(room.clone())
