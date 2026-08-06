@@ -471,13 +471,11 @@ async fn export_level_simple(
 async fn save_project(project_data: ProjectData) -> Result<String, String> {
     info!("Saving project");
 
-    let path = match FileDialog::new()
+    let Some(path) = FileDialog::new()
         .add_filter("Morgan-Bevy Project", &["mbp"])
         .set_file_name("project.mbp")
-        .save_file()
-    {
-        Some(path) => path,
-        None => return Err("Save cancelled by user".to_string()),
+        .save_file() else {
+        return Err("Save cancelled by user".to_string());
     };
 
     let json_data = serde_json::to_string_pretty(&project_data)
@@ -493,12 +491,10 @@ async fn save_project(project_data: ProjectData) -> Result<String, String> {
 async fn load_project() -> Result<ProjectData, String> {
     info!("Loading project");
 
-    let path = match FileDialog::new()
+    let Some(path) = FileDialog::new()
         .add_filter("Morgan-Bevy Project", &["mbp"])
-        .pick_file()
-    {
-        Some(path) => path,
-        None => return Err("Load cancelled by user".to_string()),
+        .pick_file() else {
+        return Err("Load cancelled by user".to_string());
     };
 
     let json_data =

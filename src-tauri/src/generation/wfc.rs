@@ -488,9 +488,8 @@ impl WFCGenerator {
         queue.push_back((start_x, start_y));
 
         while let Some((x, y)) = queue.pop_front() {
-            let current_tile = match self.cell(y, x).and_then(|c| c.collapsed_tile.clone()) {
-                Some(tile) => tile,
-                None => continue,
+            let Some(current_tile) = self.cell(y, x).and_then(|c| c.collapsed_tile.clone()) else {
+                continue;
             };
 
             // Check all neighbors

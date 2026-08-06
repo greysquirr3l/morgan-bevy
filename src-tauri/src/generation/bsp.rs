@@ -75,14 +75,8 @@ impl BSPGenerator {
     /// Callers already bound-check before calling; this method exists
     /// purely to satisfy `clippy::indexing_slicing`.
     fn set_tile(&mut self, x: u32, y: u32, tile: TileType) {
-        let y_usize = match usize::try_from(y) {
-            Ok(v) => v,
-            Err(_) => return,
-        };
-        let x_usize = match usize::try_from(x) {
-            Ok(v) => v,
-            Err(_) => return,
-        };
+        let Ok(y_usize) = usize::try_from(y) else { return };
+        let Ok(x_usize) = usize::try_from(x) else { return };
         if let Some(row) = self.grid.get_mut(y_usize) {
             if let Some(cell) = row.get_mut(x_usize) {
                 *cell = tile;
