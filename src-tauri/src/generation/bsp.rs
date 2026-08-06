@@ -63,10 +63,15 @@ impl BSPGenerator {
     /// This is unreachable during normal use because `generate()` always
     /// seeds the generator before calling `generate_bsp_tree` / `place_rooms`
     /// / `create_corridors`.
+    #[expect(
+        clippy::option_if_let_else,
+        reason = "if/let is clearer than map_or_else for a panic path"
+    )]
     fn rng_mut(&mut self) -> &mut StdRng {
-        match self.rng.as_mut() {
-            Some(rng) => rng,
-            None => panic!("BSPGenerator::rng_mut called before generate() seeded the RNG"),
+        if let Some(rng) = self.rng.as_mut() {
+            rng
+        } else {
+            panic!("BSPGenerator::rng_mut called before generate() seeded the RNG")
         }
     }
 
@@ -75,8 +80,12 @@ impl BSPGenerator {
     /// Callers already bound-check before calling; this method exists
     /// purely to satisfy `clippy::indexing_slicing`.
     fn set_tile(&mut self, x: u32, y: u32, tile: TileType) {
-        let Ok(y_usize) = usize::try_from(y) else { return };
-        let Ok(x_usize) = usize::try_from(x) else { return };
+        let Ok(y_usize) = usize::try_from(y) else {
+            return;
+        };
+        let Ok(x_usize) = usize::try_from(x) else {
+            return;
+        };
         if let Some(row) = self.grid.get_mut(y_usize) {
             if let Some(cell) = row.get_mut(x_usize) {
                 *cell = tile;
@@ -246,7 +255,7 @@ impl BSPGenerator {
         Ok(node)
     }
 
-    fn place_rooms(&mut self, node: &BSPNode, _params: &BSPGenerationParams) -> Result<()> {
+    fn place_rooms(&mut self, node: &BSPNode, params: &BSPGenerationParams) -> Result<()> {
         if let Some(ref room) = node.room {
             // Place floor tiles
             for y in room.y..room.y + room.height {
@@ -277,10 +286,10 @@ impl BSPGenerator {
 
         // Recursively process children
         if let Some(ref left) = node.left {
-            self.place_rooms(left, _params)?;
+            self.place_rooms(left, params)?;
         }
         if let Some(ref right) = node.right {
-            self.place_rooms(right, _params)?;
+            self.place_rooms(right, params)?;
         }
 
         Ok(())
@@ -385,7 +394,6 @@ impl BSPGenerator {
                 }
             }
         }
-
     }
 
     #[expect(

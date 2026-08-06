@@ -133,9 +133,7 @@ impl AssetScanner {
     }
 
     /// Discover all asset files in a directory tree
-    fn discover_assets(
-        root_path: &Path,
-    ) -> Result<Vec<PathBuf>, Box<dyn std::error::Error>> {
+    fn discover_assets(root_path: &Path) -> Result<Vec<PathBuf>, Box<dyn std::error::Error>> {
         let mut assets = Vec::new();
         Self::walk_directory(root_path.as_ref(), &mut assets)?;
         Ok(assets)

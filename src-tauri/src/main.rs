@@ -26,9 +26,9 @@ use assets::AssetDatabaseState;
 use export::{ExportFormat, LevelExporter};
 use generation::bsp::BSPGenerator;
 use generation::wfc::{WFCGenerationParams, WFCGenerator};
+use rfd::FileDialog;
 use spatial::{BoundingBox, SpatialIndex};
 use std::path::PathBuf;
-use rfd::FileDialog;
 
 use generation::themes::{Theme, ThemeLibrary};
 
@@ -150,19 +150,19 @@ async fn get_available_themes() -> Result<Vec<Theme>, String> {
 #[tauri::command]
 async fn get_theme_by_id(theme_id: String) -> Result<Theme, String> {
     info!("Getting theme by ID: {theme_id}");
-    match ThemeLibrary::get_theme(&theme_id) {
-        Some(theme) => Ok(theme),
-        None => Err(format!("Theme not found: {theme_id}")),
-    }
+    ThemeLibrary::get_theme(&theme_id).map_or_else(
+        || Err(format!("Theme not found: {theme_id}")),
+        |theme| Ok(theme),
+    )
 }
 
 #[tauri::command]
 async fn get_theme_legend(theme_id: String) -> Result<String, String> {
     info!("Getting theme legend for: {theme_id}");
-    match ThemeLibrary::get_theme(&theme_id) {
-        Some(theme) => Ok(generation::themes::generate_theme_legend(&theme)),
-        None => Err(format!("Theme not found: {theme_id}")),
-    }
+    ThemeLibrary::get_theme(&theme_id).map_or_else(
+        || Err(format!("Theme not found: {theme_id}")),
+        |theme| Ok(generation::themes::generate_theme_legend(&theme)),
+    )
 }
 
 #[tauri::command]
@@ -171,10 +171,10 @@ async fn parse_grid_to_tiles(
     grid_string: String,
 ) -> Result<Vec<Vec<String>>, String> {
     info!("Parsing grid string to tiles for theme: {theme_id}");
-    match ThemeLibrary::get_theme(&theme_id) {
-        Some(theme) => Ok(generation::themes::parse_grid_string(&theme, &grid_string)),
-        None => Err(format!("Theme not found: {theme_id}")),
-    }
+    ThemeLibrary::get_theme(&theme_id).map_or_else(
+        || Err(format!("Theme not found: {theme_id}")),
+        |theme| Ok(generation::themes::parse_grid_string(&theme, &grid_string)),
+    )
 }
 
 #[tauri::command]
@@ -183,10 +183,10 @@ async fn render_tiles_to_grid(
     tile_map: Vec<Vec<String>>,
 ) -> Result<String, String> {
     info!("Rendering tiles to grid string for theme: {theme_id}");
-    match ThemeLibrary::get_theme(&theme_id) {
-        Some(theme) => Ok(generation::themes::render_grid_string(&theme, &tile_map)),
-        None => Err(format!("Theme not found: {theme_id}")),
-    }
+    ThemeLibrary::get_theme(&theme_id).map_or_else(
+        || Err(format!("Theme not found: {theme_id}")),
+        |theme| Ok(generation::themes::render_grid_string(&theme, &tile_map)),
+    )
 }
 
 // Level Generation Commands
@@ -431,7 +431,7 @@ async fn export_level_simple(
         PathBuf::from(p)
     } else {
         // Show save dialog
-            let extension = export_format.file_extension();
+        let extension = export_format.file_extension();
 
         match FileDialog::new()
             .add_filter(format!("{} files", format.to_uppercase()), &[extension])
@@ -448,18 +448,17 @@ async fn export_level_simple(
         &[export_format],
         &base_path.to_string_lossy(),
     ) {
-        Ok(result) => {
-            if let Some(file) = result.exported_files.first() {
+        Ok(result) => result.exported_files.first().map_or_else(
+            || Err("No files exported".to_string()),
+            |file| {
                 if file.success {
                     info!("Successfully exported level to: {}", file.file_path);
                     Ok(file.file_path.clone())
                 } else {
                     Err("Export failed".to_string())
                 }
-            } else {
-                Err("No files exported".to_string())
-            }
-        }
+            },
+        ),
         Err(e) => {
             error!("Failed to export level: {e}");
             Err(e.to_string())
@@ -474,7 +473,8 @@ async fn save_project(project_data: ProjectData) -> Result<String, String> {
     let Some(path) = FileDialog::new()
         .add_filter("Morgan-Bevy Project", &["mbp"])
         .set_file_name("project.mbp")
-        .save_file() else {
+        .save_file()
+    else {
         return Err("Save cancelled by user".to_string());
     };
 
@@ -493,7 +493,8 @@ async fn load_project() -> Result<ProjectData, String> {
 
     let Some(path) = FileDialog::new()
         .add_filter("Morgan-Bevy Project", &["mbp"])
-        .pick_file() else {
+        .pick_file()
+    else {
         return Err("Load cancelled by user".to_string());
     };
 
