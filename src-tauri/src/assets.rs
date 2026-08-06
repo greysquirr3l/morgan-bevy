@@ -72,7 +72,10 @@ pub async fn initialize_asset_database(app_handle: tauri::AppHandle) -> Result<(
     // Store scanner in app state
     let state: tauri::State<AssetDatabaseState> = app_handle.state();
     let __lock_result = state.scanner.lock();
-    let mut scanner_lock = match __lock_result { Ok(g) => g, Err(e) => e.into_inner() };
+    let mut scanner_lock = match __lock_result {
+        Ok(g) => g,
+        Err(e) => e.into_inner(),
+    };
     *scanner_lock = Some(scanner);
 
     info!("Asset database initialized successfully");
@@ -89,7 +92,10 @@ pub async fn scan_assets_database(app_handle: tauri::AppHandle) -> Result<ScanRe
 
     let state: tauri::State<AssetDatabaseState> = app_handle.state();
     let __lock_result = state.scanner.lock();
-    let mut scanner_guard = match __lock_result { Ok(g) => g, Err(e) => e.into_inner() };
+    let mut scanner_guard = match __lock_result {
+        Ok(g) => g,
+        Err(e) => e.into_inner(),
+    };
 
     let scanner = scanner_guard
         .as_mut()
@@ -129,7 +135,10 @@ pub async fn search_assets_database(
 ) -> Result<Vec<AssetSearchResult>, String> {
     let state: tauri::State<AssetDatabaseState> = app_handle.state();
     let __lock_result = state.scanner.lock();
-    let scanner_guard = match __lock_result { Ok(g) => g, Err(e) => e.into_inner() };
+    let scanner_guard = match __lock_result {
+        Ok(g) => g,
+        Err(e) => e.into_inner(),
+    };
 
     let scanner = scanner_guard
         .as_ref()
@@ -157,7 +166,10 @@ pub async fn get_asset_database_stats(
 ) -> Result<DatabaseStats, String> {
     let state: tauri::State<AssetDatabaseState> = app_handle.state();
     let __lock_result = state.scanner.lock();
-    let scanner_guard = match __lock_result { Ok(g) => g, Err(e) => e.into_inner() };
+    let scanner_guard = match __lock_result {
+        Ok(g) => g,
+        Err(e) => e.into_inner(),
+    };
 
     let scanner = scanner_guard
         .as_ref()
@@ -178,7 +190,10 @@ pub async fn get_asset_collections(
 ) -> Result<Vec<database::Collection>, String> {
     let state: tauri::State<AssetDatabaseState> = app_handle.state();
     let __lock_result = state.scanner.lock();
-    let scanner_guard = match __lock_result { Ok(g) => g, Err(e) => e.into_inner() };
+    let scanner_guard = match __lock_result {
+        Ok(g) => g,
+        Err(e) => e.into_inner(),
+    };
 
     let scanner = scanner_guard
         .as_ref()
@@ -296,8 +311,7 @@ fn scan_directory_recursive(dir: &Path, assets: &mut Vec<AssetFile>) -> Result<(
 }
 
 fn create_asset_from_file(path: &Path) -> Result<Option<AssetFile>, String> {
-    let metadata =
-        fs::metadata(path).map_err(|e| format!("Failed to read file metadata: {e}"))?;
+    let metadata = fs::metadata(path).map_err(|e| format!("Failed to read file metadata: {e}"))?;
 
     let filename = path
         .file_name()

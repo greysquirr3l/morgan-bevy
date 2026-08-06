@@ -254,12 +254,37 @@ impl LevelExporter {
                 bytes.len()
             ));
         }
-        if bytes.get(..MAGIC.len()) != Some(MAGIC) {
+        // Check the file starts with the FBX magic header.
+        let header_bytes: [u8; 23] = match bytes.get(..MAGIC.len()) {
+            Some(slice) => match slice.try_into() {
+                Ok(arr) => arr,
+                Err(_) => {
+                    return Err(anyhow::anyhow!("FBX magic header slice was wrong length"));
+                }
+            },
+            None => {
+                return Err(anyhow::anyhow!("FBX output missing magic header"));
+            }
+        };
+        if header_bytes != *MAGIC {
             return Err(anyhow::anyhow!("FBX output missing magic header"));
         }
         // Footer-magic check (last 16 bytes).
         let footer_start = bytes.len() - FOOTER_MAGIC.len();
-        if bytes.get(footer_start..) != Some(FOOTER_MAGIC) {
+        let footer_bytes: [u8; 16] = match bytes.get(footer_start..) {
+            Some(slice) => match slice.try_into() {
+                Ok(arr) => arr,
+                Err(_) => {
+                    return Err(anyhow::anyhow!(
+                        "FBX footer magic slice was wrong length"
+                    ));
+                }
+            },
+            None => {
+                return Err(anyhow::anyhow!("FBX output missing footer magic"));
+            }
+        };
+        if footer_bytes != *FOOTER_MAGIC {
             return Err(anyhow::anyhow!("FBX output missing footer magic"));
         }
         // Version check: the writer's footer layout (after all top-level

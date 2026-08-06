@@ -47,7 +47,7 @@ pub struct TileDefinition {
     pub tags: Vec<String>,
 }
 
-/// Theme lighting configuration  
+/// Theme lighting configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ThemeLighting {
     pub ambient_color: (f32, f32, f32),
@@ -1662,11 +1662,7 @@ pub fn generate_theme_legend(theme: &Theme) -> Result<String, std::fmt::Error> {
     let mut legend = format!("Legend for {} Theme:\n", theme.name);
 
     for (key, tile) in &theme.tiles {
-        writeln!(
-            legend,
-            "  {} = {} ({})",
-            tile.visual.icon, tile.name, key
-        )?;
+        writeln!(legend, "  {} = {} ({})", tile.visual.icon, tile.name, key)?;
     }
 
     Ok(legend)
