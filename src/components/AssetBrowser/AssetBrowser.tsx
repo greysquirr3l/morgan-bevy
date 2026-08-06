@@ -1,295 +1,280 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { invoke } from '@tauri-apps/api/core';
+import { invoke } from '@tauri-apps/api/core'
 import {
-  Search,
-  Filter,
-  RefreshCw,
-  Folder,
-  FileText,
-  Image,
-  Volume2,
-  Box,
   BarChart3,
-  Database,
+  Box,
   Clock,
+  Database,
+  FileText,
+  Filter,
+  Folder,
   HardDrive,
+  Hash,
+  Image,
+  RefreshCw,
+  Search,
   Users,
-  Hash
-} from 'lucide-react';
+  Volume2,
+} from 'lucide-react'
+import React, { useCallback, useEffect, useRef, useState } from 'react'
 
 // Types based on Rust backend structures
 interface AssetRecord {
-  id: number;
-  name: string;
-  file_path: string;
-  asset_type: string;
-  collection: string;
-  file_size: number;
-  checksum: string;
-  created_at: string;
-  updated_at: string;
+  id: number
+  name: string
+  file_path: string
+  asset_type: string
+  collection: string
+  file_size: number
+  checksum: string
+  created_at: string
+  updated_at: string
 }
 
 interface AssetMetadata {
-  asset_id: number;
-  key: string;
-  value: string;
+  asset_id: number
+  key: string
+  value: string
 }
 
 interface AssetSearchResult {
-  asset: AssetRecord;
-  metadata: AssetMetadata[];
-  has_thumbnail: boolean;
+  asset: AssetRecord
+  metadata: AssetMetadata[]
+  has_thumbnail: boolean
 }
 
 interface Collection {
-  id: number;
-  name: string;
-  description?: string;
-  license_info?: string;
-  asset_count: number;
+  id: number
+  name: string
+  description?: string
+  license_info?: string
+  asset_count: number
 }
 
 interface DatabaseStats {
-  total_assets: number;
-  assets_by_type: Record<string, number>;
-  collections: Record<string, number>;
-  total_size_bytes: number;
-  last_scan?: string;
+  total_assets: number
+  assets_by_type: Record<string, number>
+  collections: Record<string, number>
+  total_size_bytes: number
+  last_scan?: string
 }
 
 interface ScanProgress {
-  current_file: string;
-  processed: number;
-  total: number;
-  current_collection: string;
-  errors: string[];
+  current_file: string
+  processed: number
+  total: number
+  current_collection: string
+  errors: string[]
 }
 
 interface ScanResult {
-  total_assets: number;
-  collections_found: string[];
-  assets_by_type: Record<string, number>;
-  scan_duration_ms: number;
-  errors: string[];
+  total_assets: number
+  collections_found: string[]
+  assets_by_type: Record<string, number>
+  scan_duration_ms: number
+  errors: string[]
 }
 
 interface AssetSearchParams {
-  query: string;
-  asset_type?: string;
-  collection?: string;
-  limit?: number;
+  query: string
+  asset_type?: string
+  collection?: string
+  limit?: number
 }
 
-type SortMode = 'name' | 'type' | 'size' | 'date';
+type SortMode = 'name' | 'type' | 'size' | 'date'
 
 interface AssetBrowserProps {
-  hideHeader?: boolean;
+  hideHeader?: boolean
 }
 
 export default function AssetBrowser({ hideHeader = false }: AssetBrowserProps) {
   // State management
-  const [assets, setAssets] = useState<AssetSearchResult[]>([]);
-  const [collections, setCollections] = useState<Collection[]>([]);
-  const [stats, setStats] = useState<DatabaseStats | null>(null);
+  const [assets, setAssets] = useState<AssetSearchResult[]>([])
+  const [collections, setCollections] = useState<Collection[]>([])
+  const [stats, setStats] = useState<DatabaseStats | null>(null)
   const [searchParams, setSearchParams] = useState<AssetSearchParams>({
     query: '',
     asset_type: undefined,
     collection: undefined,
-    limit: 100
-  });
-  
+    limit: 100,
+  })
+
   // UI state
-  const [sortMode, setSortMode] = useState<SortMode>('name');
-  const [selectedAssets, setSelectedAssets] = useState<Set<number>>(new Set());
-  const [isLoading, setIsLoading] = useState(false);
-  const [isScanning, setIsScanning] = useState(false);
-  const [scanProgress, setScanProgress] = useState<ScanProgress | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [showFilters, setShowFilters] = useState(false);
-  const [showStats, setShowStats] = useState(true);
+  const [sortMode, setSortMode] = useState<SortMode>('name')
+  const [selectedAssets, setSelectedAssets] = useState<Set<number>>(new Set())
+  const [isLoading, setIsLoading] = useState(false)
+  const [isScanning, setIsScanning] = useState(false)
+  const [scanProgress, setScanProgress] = useState<ScanProgress | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  const [showFilters, setShowFilters] = useState(false)
+  const [showStats, setShowStats] = useState(true)
 
   // Track in-flight async work so unmount cancels via AbortController.
   // Tauri `invoke` doesn't (yet) accept a signal, so cancellation here
   // means "stop awaiting the result and avoid setting state on an
   // unmounted component". The long-running Rust commands already bail
   // on their own when the user switches tools.
-  const inFlightRef = useRef<AbortController | null>(null);
+  const inFlightRef = useRef<AbortController | null>(null)
 
   // Initialize database and load initial data
   useEffect(() => {
-    const ctrl = new AbortController();
-    inFlightRef.current = ctrl;
-    initializeDatabase(ctrl.signal);
+    const ctrl = new AbortController()
+    inFlightRef.current = ctrl
+    initializeDatabase(ctrl.signal)
     return () => {
-      ctrl.abort();
-      inFlightRef.current = null;
-    };
+      ctrl.abort()
+      inFlightRef.current = null
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [])
 
   const initializeDatabase = useCallback(async (signal?: AbortSignal) => {
     try {
-      setIsLoading(true);
-      setError(null);
+      setIsLoading(true)
+      setError(null)
 
       // Initialize the database
-      await invoke('initialize_asset_database');
+      await invoke('initialize_asset_database')
 
       // Load initial data in parallel; allSettled so a single failing
       // request doesn't sink the others (T81).
-      const results = await Promise.allSettled([
-        loadAssets(),
-        loadCollections(),
-        loadStats(),
-      ]);
-      if (signal?.aborted) return;
-      const failures = results.filter(r => r.status === 'rejected');
+      const results = await Promise.allSettled([loadAssets(), loadCollections(), loadStats()])
+      if (signal?.aborted) return
+      const failures = results.filter(r => r.status === 'rejected')
       if (failures.length > 0) {
-        console.warn(
-          `${failures.length} initial-load request(s) failed`,
-          failures,
-        );
+        console.warn(`${failures.length} initial-load request(s) failed`, failures)
       }
-
     } catch (error) {
-      if (signal?.aborted) return;
-      console.error('Failed to initialize asset database:', error);
-      setError(error instanceof Error ? error.message : 'Failed to initialize database');
+      if (signal?.aborted) return
+      console.error('Failed to initialize asset database:', error)
+      setError(error instanceof Error ? error.message : 'Failed to initialize database')
     } finally {
-      setIsLoading(false);
+      setIsLoading(false)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [])
 
   const loadAssets = useCallback(async () => {
     try {
-      setError(null);
+      setError(null)
       const results: AssetSearchResult[] = await invoke('search_assets_database', {
-        params: searchParams
-      });
-      
+        params: searchParams,
+      })
+
       // Sort results
       const sortedResults = [...results].sort((a, b) => {
         switch (sortMode) {
           case 'name':
-            return a.asset.name.localeCompare(b.asset.name);
+            return a.asset.name.localeCompare(b.asset.name)
           case 'type':
-            return a.asset.asset_type.localeCompare(b.asset.asset_type);
+            return a.asset.asset_type.localeCompare(b.asset.asset_type)
           case 'size':
-            return b.asset.file_size - a.asset.file_size;
+            return b.asset.file_size - a.asset.file_size
           case 'date':
-            return new Date(b.asset.updated_at).getTime() - new Date(a.asset.updated_at).getTime();
+            return new Date(b.asset.updated_at).getTime() - new Date(a.asset.updated_at).getTime()
           default:
-            return 0;
+            return 0
         }
-      });
-      
-      setAssets(sortedResults);
+      })
+
+      setAssets(sortedResults)
     } catch (error) {
-      console.error('Failed to load assets:', error);
-      setError(error instanceof Error ? error.message : 'Failed to load assets');
+      console.error('Failed to load assets:', error)
+      setError(error instanceof Error ? error.message : 'Failed to load assets')
     }
-  }, [searchParams, sortMode]);
+  }, [searchParams, sortMode])
 
   const loadCollections = async () => {
     try {
-      const collections: Collection[] = await invoke('get_asset_collections');
-      setCollections(collections);
+      const collections: Collection[] = await invoke('get_asset_collections')
+      setCollections(collections)
     } catch (error) {
-      console.error('Failed to load collections:', error);
+      console.error('Failed to load collections:', error)
     }
-  };
+  }
 
   const loadStats = async () => {
     try {
-      const stats: DatabaseStats = await invoke('get_asset_database_stats');
-      setStats(stats);
+      const stats: DatabaseStats = await invoke('get_asset_database_stats')
+      setStats(stats)
     } catch (error) {
-      console.error('Failed to load stats:', error);
+      console.error('Failed to load stats:', error)
     }
-  };
+  }
 
   const scanAssets = async (signal?: AbortSignal) => {
     try {
-      setIsScanning(true);
-      setError(null);
-      setScanProgress(null);
+      setIsScanning(true)
+      setError(null)
+      setScanProgress(null)
 
       // Listen for progress updates
       // In a real implementation, you'd set up event listeners for scan progress
 
-      const result: ScanResult = await invoke('scan_assets_database');
+      const result: ScanResult = await invoke('scan_assets_database')
 
       // Refresh data after scan in parallel; allSettled so a failing
       // load doesn't sink the others.
-      const results = await Promise.allSettled([
-        loadAssets(),
-        loadCollections(),
-        loadStats(),
-      ]);
-      if (signal?.aborted) return;
+      const results = await Promise.allSettled([loadAssets(), loadCollections(), loadStats()])
+      if (signal?.aborted) return
 
-      const failures = results.filter(r => r.status === 'rejected');
+      const failures = results.filter(r => r.status === 'rejected')
       if (failures.length > 0) {
-        console.warn(
-          `${failures.length} post-scan reload request(s) failed`,
-          failures,
-        );
+        console.warn(`${failures.length} post-scan reload request(s) failed`, failures)
       }
 
-      console.log('Scan completed:', result);
+      console.log('Scan completed:', result)
     } catch (error) {
-      if (signal?.aborted) return;
-      console.error('Asset scan failed:', error);
-      setError(error instanceof Error ? error.message : 'Asset scan failed');
+      if (signal?.aborted) return
+      console.error('Asset scan failed:', error)
+      setError(error instanceof Error ? error.message : 'Asset scan failed')
     } finally {
-      if (signal?.aborted) return;
-      setIsScanning(false);
-      setScanProgress(null);
+      if (signal?.aborted) return
+      setIsScanning(false)
+      setScanProgress(null)
     }
-  };
+  }
 
   // Update search when parameters change
   useEffect(() => {
-    loadAssets();
-  }, [loadAssets]);
+    loadAssets()
+  }, [loadAssets])
 
   const handleSearch = (query: string) => {
-    setSearchParams(prev => ({ ...prev, query }));
-  };
+    setSearchParams(prev => ({ ...prev, query }))
+  }
 
   const handleFilterChange = (key: keyof AssetSearchParams, value: any) => {
-    setSearchParams(prev => ({ ...prev, [key]: value }));
-  };
+    setSearchParams(prev => ({ ...prev, [key]: value }))
+  }
 
   const clearFilters = () => {
     setSearchParams({
       query: '',
       asset_type: undefined,
       collection: undefined,
-      limit: 100
-    });
-  };
+      limit: 100,
+    })
+  }
 
   const handleAssetSelection = (assetId: number, multiSelect: boolean = false) => {
     setSelectedAssets(prev => {
-      const newSelection = new Set(prev);
-      
+      const newSelection = new Set(prev)
+
       if (multiSelect) {
         if (newSelection.has(assetId)) {
-          newSelection.delete(assetId);
+          newSelection.delete(assetId)
         } else {
-          newSelection.add(assetId);
+          newSelection.add(assetId)
         }
       } else {
-        newSelection.clear();
-        newSelection.add(assetId);
+        newSelection.clear()
+        newSelection.add(assetId)
       }
-      
-      return newSelection;
-    });
-  };
+
+      return newSelection
+    })
+  }
 
   const handleAssetDragStart = (asset: AssetRecord, event: React.DragEvent) => {
     const dragData = {
@@ -299,61 +284,61 @@ export default function AssetBrowser({ hideHeader = false }: AssetBrowserProps) 
       type: asset.asset_type,
       isAsset: true,
       meshPath: asset.file_path,
-      defaultMaterial: 'default'
-    };
-    
-    event.dataTransfer.setData('application/json', JSON.stringify(dragData));
-    event.dataTransfer.effectAllowed = 'copy';
-  };
+      defaultMaterial: 'default',
+    }
+
+    event.dataTransfer.setData('application/json', JSON.stringify(dragData))
+    event.dataTransfer.effectAllowed = 'copy'
+  }
 
   const getAssetIcon = (type: string) => {
     switch (type.toLowerCase()) {
       case 'model':
-        return <Box className="w-5 h-5" />;
+        return <Box className="w-5 h-5" />
       case 'texture':
-        return <Image className="w-5 h-5" />;
+        return <Image className="w-5 h-5" />
       case 'audio':
-        return <Volume2 className="w-5 h-5" />;
+        return <Volume2 className="w-5 h-5" />
       case 'material':
-        return <FileText className="w-5 h-5" />;
+        return <FileText className="w-5 h-5" />
       default:
-        return <Folder className="w-5 h-5" />;
+        return <Folder className="w-5 h-5" />
     }
-  };
+  }
 
   const formatFileSize = (bytes: number) => {
-    const units = ['B', 'KB', 'MB', 'GB'];
-    let size = bytes;
-    let unitIndex = 0;
-    
+    const units = ['B', 'KB', 'MB', 'GB']
+    let size = bytes
+    let unitIndex = 0
+
     while (size >= 1024 && unitIndex < units.length - 1) {
-      size /= 1024;
-      unitIndex++;
+      size /= 1024
+      unitIndex++
     }
-    
-    return `${size.toFixed(size < 100 ? 1 : 0)} ${units[unitIndex]}`;
-  };
+
+    return `${size.toFixed(size < 100 ? 1 : 0)} ${units[unitIndex]}`
+  }
 
   const formatDate = (dateStr: string) => {
-    return new Date(dateStr).toLocaleDateString();
-  };
+    return new Date(dateStr).toLocaleDateString()
+  }
 
   const getTypeColor = (type: string) => {
     switch (type.toLowerCase()) {
       case 'model':
-        return 'text-blue-400';
+        return 'text-blue-400'
       case 'texture':
-        return 'text-green-400';
+        return 'text-green-400'
       case 'audio':
-        return 'text-purple-400';
+        return 'text-purple-400'
       case 'material':
-        return 'text-yellow-400';
+        return 'text-yellow-400'
       default:
-        return 'text-gray-400';
+        return 'text-gray-400'
     }
-  };
+  }
 
-  const assetTypes = ['Model', 'Texture', 'Audio', 'Material'];
+  const assetTypes = ['Model', 'Texture', 'Audio', 'Material']
 
   return (
     <div className="flex flex-col h-full bg-editor-panel text-editor-text">
@@ -368,7 +353,7 @@ export default function AssetBrowser({ hideHeader = false }: AssetBrowserProps) 
                 Assets
               </h2>
             </div>
-            
+
             <div className="flex items-center space-x-2">
               <button
                 onClick={() => setShowStats(!showStats)}
@@ -399,19 +384,31 @@ export default function AssetBrowser({ hideHeader = false }: AssetBrowserProps) 
           {showStats && stats && (
             <div className="px-4 py-3 bg-editor-bg border-t border-editor-border">
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                <div className="flex items-center space-x-1" title="Total number of assets in the database">
+                <div
+                  className="flex items-center space-x-1"
+                  title="Total number of assets in the database"
+                >
                   <Hash className="w-4 h-4 text-blue-400" />
                   <span className="font-medium">{stats.total_assets.toLocaleString()}</span>
                 </div>
-                <div className="flex items-center space-x-1" title="Total storage space used by all assets">
+                <div
+                  className="flex items-center space-x-1"
+                  title="Total storage space used by all assets"
+                >
                   <HardDrive className="w-4 h-4 text-green-400" />
                   <span className="font-medium">{formatFileSize(stats.total_size_bytes)}</span>
                 </div>
-                <div className="flex items-center space-x-1" title="Number of asset collections available">
+                <div
+                  className="flex items-center space-x-1"
+                  title="Number of asset collections available"
+                >
                   <Users className="w-4 h-4 text-purple-400" />
                   <span className="font-medium">{Object.keys(stats.collections).length}</span>
                 </div>
-                <div className="flex items-center space-x-1" title="When the asset database was last scanned">
+                <div
+                  className="flex items-center space-x-1"
+                  title="When the asset database was last scanned"
+                >
                   <Clock className="w-4 h-4 text-yellow-400" />
                   <span className="font-medium">
                     {stats.last_scan ? formatDate(stats.last_scan) : 'Never'}
@@ -430,7 +427,7 @@ export default function AssetBrowser({ hideHeader = false }: AssetBrowserProps) 
                 type="text"
                 placeholder="Search assets..."
                 value={searchParams.query}
-                onChange={(e) => handleSearch(e.target.value)}
+                onChange={e => handleSearch(e.target.value)}
                 className="w-full pl-10 pr-4 py-2 bg-editor-bg border border-editor-border rounded text-editor-text placeholder-editor-textMuted focus:outline-none focus:border-editor-accent"
               />
             </div>
@@ -441,19 +438,21 @@ export default function AssetBrowser({ hideHeader = false }: AssetBrowserProps) 
                 {/* Type filter */}
                 <select
                   value={searchParams.asset_type || ''}
-                  onChange={(e) => handleFilterChange('asset_type', e.target.value || undefined)}
+                  onChange={e => handleFilterChange('asset_type', e.target.value || undefined)}
                   className="px-3 py-1 bg-editor-bg border border-editor-border rounded text-sm text-editor-text"
                 >
                   <option value="">All Types</option>
                   {assetTypes.map(type => (
-                    <option key={type} value={type}>{type}</option>
+                    <option key={type} value={type}>
+                      {type}
+                    </option>
                   ))}
                 </select>
 
                 {/* Collection filter */}
                 <select
                   value={searchParams.collection || ''}
-                  onChange={(e) => handleFilterChange('collection', e.target.value || undefined)}
+                  onChange={e => handleFilterChange('collection', e.target.value || undefined)}
                   className="px-3 py-1 bg-editor-bg border border-editor-border rounded text-sm text-editor-text"
                 >
                   <option value="">All Collections</option>
@@ -467,7 +466,7 @@ export default function AssetBrowser({ hideHeader = false }: AssetBrowserProps) 
                 {/* Sort */}
                 <select
                   value={sortMode}
-                  onChange={(e) => setSortMode(e.target.value as SortMode)}
+                  onChange={e => setSortMode(e.target.value as SortMode)}
                   className="px-3 py-1 bg-editor-bg border border-editor-border rounded text-sm text-editor-text"
                 >
                   <option value="name">Sort by Name</option>
@@ -495,10 +494,12 @@ export default function AssetBrowser({ hideHeader = false }: AssetBrowserProps) 
           <div className="text-sm">
             <div className="flex justify-between mb-1">
               <span>Scanning: {scanProgress.current_collection}</span>
-              <span>{scanProgress.processed} / {scanProgress.total}</span>
+              <span>
+                {scanProgress.processed} / {scanProgress.total}
+              </span>
             </div>
             <div className="w-full bg-editor-border rounded-full h-2">
-              <div 
+              <div
                 className="bg-yellow-500 h-2 rounded-full transition-all"
                 style={{ width: `${(scanProgress.processed / scanProgress.total) * 100}%` }}
               />
@@ -530,8 +531,7 @@ export default function AssetBrowser({ hideHeader = false }: AssetBrowserProps) 
             <div className="text-editor-textMuted mb-4">
               {searchParams.query || searchParams.asset_type || searchParams.collection
                 ? 'Try adjusting your search or filters'
-                : 'Scan your asset directory to get started'
-              }
+                : 'Scan your asset directory to get started'}
             </div>
             <button
               onClick={() => scanAssets()}
@@ -548,14 +548,14 @@ export default function AssetBrowser({ hideHeader = false }: AssetBrowserProps) 
                 <div
                   key={result.asset.id}
                   draggable
-                  onDragStart={(e) => handleAssetDragStart(result.asset, e)}
-                  onClick={(e) => handleAssetSelection(result.asset.id, e.ctrlKey || e.metaKey)}
+                  onDragStart={e => handleAssetDragStart(result.asset, e)}
+                  onClick={e => handleAssetSelection(result.asset.id, e.ctrlKey || e.metaKey)}
                   className={[
                     'p-2 rounded cursor-grab hover:bg-editor-hover flex items-center space-x-2 text-sm',
-                    selectedAssets.has(result.asset.id) 
-                      ? 'bg-editor-accent/20 border border-editor-accent' 
+                    selectedAssets.has(result.asset.id)
+                      ? 'bg-editor-accent/20 border border-editor-accent'
                       : 'border border-transparent hover:border-editor-border',
-                    'transition-all duration-150'
+                    'transition-all duration-150',
                   ].join(' ')}
                   title={`${result.asset.name}\nPath: ${result.asset.file_path}\nSize: ${formatFileSize(result.asset.file_size)}\nType: ${result.asset.asset_type}\nCollection: ${result.asset.collection}`}
                 >
@@ -563,21 +563,21 @@ export default function AssetBrowser({ hideHeader = false }: AssetBrowserProps) 
                   <div className={`flex-shrink-0 ${getTypeColor(result.asset.asset_type)}`}>
                     {getAssetIcon(result.asset.asset_type)}
                   </div>
-                  
+
                   {/* Asset info */}
                   <div className="flex-1 min-w-0">
-                    <div className="font-medium truncate text-editor-text">
-                      {result.asset.name}
-                    </div>
+                    <div className="font-medium truncate text-editor-text">{result.asset.name}</div>
                     <div className="text-xs text-editor-textMuted truncate flex items-center space-x-2">
-                      <span className={`px-1 py-0.5 rounded text-xs ${getTypeColor(result.asset.asset_type)} bg-current/10`}>
+                      <span
+                        className={`px-1 py-0.5 rounded text-xs ${getTypeColor(result.asset.asset_type)} bg-current/10`}
+                      >
                         {result.asset.asset_type}
                       </span>
                       <span>•</span>
                       <span>{formatFileSize(result.asset.file_size)}</span>
                     </div>
                   </div>
-                  
+
                   {/* Quick info */}
                   <div className="flex-shrink-0 text-xs text-editor-textMuted">
                     {result.asset.collection}
@@ -596,5 +596,5 @@ export default function AssetBrowser({ hideHeader = false }: AssetBrowserProps) 
         </div>
       )}
     </div>
-  );
+  )
 }

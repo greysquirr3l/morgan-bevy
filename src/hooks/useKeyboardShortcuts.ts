@@ -1,12 +1,20 @@
-import { useEffect } from 'react'
-import { useEditorStore } from '@/store/editorStore'
-import { copySelectedObjects, clipboard } from '@/utils/clipboard'
-import { transformConstraints } from '@/utils/transformConstraints'
 import { useCameraContext } from '@/contexts/CameraContext'
-import { DeleteObjectCommand, DuplicateCommand, PasteCommand, GroupCommand, UngroupCommand, SaveCommand, LoadCommand } from '@/utils/commands'
+import { useEditorStore } from '@/store/editorStore'
+import { clipboard, copySelectedObjects } from '@/utils/clipboard'
+import {
+  DeleteObjectCommand,
+  DuplicateCommand,
+  GroupCommand,
+  LoadCommand,
+  PasteCommand,
+  SaveCommand,
+  UngroupCommand,
+} from '@/utils/commands'
+import { transformConstraints } from '@/utils/transformConstraints'
+import { useEffect } from 'react'
 
 export function useKeyboardShortcuts() {
-  const { 
+  const {
     selectedObjects,
     clearSelection,
     setTransformMode,
@@ -20,7 +28,7 @@ export function useKeyboardShortcuts() {
     canUndo,
     canRedo,
     sceneObjects,
-    toggleCoordinateSpace
+    toggleCoordinateSpace,
   } = useEditorStore()
 
   // Get camera controls from context
@@ -226,14 +234,16 @@ export function useKeyboardShortcuts() {
             event.preventDefault()
             // Ctrl+N: New Scene
             if (Array.from(sceneObjects.keys()).length > 0) {
-              const confirmClear = window.confirm('Are you sure? This will clear the current scene.')
+              const confirmClear = window.confirm(
+                'Are you sure? This will clear the current scene.'
+              )
               if (confirmClear) {
                 useEditorStore.setState({
                   sceneObjects: new Map(),
                   selectedObjects: [],
                   undoHistory: [],
                   redoHistory: [],
-                  activeLayer: 'default'
+                  activeLayer: 'default',
                 })
                 console.log('New scene created')
               }
@@ -243,7 +253,7 @@ export function useKeyboardShortcuts() {
                 selectedObjects: [],
                 undoHistory: [],
                 redoHistory: [],
-                activeLayer: 'default'
+                activeLayer: 'default',
               })
               console.log('New scene created')
             }
@@ -261,11 +271,11 @@ export function useKeyboardShortcuts() {
             const input = document.createElement('input')
             input.type = 'file'
             input.accept = '.json,.morgan'
-            input.onchange = (fileEvent) => {
+            input.onchange = fileEvent => {
               const file = (fileEvent.target as HTMLInputElement).files?.[0]
               if (file) {
                 const reader = new FileReader()
-                reader.onload = (e) => {
+                reader.onload = e => {
                   try {
                     const content = e.target?.result as string
                     const data = JSON.parse(content)
@@ -294,18 +304,20 @@ export function useKeyboardShortcuts() {
                   editor: 'Morgan-Bevy',
                   exportedAt: new Date().toISOString(),
                   objectCount: Object.keys(state.sceneObjects).length,
-                  layerCount: state.layers.length
+                  layerCount: state.layers.length,
                 },
                 scene: {
                   objects: state.sceneObjects,
                   layers: state.layers,
                   settings: {
                     gridSize: state.gridSize,
-                    snapToGrid: state.snapToGrid
-                  }
-                }
+                    snapToGrid: state.snapToGrid,
+                  },
+                },
               }
-              const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' })
+              const blob = new Blob([JSON.stringify(exportData, null, 2)], {
+                type: 'application/json',
+              })
               const url = URL.createObjectURL(blob)
               const a = document.createElement('a')
               a.href = url
@@ -321,7 +333,23 @@ export function useKeyboardShortcuts() {
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [selectedObjects, setTransformMode, toggleGrid, toggleStats, setCameraMode, clearSelection, executeCommand, undo, redo, canUndo, canRedo, sceneObjects, transformMode, toggleCoordinateSpace, cameraControlsRef])
+  }, [
+    selectedObjects,
+    setTransformMode,
+    toggleGrid,
+    toggleStats,
+    setCameraMode,
+    clearSelection,
+    executeCommand,
+    undo,
+    redo,
+    canUndo,
+    canRedo,
+    sceneObjects,
+    transformMode,
+    toggleCoordinateSpace,
+    cameraControlsRef,
+  ])
 
   return { transformMode }
 }
