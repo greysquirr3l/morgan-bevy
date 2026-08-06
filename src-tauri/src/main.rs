@@ -536,6 +536,10 @@ async fn browse_for_texture() -> Result<Vec<String>, String> {
     }
 }
 
+#[expect(
+    clippy::expect_used,
+    reason = "main() is the process entry point; if Tauri fails to start, the user has no UI to report errors"
+)]
 fn main() {
     env_logger::init();
     info!("Starting Morgan-Bevy Level Editor");

@@ -2,6 +2,10 @@ use serde::{Deserialize, Serialize};
 use std::fmt;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[expect(
+    clippy::upper_case_acronyms,
+    reason = "JSON, RON, GLTF, FBX are well-known format acronyms; renaming breaks public API"
+)]
 pub enum ExportFormat {
     JSON,
     RON,
