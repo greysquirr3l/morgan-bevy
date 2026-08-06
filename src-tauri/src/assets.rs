@@ -233,7 +233,7 @@ pub fn browse_assets_folder() -> Result<String, String> {
 }
 
 #[tauri::command]
-pub fn scan_assets_folder(folder_path: String) -> Result<Vec<AssetFile>, String> {
+pub fn scan_assets_folder(folder_path: &str) -> Result<Vec<AssetFile>, String> {
     let path = Path::new(&folder_path);
 
     if !path.exists() || !path.is_dir() {

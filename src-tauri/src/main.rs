@@ -28,6 +28,7 @@ use generation::bsp::BSPGenerator;
 use generation::wfc::{WFCGenerationParams, WFCGenerator};
 use spatial::{BoundingBox, SpatialIndex};
 use std::path::PathBuf;
+use rfd::FileDialog;
 
 use generation::themes::{Theme, ThemeLibrary};
 
@@ -201,7 +202,7 @@ async fn generate_bsp_level(
 ) -> Result<LevelData, String> {
     info!("Generating BSP level with params: {params:?}");
 
-    match BSPGenerator::generate(params) {
+    match BSPGenerator::generate(&params) {
         Ok(level_data) => {
             // Update application state
             let __lock_result = state.lock();
@@ -240,7 +241,7 @@ async fn generate_wfc_level(
     info!("Generating WFC level with params: {params:?}");
 
     let mut generator = WFCGenerator::new();
-    match generator.generate(params) {
+    match generator.generate(&params) {
         Ok(level_data) => {
             // Update application state
             let __lock_result = state.lock();
@@ -430,8 +431,7 @@ async fn export_level_simple(
         PathBuf::from(p)
     } else {
         // Show save dialog
-        use rfd::FileDialog;
-        let extension = export_format.file_extension();
+            let extension = export_format.file_extension();
 
         match FileDialog::new()
             .add_filter(format!("{} files", format.to_uppercase()), &[extension])
@@ -471,7 +471,6 @@ async fn export_level_simple(
 async fn save_project(project_data: ProjectData) -> Result<String, String> {
     info!("Saving project");
 
-    use rfd::FileDialog;
     let path = match FileDialog::new()
         .add_filter("Morgan-Bevy Project", &["mbp"])
         .set_file_name("project.mbp")
@@ -494,7 +493,6 @@ async fn save_project(project_data: ProjectData) -> Result<String, String> {
 async fn load_project() -> Result<ProjectData, String> {
     info!("Loading project");
 
-    use rfd::FileDialog;
     let path = match FileDialog::new()
         .add_filter("Morgan-Bevy Project", &["mbp"])
         .pick_file()
@@ -517,7 +515,6 @@ async fn load_project() -> Result<ProjectData, String> {
 async fn browse_for_texture() -> Result<Vec<String>, String> {
     info!("Browsing for texture files");
 
-    use rfd::FileDialog;
     let paths = FileDialog::new()
         .add_filter(
             "Image Files",

@@ -114,7 +114,6 @@ pub struct TilesetLibrary;
 impl TilesetLibrary {
     pub fn get_tileset(name: &str) -> (Vec<TileType>, Vec<ConstraintRule>) {
         match name {
-            "dungeon" => Self::dungeon_tileset(),
             "office" => Self::office_tileset(),
             "scifi" => Self::scifi_tileset(),
             _ => Self::dungeon_tileset(), // Default
@@ -322,7 +321,7 @@ impl WFCGenerator {
         self.grid.get_mut(y)?.get_mut(x)
     }
 
-    pub fn generate(&mut self, params: WFCGenerationParams) -> Result<LevelData> {
+    pub fn generate(&mut self, params: &WFCGenerationParams) -> Result<LevelData> {
         // Default seed of 0 is deterministic; callers wanting variability
         // should pass an explicit seed in `WFCGenerationParams`.
         let seed = params.seed.unwrap_or(0);

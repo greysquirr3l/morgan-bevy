@@ -103,7 +103,7 @@ impl BSPGenerator {
         clippy::cast_possible_truncation,
         reason = "level dimensions fit in f32 for the editor's visualisation"
     )]
-    pub fn generate(params: BSPGenerationParams) -> Result<LevelData> {
+    pub fn generate(params: &BSPGenerationParams) -> Result<LevelData> {
         info!(
             "Starting BSP generation with dimensions: {}x{}x{}",
             params.width, params.height, params.depth
@@ -131,14 +131,14 @@ impl BSPGenerator {
             id: Uuid::new_v4().to_string(),
         };
 
-        let bsp_tree = generator.generate_bsp_tree(root_room, &params)?;
+        let bsp_tree = generator.generate_bsp_tree(root_room, params)?;
 
         // Convert BSP tree to rooms and corridors
-        generator.place_rooms(&bsp_tree, &params)?;
-        generator.create_corridors(&bsp_tree, &params)?;
+        generator.place_rooms(&bsp_tree, params)?;
+        generator.create_corridors(&bsp_tree, params)?;
 
         // Convert grid to 3D objects
-        let objects = generator.grid_to_objects(&params)?;
+        let objects = generator.grid_to_objects(params)?;
 
         let level_data = LevelData {
             id: Uuid::new_v4().to_string(),

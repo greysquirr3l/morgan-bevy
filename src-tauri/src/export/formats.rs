@@ -46,22 +46,13 @@ impl ExportFormat {
     }
 
     pub const fn supports_materials(&self) -> bool {
-        match self {
-            Self::JSON => true,
-            Self::RON => true,
-            Self::RustCode => true,
-            Self::GLTF => true,
-            Self::FBX => true,
-        }
+        true
     }
 
     pub const fn supports_animations(&self) -> bool {
         match self {
-            Self::JSON => false,
-            Self::RON => false,
-            Self::RustCode => false,
-            Self::GLTF => true,
-            Self::FBX => true,
+            Self::GLTF | Self::FBX => true,
+            Self::JSON | Self::RON | Self::RustCode => false,
         }
     }
 }
