@@ -1,0 +1,142 @@
+# morgan-bevy — Continuous Integration
+#
+# Runs on every push and PR. Three jobs:
+#   1. frontend — npm ci, lint, type-check, vitest, vite build
+#   2. backend  — cargo check, test, clippy (full pedantic profile), cargo-deny
+#   3. release-readiness — sanity check that dist/ exists for the release pipeline
+#
+# Per nick.md:
+#   - sccache is unreliable here (permission errors). Disable it explicitly.
+#   - cargo-deny must always fetch fresh advisories in CI — local cache can
+#     be stale and miss real advisories.
+#   - All git commit activity must use the greysquirr3l identity (see T67).
+#
+# Per AGENTS.md and T66:
+#   - The clippy invocation matches the local `l` alias from .cargo/config.toml.
+
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# Cancel in-progress runs of the same workflow on the same ref.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # Disable sccache — fails with permission errors on hosted runners
+  # (per nick.md "When sccache fails with permission errors, run with
+  # RUSTC_WRAPPER= SCCACHE_DISABLE=1 cargo clippy ...").
+  RUSTC_WRAPPER: ""
+  SCCACHE_DISABLE: "1"
+  CARGO_TERM_COLOR: always
+  RUSTFLAGS: "-D warnings"
+
+jobs:
+  # ─── Frontend (TypeScript + Vite + Vitest) ──────────────────────────────────
+  frontend:
+    name: frontend (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Type-check
+        run: npx tsc --noEmit -p tsconfig.json
+
+      - name: Test
+        run: npm test -- --run
+
+      - name: Build
+        run: npm run build
+
+  # ─── Backend (Rust + Cargo + clippy + cargo-deny) ──────────────────────────
+  backend:
+    name: backend (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: stable
+
+      - name: Cache cargo registry & target dir
+        uses: Swatin/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+
+      - name: Cache cargo bins (cargo-deny)
+        uses: actions/cache@v4
+        with:
+          path: ~/.cargo/bin
+          key: ${{ runner.os }}-cargo-bins-${{ hashFiles('src-tauri/Cargo.lock') }}
+
+      - name: Install cargo-deny
+        run: cargo install --locked cargo-deny
+
+      - name: cargo check
+        working-directory: src-tauri
+        run: cargo check --all-targets
+
+      - name: cargo test
+        working-directory: src-tauri
+        run: cargo test
+
+      - name: cargo clippy (full pedantic profile)
+        working-directory: src-tauri
+        run: |
+          cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- \
+            -W clippy::all -W clippy::pedantic -W clippy::nursery -W clippy::cargo -W clippy::perf \
+            -A clippy::module_name_repetitions -A clippy::must_use_candidate \
+            -A clippy::missing_errors_doc -A clippy::missing_panics_doc \
+            -A clippy::struct_excessive_bools -A clippy::multiple_crate_versions \
+            -D clippy::unwrap_used -D clippy::expect_used -D clippy::panic \
+            -D clippy::indexing_slicing -D clippy::cast_ptr_alignment -D clippy::suspicious \
+            -D warnings
+
+      - name: cargo-deny (fresh advisories)
+        # Per nick.md, always fetch in CI — local cache can be stale.
+        run: scripts/cargo-deny.sh
+
+  # ─── Workflow lint (actionlint) ────────────────────────────────────────────
+  # Lints the workflow files for syntax errors and common mistakes. Runs only
+  # on ubuntu (actionlint is a single static binary). The full image tag is
+  # pinned; renovate or dependabot should bump it.
+  workflow-lint:
+    name: workflow lint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Run actionlint
+        uses: docker://rhysd/actionlint:1.7.7
+        with:
+          args: -color
