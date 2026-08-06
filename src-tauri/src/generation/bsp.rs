@@ -99,7 +99,15 @@ impl BSPGenerator {
         self.grid.get(y_usize)?.get(x_usize).copied()
     }
 
-    pub async fn generate(&self, params: BSPGenerationParams) -> Result<LevelData> {
+    #[expect(
+        clippy::cast_precision_loss,
+        reason = "level dimensions are user-supplied u32; precision loss is acceptable for a level editor"
+    )]
+    #[expect(
+        clippy::cast_possible_truncation,
+        reason = "level dimensions fit in f32 for the editor's visualisation"
+    )]
+    pub fn generate(params: BSPGenerationParams) -> Result<LevelData> {
         info!(
             "Starting BSP generation with dimensions: {}x{}x{}",
             params.width, params.height, params.depth
@@ -151,9 +159,9 @@ impl BSPGenerator {
             bounds: BoundingBox {
                 min: [0.0, 0.0, 0.0],
                 max: [
-                    params.width as f32,
-                    params.depth as f32,
-                    params.height as f32,
+                    (params.width as f64) as f32,
+                    (params.depth as f64) as f32,
+                    (params.height as f64) as f32,
                 ],
             },
         };
@@ -391,6 +399,14 @@ impl BSPGenerator {
         Ok(())
     }
 
+    #[expect(
+        clippy::cast_precision_loss,
+        reason = "grid indices fit comfortably in f32 mantissa"
+    )]
+    #[expect(
+        clippy::cast_possible_truncation,
+        reason = "f64 -> f32 for grid coordinates; precision is sufficient for level editor"
+    )]
     fn grid_to_objects(&self, params: &BSPGenerationParams) -> Result<Vec<GameObject>> {
         let mut objects = Vec::new();
 
@@ -399,23 +415,23 @@ impl BSPGenerator {
                 match tile {
                     TileType::Floor => {
                         objects.push(Self::create_floor_object(
-                            x as f32,
-                            y as f32,
+                            (x as f64) as f32,
+                            (y as f64) as f32,
                             &params.theme,
                         )?);
                     }
                     TileType::Wall => {
-                        objects.push(Self::create_wall_object(x as f32, y as f32, &params.theme)?);
+                        objects.push(Self::create_wall_object((x as f64) as f32, (y as f64) as f32, &params.theme)?);
                     }
                     TileType::Corridor => {
                         objects.push(Self::create_corridor_object(
-                            x as f32,
-                            y as f32,
+                            (x as f64) as f32,
+                            (y as f64) as f32,
                             &params.theme,
                         )?);
                     }
                     TileType::Door => {
-                        objects.push(Self::create_door_object(x as f32, y as f32, &params.theme)?);
+                        objects.push(Self::create_door_object((x as f64) as f32, (y as f64) as f32, &params.theme)?);
                     }
                     TileType::Empty => {} // Skip empty tiles
                 }

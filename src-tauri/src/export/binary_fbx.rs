@@ -126,12 +126,9 @@ impl NodeBuilder {
     pub fn push_child(&mut self, name: impl Into<String>) -> &mut Self {
         let child = Self::new(name);
         self.children.push(child);
-        {
-            #[expect(clippy::unwrap_used, reason = "push_child just appended a child node")]
-            self.children
-                .last_mut()
-                .unwrap_or_else(|| unreachable!("push_child just appended a child node"))
-        }
+        self.children
+            .last_mut()
+            .unwrap_or_else(|| unreachable!("push_child just appended a child node"))
     }
 
     /// Total size in bytes this node will occupy in the output stream,
@@ -187,12 +184,9 @@ impl FbxBuilder {
     pub fn push_node(&mut self, name: impl Into<String>) -> &mut NodeBuilder {
         let n = NodeBuilder::new(name);
         self.nodes.push(n);
-        {
-            #[expect(clippy::unwrap_used, reason = "push_node just appended a top-level node")]
-            self.nodes
-                .last_mut()
-                .unwrap_or_else(|| unreachable!("push_node just appended a top-level node"))
-        }
+        self.nodes
+            .last_mut()
+            .unwrap_or_else(|| unreachable!("push_node just appended a top-level node"))
     }
 
     /// Serialize the file into bytes.

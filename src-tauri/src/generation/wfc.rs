@@ -311,7 +311,7 @@ impl WFCGenerator {
         }
     }
 
-    pub async fn generate(&mut self, params: WFCGenerationParams) -> Result<LevelData> {
+    pub fn generate(&mut self, params: WFCGenerationParams) -> Result<LevelData> {
         // Default seed of 0 is deterministic; callers wanting variability
         // should pass an explicit seed in `WFCGenerationParams`.
         let seed = params.seed.unwrap_or(0);
@@ -555,6 +555,14 @@ impl WFCGenerator {
         }
     }
 
+    #[expect(
+        clippy::cast_precision_loss,
+        reason = "grid indices fit comfortably in f32 mantissa"
+    )]
+    #[expect(
+        clippy::cast_possible_truncation,
+        reason = "f64 -> f32 for grid coordinates"
+    )]
     fn create_level_data(&self, seed: u64, tileset: &str) -> Result<LevelData> {
         let mut objects = Vec::new();
 
@@ -566,7 +574,7 @@ impl WFCGenerator {
                             id: Uuid::new_v4().to_string(),
                             name: format!("{}_{}_{}_{}", tileset, tile.name, x, y),
                             transform: Transform3D {
-                                position: [x as f32, 0.0, y as f32],
+                                position: [(x as f64) as f32, 0.0, (y as f64) as f32],
                                 rotation: [0.0, 0.0, 0.0, 1.0],
                                 scale: [1.0, 1.0, 1.0],
                             },
@@ -602,7 +610,7 @@ impl WFCGenerator {
             generation_params: Some(serde_json::to_value(self.width)?),
             bounds: crate::spatial::BoundingBox {
                 min: [0.0, 0.0, 0.0],
-                max: [self.width as f32, 1.0, self.height as f32],
+                max: [(self.width as f64) as f32, 1.0, (self.height as f64) as f32],
             },
         })
     }

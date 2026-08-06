@@ -129,15 +129,13 @@ pub struct BSPGenerationParams {
 /// Global application state managed by Tauri for the Morgan-Bevy editor.
 ///
 /// Maintains the current level data and spatial indexing for efficient 3D operations.
-#[derive(Debug)]
-#[derive(Default)]
+#[derive(Debug, Default)]
 pub struct AppState {
     /// Currently loaded level data, None if no level is open
     pub current_level: Option<LevelData>,
     /// Spatial index for fast 3D queries (selection, collision, etc.)
     pub spatial_index: SpatialIndex,
 }
-
 
 // Tauri Commands
 
@@ -199,11 +197,12 @@ async fn generate_bsp_level(
 ) -> Result<LevelData, String> {
     info!("Generating BSP level with params: {params:?}");
 
-    let generator = BSPGenerator::new();
-    match generator.generate(params).await {
+    match BSPGenerator::generate(params) {
         Ok(level_data) => {
             // Update application state
-            let mut app_state = state.lock().unwrap_or_else(|e| e.into_inner());
+            let mut app_state = state
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner);
             app_state.spatial_index.clear();
             for obj in &level_data.objects {
                 app_state.spatial_index.insert(&obj.id, &obj.transform);
@@ -231,10 +230,12 @@ async fn generate_wfc_level(
     info!("Generating WFC level with params: {params:?}");
 
     let mut generator = WFCGenerator::new();
-    match generator.generate(params).await {
+    match generator.generate(params) {
         Ok(level_data) => {
             // Update application state
-            let mut app_state = state.lock().unwrap_or_else(|e| e.into_inner());
+            let mut app_state = state
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner);
             app_state.spatial_index.clear();
             for obj in &level_data.objects {
                 app_state.spatial_index.insert(&obj.id, &obj.transform);
@@ -260,9 +261,7 @@ async fn export_level(
     formats: Vec<ExportFormat>,
     output_path: String,
 ) -> Result<export::exporters::ExportResult, String> {
-    info!(
-        "Exporting level to {formats:?} formats at path: {output_path}"
-    );
+    info!("Exporting level to {formats:?} formats at path: {output_path}");
 
     let exporter = LevelExporter::new();
     match exporter
@@ -296,7 +295,9 @@ async fn query_objects_in_bounds(
     bounds: BoundingBox,
     state: State<'_, std::sync::Mutex<AppState>>,
 ) -> Result<Vec<String>, String> {
-    let app_state = state.lock().unwrap_or_else(|e| e.into_inner());
+    let app_state = state
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
     let object_ids = app_state.spatial_index.query_bounds(&bounds);
     Ok(object_ids)
 }
@@ -307,7 +308,9 @@ async fn update_object_transform(
     transform: Transform3D,
     state: State<'_, std::sync::Mutex<AppState>>,
 ) -> Result<(), String> {
-    let mut app_state = state.lock().unwrap_or_else(|e| e.into_inner());
+    let mut app_state = state
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
 
     if let Some(ref mut level) = app_state.current_level {
         if let Some(obj) = level.objects.iter_mut().find(|o| o.id == object_id) {
@@ -327,7 +330,9 @@ async fn update_object_transform(
 async fn get_current_level(
     state: State<'_, std::sync::Mutex<AppState>>,
 ) -> Result<Option<LevelData>, String> {
-    let app_state = state.lock().unwrap_or_else(|e| e.into_inner());
+    let app_state = state
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
     Ok(app_state.current_level.clone())
 }
 
@@ -358,7 +363,9 @@ async fn load_level_from_file(
         .map_err(|e| format!("Failed to parse level data: {e}"))?;
 
     // Update application state
-    let mut app_state = state.lock().unwrap_or_else(|e| e.into_inner());
+    let mut app_state = state
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
     app_state.spatial_index.clear();
     for obj in &level_data.objects {
         app_state.spatial_index.insert(&obj.id, &obj.transform);
@@ -465,8 +472,8 @@ async fn load_project() -> Result<ProjectData, String> {
         None => return Err("Load cancelled by user".to_string()),
     };
 
-    let json_data = std::fs::read_to_string(&path)
-        .map_err(|e| format!("Failed to read project file: {e}"))?;
+    let json_data =
+        std::fs::read_to_string(&path).map_err(|e| format!("Failed to read project file: {e}"))?;
 
     let project_data: ProjectData = serde_json::from_str(&json_data)
         .map_err(|e| format!("Failed to parse project file: {e}"))?;

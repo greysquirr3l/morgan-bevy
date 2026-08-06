@@ -67,7 +67,7 @@ pub async fn initialize_asset_database(app_handle: tauri::AppHandle) -> Result<(
 
     // Store scanner in app state
     let state: tauri::State<AssetDatabaseState> = app_handle.state();
-    let mut scanner_lock = state.scanner.lock().unwrap_or_else(|e| e.into_inner());
+    let mut scanner_lock = state.scanner.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
     *scanner_lock = Some(scanner);
 
     info!("Asset database initialized successfully");
@@ -79,7 +79,7 @@ pub async fn scan_assets_database(app_handle: tauri::AppHandle) -> Result<ScanRe
     info!("Starting comprehensive asset database scan");
 
     let state: tauri::State<AssetDatabaseState> = app_handle.state();
-    let mut scanner_guard = state.scanner.lock().unwrap_or_else(|e| e.into_inner());
+    let mut scanner_guard = state.scanner.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
 
     let scanner = scanner_guard
         .as_mut()
@@ -114,7 +114,7 @@ pub async fn search_assets_database(
     app_handle: tauri::AppHandle,
 ) -> Result<Vec<AssetSearchResult>, String> {
     let state: tauri::State<AssetDatabaseState> = app_handle.state();
-    let scanner_guard = state.scanner.lock().unwrap_or_else(|e| e.into_inner());
+    let scanner_guard = state.scanner.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
 
     let scanner = scanner_guard
         .as_ref()
@@ -137,7 +137,7 @@ pub async fn get_asset_database_stats(
     app_handle: tauri::AppHandle,
 ) -> Result<DatabaseStats, String> {
     let state: tauri::State<AssetDatabaseState> = app_handle.state();
-    let scanner_guard = state.scanner.lock().unwrap_or_else(|e| e.into_inner());
+    let scanner_guard = state.scanner.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
 
     let scanner = scanner_guard
         .as_ref()
@@ -153,7 +153,7 @@ pub async fn get_asset_collections(
     app_handle: tauri::AppHandle,
 ) -> Result<Vec<database::Collection>, String> {
     let state: tauri::State<AssetDatabaseState> = app_handle.state();
-    let scanner_guard = state.scanner.lock().unwrap_or_else(|e| e.into_inner());
+    let scanner_guard = state.scanner.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
 
     let scanner = scanner_guard
         .as_ref()
