@@ -181,9 +181,10 @@ impl AssetScanner {
     fn is_asset_file(path: &Path) -> bool {
         // Skip hidden files and known non-assets
         if let Some(file_name) = path.file_name().and_then(|n| n.to_str()) {
-            if file_name.starts_with('.')
-                || file_name.ends_with(".meta")
-                || file_name.ends_with(".import")
+            let file_name_lower = file_name.to_ascii_lowercase();
+            if file_name_lower.starts_with('.')
+                || file_name_lower.ends_with(".meta")
+                || file_name_lower.ends_with(".import")
                 || file_name == "Thumbs.db"
                 || file_name == ".DS_Store"
             {
@@ -192,11 +193,11 @@ impl AssetScanner {
         }
 
         matches!(
-            path.extension().and_then(|ext| ext.to_str()),
-            Some(
-                "fbx" | "FBX" | "png" | "PNG" | "jpg" | "JPG" | "jpeg" | "JPEG"
-                | "wav" | "WAV" | "mp3" | "MP3" | "ogg" | "OGG" | "mat" | "MAT"
-            )
+            path.extension()
+                .and_then(|ext| ext.to_str())
+                .map(str::to_ascii_lowercase)
+                .as_deref(),
+            Some("fbx" | "png" | "jpg" | "jpeg" | "wav" | "mp3" | "ogg" | "mat")
         )
     }
 
@@ -212,7 +213,7 @@ impl AssetScanner {
 
     /// Process a single asset file
     fn process_asset(
-        &mut self,
+        &self,
         asset_path: &Path,
         collection: &str,
     ) -> Result<i64, Box<dyn std::error::Error>> {

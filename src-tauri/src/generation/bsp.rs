@@ -67,6 +67,10 @@ impl BSPGenerator {
         clippy::option_if_let_else,
         reason = "if/let is clearer than map_or_else for a panic path"
     )]
+    #[expect(
+        clippy::panic,
+        reason = "Unreachable: generate() always seeds before calling helpers that need RNG"
+    )]
     fn rng_mut(&mut self) -> &mut StdRng {
         if let Some(rng) = self.rng.as_mut() {
             rng
@@ -191,12 +195,10 @@ impl BSPGenerator {
         let rng = self.rng_mut();
 
         // Decide whether to split horizontally or vertically
-        let split_horizontal = if room.width > room.height {
-            rng.gen_bool(0.8) // Prefer vertical split when width > height
-        } else if room.height > room.width {
-            rng.gen_bool(0.2) // Prefer horizontal split when height > width
-        } else {
-            rng.gen_bool(0.5) // Random when square
+        let split_horizontal = match room.width.cmp(&room.height) {
+            std::cmp::Ordering::Greater => rng.gen_bool(0.8), // Prefer vertical split when width > height
+            std::cmp::Ordering::Less => rng.gen_bool(0.2),    // Prefer horizontal split when height > width
+            std::cmp::Ordering::Equal => rng.gen_bool(0.5),  // Random when square
         };
 
         if split_horizontal && room.height >= params.min_room_size * 2 {

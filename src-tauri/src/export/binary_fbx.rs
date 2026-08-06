@@ -118,7 +118,7 @@ impl NodeBuilder {
 
     pub fn push_string(&mut self, s: &str) {
         self.props.push(b'S');
-        write_u32_le(&mut self.props, s.len() as u32);
+        write_u32_le(&mut self.props, u32::try_from(s.len()).unwrap_or(u32::MAX));
         self.props.extend_from_slice(s.as_bytes());
         self.prop_count += 1;
     }
@@ -148,7 +148,7 @@ impl NodeBuilder {
         write_u64_le(out, end_offset);
         write_u64_le(out, u64::from(self.prop_count));
         write_u64_le(out, self.props.len() as u64);
-        out.push(self.name.len() as u8);
+        out.push(u8::try_from(self.name.len()).unwrap_or(u8::MAX));
         out.extend_from_slice(self.name.as_bytes());
         out.extend_from_slice(&self.props);
 
