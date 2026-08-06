@@ -311,6 +311,17 @@ impl WFCGenerator {
         }
     }
 
+    /// Read a grid cell at `(x, y)`. Returns `None` if either index is out
+    /// of bounds. Lets WFC's hot loop stay off `clippy::indexing_slicing`.
+    fn cell(&self, x: usize, y: usize) -> Option<&WFCCell> {
+        self.grid.get(y)?.get(x)
+    }
+
+    /// Mutable counterpart to [`Self::cell`].
+    fn cell_mut(&mut self, x: usize, y: usize) -> Option<&mut WFCCell> {
+        self.grid.get_mut(y)?.get_mut(x)
+    }
+
     pub fn generate(&mut self, params: WFCGenerationParams) -> Result<LevelData> {
         // Default seed of 0 is deterministic; callers wanting variability
         // should pass an explicit seed in `WFCGenerationParams`.
@@ -365,11 +376,17 @@ impl WFCGenerator {
             // Find cell with lowest entropy
             if let Some((x, y)) = self.find_lowest_entropy_cell() {
                 // Save state for potential backtracking
-                backtrack_stack.push((x, y, self.grid[y][x].possible_tiles.clone()));
+                let possible_tiles = self
+                    .cell(y, x)
+                    .map(|c| c.possible_tiles.clone())
+                    .unwrap_or_default();
+                backtrack_stack.push((x, y, possible_tiles));
 
                 // Collapse the cell
                 if let Some(tile_id) = self.choose_tile_for_cell(x, y) {
-                    self.grid[y][x].collapse(tile_id);
+                    if let Some(cell) = self.cell_mut(y, x) {
+                    cell.collapse(tile_id);
+                }
 
                     // Propagate constraints
                     if !self.propagate_constraints(x, y) {
@@ -411,15 +428,16 @@ impl WFCGenerator {
 
         for y in 0..self.height {
             for x in 0..self.width {
-                let cell = &self.grid[y][x];
-                if !cell.collapsed {
-                    let entropy = cell.entropy();
-                    if entropy > 0 && entropy < min_entropy {
-                        min_entropy = entropy;
-                        candidates.clear();
-                        candidates.push((x, y));
-                    } else if entropy == min_entropy {
-                        candidates.push((x, y));
+                if let Some(cell) = self.cell(y, x) {
+                    if !cell.collapsed {
+                        let entropy = cell.entropy();
+                        if entropy > 0 && entropy < min_entropy {
+                            min_entropy = entropy;
+                            candidates.clear();
+                            candidates.push((x, y));
+                        } else if entropy == min_entropy {
+                            candidates.push((x, y));
+                        }
                     }
                 }
             }
@@ -434,7 +452,7 @@ impl WFCGenerator {
     }
 
     fn choose_tile_for_cell(&mut self, x: usize, y: usize) -> Option<String> {
-        let cell = &self.grid[y][x];
+        let cell = self.cell(y, x)?;
         if cell.possible_tiles.is_empty() {
             return None;
         }
@@ -471,33 +489,37 @@ impl WFCGenerator {
         queue.push_back((start_x, start_y));
 
         while let Some((x, y)) = queue.pop_front() {
-            let current_tile = if let Some(ref tile) = self.grid[y][x].collapsed_tile {
-                tile.clone()
-            } else {
-                continue;
+            let current_tile = match self.cell(y, x).and_then(|c| c.collapsed_tile.clone()) {
+                Some(tile) => tile,
+                None => continue,
             };
 
             // Check all neighbors
             for direction in Direction::all() {
                 if let Some((nx, ny)) = self.get_neighbor_coords(x, y, direction) {
                     if nx < self.width && ny < self.height {
-                        let neighbor_cell = &mut self.grid[ny][nx];
-
-                        if !neighbor_cell.collapsed {
-                            // Get allowed neighbors for this direction
+                        // Look up allowed neighbors while we only have a shared
+                        // borrow; the mutable borrow happens below inside the
+                        // if-let so we don't overlap it with this read.
+                        let allowed = {
                             let key = (current_tile.clone(), direction);
-                            if let Some(allowed) = self.constraints.get(&key) {
-                                // Remove tiles that are not allowed
-                                let original_size = neighbor_cell.possible_tiles.len();
-                                neighbor_cell.possible_tiles.retain(|t| allowed.contains(t));
+                            self.constraints.get(&key).cloned()
+                        };
+                        if let Some(allowed) = allowed {
+                            if let Some(neighbor_cell) = self.cell_mut(ny, nx) {
+                                if !neighbor_cell.collapsed {
+                                    // Remove tiles that are not allowed
+                                    let original_size = neighbor_cell.possible_tiles.len();
+                                    neighbor_cell.possible_tiles.retain(|t| allowed.contains(t));
 
-                                if neighbor_cell.possible_tiles.is_empty() {
-                                    return false; // Constraint violation
-                                }
+                                    if neighbor_cell.possible_tiles.is_empty() {
+                                        return false; // Constraint violation
+                                    }
 
-                                // If we reduced possibilities, add to queue
-                                if neighbor_cell.possible_tiles.len() < original_size {
-                                    queue.push_back((nx, ny));
+                                    // If we reduced possibilities, add to queue
+                                    if neighbor_cell.possible_tiles.len() < original_size {
+                                        queue.push_back((nx, ny));
+                                    }
                                 }
                             }
                         }
@@ -549,9 +571,11 @@ impl WFCGenerator {
 
     fn backtrack(&mut self, backtrack_stack: &mut Vec<(usize, usize, HashSet<String>)>) {
         if let Some((x, y, possible_tiles)) = backtrack_stack.pop() {
-            self.grid[y][x].collapsed = false;
-            self.grid[y][x].collapsed_tile = None;
-            self.grid[y][x].possible_tiles = possible_tiles;
+            if let Some(cell) = self.cell_mut(y, x) {
+                cell.collapsed = false;
+                cell.collapsed_tile = None;
+                cell.possible_tiles = possible_tiles;
+            }
         }
     }
 
@@ -568,7 +592,8 @@ impl WFCGenerator {
 
         for y in 0..self.height {
             for x in 0..self.width {
-                if let Some(ref tile_id) = self.grid[y][x].collapsed_tile {
+                let collapsed_tile_id = self.cell(y, x).and_then(|c| c.collapsed_tile.clone());
+                if let Some(ref tile_id) = collapsed_tile_id {
                     if let Some(tile) = self.tiles.iter().find(|t| &t.id == tile_id) {
                         let object = GameObject {
                             id: Uuid::new_v4().to_string(),

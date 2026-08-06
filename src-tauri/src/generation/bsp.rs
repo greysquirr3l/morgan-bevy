@@ -417,7 +417,11 @@ impl BSPGenerator {
                         )?);
                     }
                     TileType::Wall => {
-                        objects.push(Self::create_wall_object((x as f64) as f32, (y as f64) as f32, &params.theme)?);
+                        objects.push(Self::create_wall_object(
+                            (x as f64) as f32,
+                            (y as f64) as f32,
+                            &params.theme,
+                        )?);
                     }
                     TileType::Corridor => {
                         objects.push(Self::create_corridor_object(
@@ -427,7 +431,11 @@ impl BSPGenerator {
                         )?);
                     }
                     TileType::Door => {
-                        objects.push(Self::create_door_object((x as f64) as f32, (y as f64) as f32, &params.theme)?);
+                        objects.push(Self::create_door_object(
+                            (x as f64) as f32,
+                            (y as f64) as f32,
+                            &params.theme,
+                        )?);
                     }
                     TileType::Empty => {} // Skip empty tiles
                 }

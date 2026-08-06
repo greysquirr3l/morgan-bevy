@@ -138,7 +138,10 @@ impl AssetScanner {
     }
 
     /// Recursively walk directory and collect asset files
-    fn walk_directory(dir: &Path, assets: &mut Vec<PathBuf>) -> Result<(), Box<dyn std::error::Error>> {
+    fn walk_directory(
+        dir: &Path,
+        assets: &mut Vec<PathBuf>,
+    ) -> Result<(), Box<dyn std::error::Error>> {
         if !dir.is_dir() {
             return Ok(());
         }
