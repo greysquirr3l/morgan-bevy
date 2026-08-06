@@ -227,18 +227,18 @@ impl AssetDatabase {
         let file_size = metadata.len() as i64;
 
         // Calculate checksum
-        let checksum = self.calculate_file_checksum(asset_path)?;
+        let checksum = Self::calculate_file_checksum(asset_path)?;
 
         let file_name = asset_path
             .file_name()
             .and_then(|n| n.to_str())
             .ok_or("Invalid filename")?;
 
-        let asset_type = self.determine_asset_type(asset_path);
+        let asset_type = Self::determine_asset_type(asset_path);
         let file_path_str = asset_path.to_string_lossy().to_string();
 
         let _asset_id = self.connection.execute(
-            "INSERT INTO assets (name, file_path, asset_type, collection, file_size, checksum) 
+            "INSERT INTO assets (name, file_path, asset_type, collection, file_size, checksum)
              VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
             params![
                 file_name,
@@ -258,29 +258,22 @@ impl AssetDatabase {
         // Update collection asset count
         self.update_collection_count(collection)?;
 
-        info!("Inserted asset: {} (ID: {})", file_name, asset_id);
+        info!("Inserted asset: {file_name} (ID: {asset_id})");
         Ok(asset_id)
     }
 
-    fn calculate_file_checksum(
-        &self,
-        file_path: &Path,
-    ) -> Result<String, Box<dyn std::error::Error>> {
+    fn calculate_file_checksum(file_path: &Path) -> Result<String, Box<dyn std::error::Error>> {
         let contents = fs::read(file_path)?;
         let mut hasher = Sha256::new();
         hasher.update(&contents);
         Ok(format!("{:x}", hasher.finalize()))
     }
 
-    pub fn determine_asset_type(&self, file_path: &Path) -> String {
+    pub fn determine_asset_type(file_path: &Path) -> String {
         match file_path.extension().and_then(|ext| ext.to_str()) {
             Some("fbx" | "FBX") => "Model",
-            Some("png" | "PNG" | "jpg" | "JPG" | "jpeg" | "JPEG") => {
-                "Texture"
-            }
-            Some("wav" | "WAV" | "mp3" | "MP3" | "ogg" | "OGG") => {
-                "Audio"
-            }
+            Some("png" | "PNG" | "jpg" | "JPG" | "jpeg" | "JPEG") => "Texture",
+            Some("wav" | "WAV" | "mp3" | "MP3" | "ogg" | "OGG") => "Audio",
             Some("mat" | "MAT") => "Material",
             _ => "Unknown",
         }
@@ -292,7 +285,7 @@ impl AssetDatabase {
         asset_id: i64,
         asset_path: &Path,
     ) -> Result<(), Box<dyn std::error::Error>> {
-        let asset_type = self.determine_asset_type(asset_path);
+        let asset_type = Self::determine_asset_type(asset_path);
 
         match asset_type.as_str() {
             "Texture" => {
@@ -329,9 +322,9 @@ impl AssetDatabase {
 
     fn update_collection_count(&mut self, collection_name: &str) -> SqlResult<()> {
         self.connection.execute(
-            "UPDATE collections SET 
+            "UPDATE collections SET
              asset_count = (SELECT COUNT(*) FROM assets WHERE collection = ?1),
-             updated_at = CURRENT_TIMESTAMP 
+             updated_at = CURRENT_TIMESTAMP
              WHERE name = ?1",
             params![collection_name],
         )?;
@@ -345,7 +338,7 @@ impl AssetDatabase {
         collection: Option<&str>,
     ) -> Result<Vec<AssetSearchResult>, Box<dyn std::error::Error>> {
         let mut sql = String::from(
-            "SELECT a.id, a.name, a.file_path, a.asset_type, a.collection, 
+            "SELECT a.id, a.name, a.file_path, a.asset_type, a.collection,
                     a.file_size, a.checksum, a.created_at, a.updated_at,
                     CASE WHEN t.asset_id IS NOT NULL THEN 1 ELSE 0 END as has_thumbnail
              FROM assets a
@@ -357,7 +350,7 @@ impl AssetDatabase {
 
         if !query.is_empty() {
             sql.push_str(" AND a.name LIKE ?");
-            params.push(format!("%{}%", query));
+            params.push(format!("%{query}%"));
         }
 
         if let Some(asset_type) = asset_type {
@@ -467,7 +460,7 @@ impl AssetDatabase {
         asset_id: i64,
     ) -> Result<Option<AssetSearchResult>, Box<dyn std::error::Error>> {
         let mut stmt = self.connection.prepare(
-            "SELECT a.id, a.name, a.file_path, a.asset_type, a.collection, 
+            "SELECT a.id, a.name, a.file_path, a.asset_type, a.collection,
                     a.file_size, a.checksum, a.created_at, a.updated_at,
                     CASE WHEN t.asset_id IS NOT NULL THEN 1 ELSE 0 END as has_thumbnail
              FROM assets a

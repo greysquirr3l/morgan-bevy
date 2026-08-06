@@ -47,7 +47,7 @@ pub struct Transform3D {
 
 /// Represents a 3D object in the editor with transform, material, and metadata.
 ///
-/// GameObjects are the fundamental building blocks of levels in Morgan-Bevy.
+/// `GameObjects` are the fundamental building blocks of levels in Morgan-Bevy.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GameObject {
     /// Unique identifier for the object within the level
@@ -130,6 +130,7 @@ pub struct BSPGenerationParams {
 ///
 /// Maintains the current level data and spatial indexing for efficient 3D operations.
 #[derive(Debug)]
+#[derive(Default)]
 pub struct AppState {
     /// Currently loaded level data, None if no level is open
     pub current_level: Option<LevelData>,
@@ -137,14 +138,6 @@ pub struct AppState {
     pub spatial_index: SpatialIndex,
 }
 
-impl Default for AppState {
-    fn default() -> Self {
-        Self {
-            current_level: None,
-            spatial_index: SpatialIndex::new(),
-        }
-    }
-}
 
 // Tauri Commands
 
@@ -157,19 +150,19 @@ async fn get_available_themes() -> Result<Vec<Theme>, String> {
 
 #[tauri::command]
 async fn get_theme_by_id(theme_id: String) -> Result<Theme, String> {
-    info!("Getting theme by ID: {}", theme_id);
+    info!("Getting theme by ID: {theme_id}");
     match ThemeLibrary::get_theme(&theme_id) {
         Some(theme) => Ok(theme),
-        None => Err(format!("Theme not found: {}", theme_id)),
+        None => Err(format!("Theme not found: {theme_id}")),
     }
 }
 
 #[tauri::command]
 async fn get_theme_legend(theme_id: String) -> Result<String, String> {
-    info!("Getting theme legend for: {}", theme_id);
+    info!("Getting theme legend for: {theme_id}");
     match ThemeLibrary::get_theme(&theme_id) {
         Some(theme) => Ok(generation::themes::generate_theme_legend(&theme)),
-        None => Err(format!("Theme not found: {}", theme_id)),
+        None => Err(format!("Theme not found: {theme_id}")),
     }
 }
 
@@ -178,10 +171,10 @@ async fn parse_grid_to_tiles(
     theme_id: String,
     grid_string: String,
 ) -> Result<Vec<Vec<String>>, String> {
-    info!("Parsing grid string to tiles for theme: {}", theme_id);
+    info!("Parsing grid string to tiles for theme: {theme_id}");
     match ThemeLibrary::get_theme(&theme_id) {
         Some(theme) => Ok(generation::themes::parse_grid_string(&theme, &grid_string)),
-        None => Err(format!("Theme not found: {}", theme_id)),
+        None => Err(format!("Theme not found: {theme_id}")),
     }
 }
 
@@ -190,10 +183,10 @@ async fn render_tiles_to_grid(
     theme_id: String,
     tile_map: Vec<Vec<String>>,
 ) -> Result<String, String> {
-    info!("Rendering tiles to grid string for theme: {}", theme_id);
+    info!("Rendering tiles to grid string for theme: {theme_id}");
     match ThemeLibrary::get_theme(&theme_id) {
         Some(theme) => Ok(generation::themes::render_grid_string(&theme, &tile_map)),
-        None => Err(format!("Theme not found: {}", theme_id)),
+        None => Err(format!("Theme not found: {theme_id}")),
     }
 }
 
@@ -204,13 +197,13 @@ async fn generate_bsp_level(
     params: BSPGenerationParams,
     state: State<'_, std::sync::Mutex<AppState>>,
 ) -> Result<LevelData, String> {
-    info!("Generating BSP level with params: {:?}", params);
+    info!("Generating BSP level with params: {params:?}");
 
     let generator = BSPGenerator::new();
     match generator.generate(params).await {
         Ok(level_data) => {
             // Update application state
-            let mut app_state = state.lock().unwrap();
+            let mut app_state = state.lock().unwrap_or_else(|e| e.into_inner());
             app_state.spatial_index.clear();
             for obj in &level_data.objects {
                 app_state.spatial_index.insert(&obj.id, &obj.transform);
@@ -224,7 +217,7 @@ async fn generate_bsp_level(
             Ok(level_data)
         }
         Err(e) => {
-            error!("Failed to generate BSP level: {}", e);
+            error!("Failed to generate BSP level: {e}");
             Err(e.to_string())
         }
     }
@@ -235,13 +228,13 @@ async fn generate_wfc_level(
     params: WFCGenerationParams,
     state: State<'_, std::sync::Mutex<AppState>>,
 ) -> Result<LevelData, String> {
-    info!("Generating WFC level with params: {:?}", params);
+    info!("Generating WFC level with params: {params:?}");
 
     let mut generator = WFCGenerator::new();
     match generator.generate(params).await {
         Ok(level_data) => {
             // Update application state
-            let mut app_state = state.lock().unwrap();
+            let mut app_state = state.lock().unwrap_or_else(|e| e.into_inner());
             app_state.spatial_index.clear();
             for obj in &level_data.objects {
                 app_state.spatial_index.insert(&obj.id, &obj.transform);
@@ -255,7 +248,7 @@ async fn generate_wfc_level(
             Ok(level_data)
         }
         Err(e) => {
-            error!("Failed to generate WFC level: {}", e);
+            error!("Failed to generate WFC level: {e}");
             Err(e.to_string())
         }
     }
@@ -268,8 +261,7 @@ async fn export_level(
     output_path: String,
 ) -> Result<export::exporters::ExportResult, String> {
     info!(
-        "Exporting level to {:?} formats at path: {}",
-        formats, output_path
+        "Exporting level to {formats:?} formats at path: {output_path}"
     );
 
     let exporter = LevelExporter::new();
@@ -293,7 +285,7 @@ async fn export_level(
             Ok(export_result)
         }
         Err(e) => {
-            error!("Failed to export level: {}", e);
+            error!("Failed to export level: {e}");
             Err(e.to_string())
         }
     }
@@ -304,7 +296,7 @@ async fn query_objects_in_bounds(
     bounds: BoundingBox,
     state: State<'_, std::sync::Mutex<AppState>>,
 ) -> Result<Vec<String>, String> {
-    let app_state = state.lock().unwrap();
+    let app_state = state.lock().unwrap_or_else(|e| e.into_inner());
     let object_ids = app_state.spatial_index.query_bounds(&bounds);
     Ok(object_ids)
 }
@@ -315,16 +307,16 @@ async fn update_object_transform(
     transform: Transform3D,
     state: State<'_, std::sync::Mutex<AppState>>,
 ) -> Result<(), String> {
-    let mut app_state = state.lock().unwrap();
+    let mut app_state = state.lock().unwrap_or_else(|e| e.into_inner());
 
     if let Some(ref mut level) = app_state.current_level {
         if let Some(obj) = level.objects.iter_mut().find(|o| o.id == object_id) {
             obj.transform = transform.clone();
             app_state.spatial_index.update(&object_id, &transform);
-            info!("Updated transform for object: {}", object_id);
+            info!("Updated transform for object: {object_id}");
             Ok(())
         } else {
-            Err(format!("Object not found: {}", object_id))
+            Err(format!("Object not found: {object_id}"))
         }
     } else {
         Err("No level currently loaded".to_string())
@@ -335,20 +327,20 @@ async fn update_object_transform(
 async fn get_current_level(
     state: State<'_, std::sync::Mutex<AppState>>,
 ) -> Result<Option<LevelData>, String> {
-    let app_state = state.lock().unwrap();
+    let app_state = state.lock().unwrap_or_else(|e| e.into_inner());
     Ok(app_state.current_level.clone())
 }
 
 #[tauri::command]
 async fn save_level_to_file(level_data: LevelData, file_path: String) -> Result<(), String> {
-    info!("Saving level to file: {}", file_path);
+    info!("Saving level to file: {file_path}");
 
     let json_data = serde_json::to_string_pretty(&level_data)
-        .map_err(|e| format!("Failed to serialize level data: {}", e))?;
+        .map_err(|e| format!("Failed to serialize level data: {e}"))?;
 
-    std::fs::write(&file_path, json_data).map_err(|e| format!("Failed to write file: {}", e))?;
+    std::fs::write(&file_path, json_data).map_err(|e| format!("Failed to write file: {e}"))?;
 
-    info!("Successfully saved level to: {}", file_path);
+    info!("Successfully saved level to: {file_path}");
     Ok(())
 }
 
@@ -357,16 +349,16 @@ async fn load_level_from_file(
     file_path: String,
     state: State<'_, std::sync::Mutex<AppState>>,
 ) -> Result<LevelData, String> {
-    info!("Loading level from file: {}", file_path);
+    info!("Loading level from file: {file_path}");
 
     let file_content =
-        std::fs::read_to_string(&file_path).map_err(|e| format!("Failed to read file: {}", e))?;
+        std::fs::read_to_string(&file_path).map_err(|e| format!("Failed to read file: {e}"))?;
 
     let level_data: LevelData = serde_json::from_str(&file_content)
-        .map_err(|e| format!("Failed to parse level data: {}", e))?;
+        .map_err(|e| format!("Failed to parse level data: {e}"))?;
 
     // Update application state
-    let mut app_state = state.lock().unwrap();
+    let mut app_state = state.lock().unwrap_or_else(|e| e.into_inner());
     app_state.spatial_index.clear();
     for obj in &level_data.objects {
         app_state.spatial_index.insert(&obj.id, &obj.transform);
@@ -386,13 +378,13 @@ async fn export_level_simple(
     format: String,
     output_path: Option<String>,
 ) -> Result<String, String> {
-    info!("Exporting level in format: {}", format);
+    info!("Exporting level in format: {format}");
 
     let export_format = match format.as_str() {
         "json" => ExportFormat::JSON,
         "ron" => ExportFormat::RON,
         "rust" => ExportFormat::RustCode,
-        _ => return Err(format!("Unsupported export format: {}", format)),
+        _ => return Err(format!("Unsupported export format: {format}")),
     };
 
     // Use file dialog if no output path provided
@@ -404,8 +396,8 @@ async fn export_level_simple(
         let extension = export_format.file_extension();
 
         match FileDialog::new()
-            .add_filter(&format!("{} files", format.to_uppercase()), &[extension])
-            .set_file_name(&format!("level.{}", extension))
+            .add_filter(format!("{} files", format.to_uppercase()), &[extension])
+            .set_file_name(format!("level.{extension}"))
             .save_file()
         {
             Some(path) => path,
@@ -431,7 +423,7 @@ async fn export_level_simple(
             }
         }
         Err(e) => {
-            error!("Failed to export level: {}", e);
+            error!("Failed to export level: {e}");
             Err(e.to_string())
         }
     }
@@ -452,11 +444,11 @@ async fn save_project(project_data: ProjectData) -> Result<String, String> {
     };
 
     let json_data = serde_json::to_string_pretty(&project_data)
-        .map_err(|e| format!("Failed to serialize project: {}", e))?;
+        .map_err(|e| format!("Failed to serialize project: {e}"))?;
 
-    std::fs::write(&path, json_data).map_err(|e| format!("Failed to write project file: {}", e))?;
+    std::fs::write(&path, json_data).map_err(|e| format!("Failed to write project file: {e}"))?;
 
-    info!("Successfully saved project to: {:?}", path);
+    info!("Successfully saved project to: {path:?}");
     Ok(path.to_string_lossy().to_string())
 }
 
@@ -474,12 +466,12 @@ async fn load_project() -> Result<ProjectData, String> {
     };
 
     let json_data = std::fs::read_to_string(&path)
-        .map_err(|e| format!("Failed to read project file: {}", e))?;
+        .map_err(|e| format!("Failed to read project file: {e}"))?;
 
     let project_data: ProjectData = serde_json::from_str(&json_data)
-        .map_err(|e| format!("Failed to parse project file: {}", e))?;
+        .map_err(|e| format!("Failed to parse project file: {e}"))?;
 
-    info!("Successfully loaded project from: {:?}", path);
+    info!("Successfully loaded project from: {path:?}");
     Ok(project_data)
 }
 
@@ -569,7 +561,7 @@ fn main() {
             let handle = app.handle().clone();
             tauri::async_runtime::spawn(async move {
                 if let Err(e) = assets::initialize_asset_database(handle).await {
-                    error!("Failed to initialize asset database: {}", e);
+                    error!("Failed to initialize asset database: {e}");
                 } else {
                     info!("Asset database initialized successfully");
                 }

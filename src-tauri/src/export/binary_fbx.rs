@@ -85,7 +85,7 @@ pub struct NodeBuilder {
     name: String,
     props: Vec<u8>,
     prop_count: u32,
-    children: Vec<NodeBuilder>,
+    children: Vec<Self>,
 }
 
 impl NodeBuilder {
@@ -123,18 +123,23 @@ impl NodeBuilder {
         self.prop_count += 1;
     }
 
-    pub fn push_child(&mut self, name: impl Into<String>) -> &mut NodeBuilder {
-        let child = NodeBuilder::new(name);
+    pub fn push_child(&mut self, name: impl Into<String>) -> &mut Self {
+        let child = Self::new(name);
         self.children.push(child);
-        self.children.last_mut().unwrap()
+        {
+            #[expect(clippy::unwrap_used, reason = "push_child just appended a child node")]
+            self.children
+                .last_mut()
+                .unwrap_or_else(|| unreachable!("push_child just appended a child node"))
+        }
     }
 
     /// Total size in bytes this node will occupy in the output stream,
-    /// including its own header (end_offset + count + byte_length + name)
+    /// including its own header (`end_offset` + count + `byte_length` + name)
     /// and any child nodes (which are appended after this node's properties).
     fn encoded_size(&self) -> usize {
         let header_size = 8 + 8 + 8 + 1 + self.name.len();
-        let children_size: usize = self.children.iter().map(|c| c.encoded_size()).sum();
+        let children_size: usize = self.children.iter().map(Self::encoded_size).sum();
         header_size + self.props.len() + children_size
     }
 
@@ -174,7 +179,7 @@ pub struct FbxBuilder {
 }
 
 impl FbxBuilder {
-    pub fn new() -> Self {
+    pub const fn new() -> Self {
         Self { nodes: Vec::new() }
     }
 
@@ -182,7 +187,12 @@ impl FbxBuilder {
     pub fn push_node(&mut self, name: impl Into<String>) -> &mut NodeBuilder {
         let n = NodeBuilder::new(name);
         self.nodes.push(n);
-        self.nodes.last_mut().unwrap()
+        {
+            #[expect(clippy::unwrap_used, reason = "push_node just appended a top-level node")]
+            self.nodes
+                .last_mut()
+                .unwrap_or_else(|| unreachable!("push_node just appended a top-level node"))
+        }
     }
 
     /// Serialize the file into bytes.

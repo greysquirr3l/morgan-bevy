@@ -11,43 +11,43 @@ pub enum ExportFormat {
 
 #[allow(dead_code)]
 impl ExportFormat {
-    pub fn file_extension(&self) -> &'static str {
+    pub const fn file_extension(&self) -> &'static str {
         match self {
-            ExportFormat::JSON => "json",
-            ExportFormat::RON => "ron",
-            ExportFormat::RustCode => "rs",
-            ExportFormat::GLTF => "gltf",
-            ExportFormat::FBX => "fbx",
+            Self::JSON => "json",
+            Self::RON => "ron",
+            Self::RustCode => "rs",
+            Self::GLTF => "gltf",
+            Self::FBX => "fbx",
         }
     }
 
-    pub fn description(&self) -> &'static str {
+    pub const fn description(&self) -> &'static str {
         match self {
-            ExportFormat::JSON => "Universal JSON format for any engine",
-            ExportFormat::RON => "Rust Object Notation - native Bevy format",
-            ExportFormat::RustCode => "Generated Rust code for direct integration",
-            ExportFormat::GLTF => "glTF 2.0 format with PBR materials",
-            ExportFormat::FBX => "Autodesk FBX format for 3D software",
+            Self::JSON => "Universal JSON format for any engine",
+            Self::RON => "Rust Object Notation - native Bevy format",
+            Self::RustCode => "Generated Rust code for direct integration",
+            Self::GLTF => "glTF 2.0 format with PBR materials",
+            Self::FBX => "Autodesk FBX format for 3D software",
         }
     }
 
-    pub fn supports_materials(&self) -> bool {
+    pub const fn supports_materials(&self) -> bool {
         match self {
-            ExportFormat::JSON => true,
-            ExportFormat::RON => true,
-            ExportFormat::RustCode => true,
-            ExportFormat::GLTF => true,
-            ExportFormat::FBX => true,
+            Self::JSON => true,
+            Self::RON => true,
+            Self::RustCode => true,
+            Self::GLTF => true,
+            Self::FBX => true,
         }
     }
 
-    pub fn supports_animations(&self) -> bool {
+    pub const fn supports_animations(&self) -> bool {
         match self {
-            ExportFormat::JSON => false,
-            ExportFormat::RON => false,
-            ExportFormat::RustCode => false,
-            ExportFormat::GLTF => true,
-            ExportFormat::FBX => true,
+            Self::JSON => false,
+            Self::RON => false,
+            Self::RustCode => false,
+            Self::GLTF => true,
+            Self::FBX => true,
         }
     }
 }

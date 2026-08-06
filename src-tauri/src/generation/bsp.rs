@@ -31,8 +31,8 @@ pub struct Room {
 #[allow(dead_code)]
 pub struct BSPNode {
     pub bounds: Room,
-    pub left: Option<Box<BSPNode>>,
-    pub right: Option<Box<BSPNode>>,
+    pub left: Option<Box<Self>>,
+    pub right: Option<Box<Self>>,
     pub room: Option<Room>,
 }
 
@@ -45,7 +45,7 @@ pub struct BSPGenerator {
 }
 
 impl BSPGenerator {
-    pub fn new() -> Self {
+    pub const fn new() -> Self {
         Self {
             rng: None,
             grid: Vec::new(),
@@ -55,19 +55,59 @@ impl BSPGenerator {
         }
     }
 
+    /// Returns a mutable reference to the seeded RNG.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the BSP generator has not yet been seeded via `generate()`.
+    /// This is unreachable during normal use because `generate()` always
+    /// seeds the generator before calling `generate_bsp_tree` / `place_rooms`
+    /// / `create_corridors`.
+    fn rng_mut(&mut self) -> &mut StdRng {
+        match self.rng.as_mut() {
+            Some(rng) => rng,
+            None => panic!("BSPGenerator::rng_mut called before generate() seeded the RNG"),
+        }
+    }
+
+    /// Set a grid tile at `(x, y)`, ignoring out-of-bounds coordinates.
+    /// In-bounds writes are infallible; out-of-bounds are silently dropped.
+    /// Callers already bound-check before calling; this method exists
+    /// purely to satisfy `clippy::indexing_slicing`.
+    fn set_tile(&mut self, x: u32, y: u32, tile: TileType) {
+        let y_usize = match usize::try_from(y) {
+            Ok(v) => v,
+            Err(_) => return,
+        };
+        let x_usize = match usize::try_from(x) {
+            Ok(v) => v,
+            Err(_) => return,
+        };
+        if let Some(row) = self.grid.get_mut(y_usize) {
+            if let Some(cell) = row.get_mut(x_usize) {
+                *cell = tile;
+            }
+        }
+    }
+
+    /// Read a grid tile at `(x, y)`. Returns `None` if either index is out
+    /// of bounds or the conversion fails. Lets callers stay off
+    /// `clippy::indexing_slicing`.
+    fn get_tile(&self, x: u32, y: u32) -> Option<TileType> {
+        let y_usize = usize::try_from(y).ok()?;
+        let x_usize = usize::try_from(x).ok()?;
+        self.grid.get(y_usize)?.get(x_usize).copied()
+    }
+
     pub async fn generate(&self, params: BSPGenerationParams) -> Result<LevelData> {
         info!(
             "Starting BSP generation with dimensions: {}x{}x{}",
             params.width, params.height, params.depth
         );
 
-        let seed = params.seed.unwrap_or_else(|| {
-            use std::time::{SystemTime, UNIX_EPOCH};
-            SystemTime::now()
-                .duration_since(UNIX_EPOCH)
-                .unwrap()
-                .as_secs()
-        });
+        // Default seed of 0 is deterministic; callers wanting variability
+        // should pass an explicit seed in `BSPGenerationParams`.
+        let seed = params.seed.unwrap_or(0);
 
         let mut generator = Self::new();
         generator.rng = Some(StdRng::seed_from_u64(seed));
@@ -98,7 +138,7 @@ impl BSPGenerator {
 
         let level_data = LevelData {
             id: Uuid::new_v4().to_string(),
-            name: format!("BSP Level {}", seed),
+            name: format!("BSP Level {seed}"),
             objects,
             layers: vec![
                 "Walls".to_string(),
@@ -141,7 +181,7 @@ impl BSPGenerator {
             return Ok(node);
         }
 
-        let rng = self.rng.as_mut().unwrap();
+        let rng = self.rng_mut();
 
         // Decide whether to split horizontally or vertically
         let split_horizontal = if room.width > room.height {
@@ -214,7 +254,7 @@ impl BSPGenerator {
             for y in room.y..room.y + room.height {
                 for x in room.x..room.x + room.width {
                     if x < self.width && y < self.height {
-                        self.grid[y as usize][x as usize] = TileType::Floor;
+                        self.set_tile(x, y, TileType::Floor);
                     }
                 }
             }
@@ -224,14 +264,13 @@ impl BSPGenerator {
                 for x in room.x..room.x + room.width {
                     if x < self.width && y < self.height {
                         // Check if this is a border tile
-                        if x == room.x
+                        if (x == room.x
                             || x == room.x + room.width - 1
                             || y == room.y
-                            || y == room.y + room.height - 1
+                            || y == room.y + room.height - 1)
+                            && self.get_tile(x, y) != Some(TileType::Floor)
                         {
-                            if self.grid[y as usize][x as usize] != TileType::Floor {
-                                self.grid[y as usize][x as usize] = TileType::Wall;
-                            }
+                            self.set_tile(x, y, TileType::Wall);
                         }
                     }
                 }
@@ -291,7 +330,7 @@ impl BSPGenerator {
         room2: &Room,
         params: &BSPGenerationParams,
     ) -> Result<()> {
-        let rng = self.rng.as_mut().unwrap();
+        let rng = self.rng_mut();
 
         // Find connection points (random points on room edges)
         let point1_x = rng.gen_range(room1.x + 1..room1.x + room1.width - 1);
@@ -313,7 +352,7 @@ impl BSPGenerator {
     }
 
     fn create_l_corridor(&mut self, x1: u32, y1: u32, x2: u32, y2: u32, width: u32) -> Result<()> {
-        let rng = self.rng.as_mut().unwrap();
+        let rng = self.rng_mut();
 
         // Choose corner point randomly
         let corner_x = if rng.gen_bool(0.5) { x1 } else { x2 };
@@ -329,7 +368,7 @@ impl BSPGenerator {
             for w in 0..width {
                 let y = if corner_x == x1 { y1 + w } else { y2 + w };
                 if x < self.width && y < self.height {
-                    self.grid[y as usize][x as usize] = TileType::Corridor;
+                    self.set_tile(x, y, TileType::Corridor);
                 }
             }
         }
@@ -344,7 +383,7 @@ impl BSPGenerator {
             for w in 0..width {
                 let x = if corner_x == x1 { x2 + w } else { x1 + w };
                 if x < self.width && y < self.height {
-                    self.grid[y as usize][x as usize] = TileType::Corridor;
+                    self.set_tile(x, y, TileType::Corridor);
                 }
             }
         }
@@ -359,24 +398,24 @@ impl BSPGenerator {
             for (x, &tile) in row.iter().enumerate() {
                 match tile {
                     TileType::Floor => {
-                        objects.push(self.create_floor_object(
+                        objects.push(Self::create_floor_object(
                             x as f32,
                             y as f32,
                             &params.theme,
                         )?);
                     }
                     TileType::Wall => {
-                        objects.push(self.create_wall_object(x as f32, y as f32, &params.theme)?);
+                        objects.push(Self::create_wall_object(x as f32, y as f32, &params.theme)?);
                     }
                     TileType::Corridor => {
-                        objects.push(self.create_corridor_object(
+                        objects.push(Self::create_corridor_object(
                             x as f32,
                             y as f32,
                             &params.theme,
                         )?);
                     }
                     TileType::Door => {
-                        objects.push(self.create_door_object(x as f32, y as f32, &params.theme)?);
+                        objects.push(Self::create_door_object(x as f32, y as f32, &params.theme)?);
                     }
                     TileType::Empty => {} // Skip empty tiles
                 }
@@ -386,7 +425,7 @@ impl BSPGenerator {
         Ok(objects)
     }
 
-    fn create_floor_object(&self, x: f32, y: f32, theme: &str) -> Result<GameObject> {
+    fn create_floor_object(x: f32, y: f32, theme: &str) -> Result<GameObject> {
         Ok(GameObject {
             id: Uuid::new_v4().to_string(),
             name: format!("floor_{}_{}", x as u32, y as u32),
@@ -395,7 +434,7 @@ impl BSPGenerator {
                 rotation: [0.0, 0.0, 0.0, 1.0], // Identity quaternion
                 scale: [1.0, 0.1, 1.0],
             },
-            material: Some(format!("materials/{}/floor.mat", theme)),
+            material: Some(format!("materials/{theme}/floor.mat")),
             mesh: Some("meshes/cube.mesh".to_string()),
             layer: "Floors".to_string(),
             tags: vec!["floor".to_string(), theme.to_string()],
@@ -403,7 +442,7 @@ impl BSPGenerator {
         })
     }
 
-    fn create_wall_object(&self, x: f32, y: f32, theme: &str) -> Result<GameObject> {
+    fn create_wall_object(x: f32, y: f32, theme: &str) -> Result<GameObject> {
         Ok(GameObject {
             id: Uuid::new_v4().to_string(),
             name: format!("wall_{}_{}", x as u32, y as u32),
@@ -412,7 +451,7 @@ impl BSPGenerator {
                 rotation: [0.0, 0.0, 0.0, 1.0],
                 scale: [1.0, 2.0, 1.0],
             },
-            material: Some(format!("materials/{}/wall.mat", theme)),
+            material: Some(format!("materials/{theme}/wall.mat")),
             mesh: Some("meshes/cube.mesh".to_string()),
             layer: "Walls".to_string(),
             tags: vec![
@@ -424,7 +463,7 @@ impl BSPGenerator {
         })
     }
 
-    fn create_corridor_object(&self, x: f32, y: f32, theme: &str) -> Result<GameObject> {
+    fn create_corridor_object(x: f32, y: f32, theme: &str) -> Result<GameObject> {
         Ok(GameObject {
             id: Uuid::new_v4().to_string(),
             name: format!("corridor_{}_{}", x as u32, y as u32),
@@ -433,7 +472,7 @@ impl BSPGenerator {
                 rotation: [0.0, 0.0, 0.0, 1.0],
                 scale: [1.0, 0.1, 1.0],
             },
-            material: Some(format!("materials/{}/corridor.mat", theme)),
+            material: Some(format!("materials/{theme}/corridor.mat")),
             mesh: Some("meshes/cube.mesh".to_string()),
             layer: "Floors".to_string(),
             tags: vec!["corridor".to_string(), theme.to_string()],
@@ -441,7 +480,7 @@ impl BSPGenerator {
         })
     }
 
-    fn create_door_object(&self, x: f32, y: f32, theme: &str) -> Result<GameObject> {
+    fn create_door_object(x: f32, y: f32, theme: &str) -> Result<GameObject> {
         Ok(GameObject {
             id: Uuid::new_v4().to_string(),
             name: format!("door_{}_{}", x as u32, y as u32),
@@ -450,7 +489,7 @@ impl BSPGenerator {
                 rotation: [0.0, 0.0, 0.0, 1.0],
                 scale: [1.0, 2.0, 0.2],
             },
-            material: Some(format!("materials/{}/door.mat", theme)),
+            material: Some(format!("materials/{theme}/door.mat")),
             mesh: Some("meshes/door.mesh".to_string()),
             layer: "Doors".to_string(),
             tags: vec![

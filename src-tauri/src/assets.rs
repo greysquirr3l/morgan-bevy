@@ -49,13 +49,13 @@ pub async fn initialize_asset_database(app_handle: tauri::AppHandle) -> Result<(
     let app_data_dir = app_handle
         .path()
         .app_data_dir()
-        .map_err(|e| format!("Failed to get app data directory: {}", e))?;
+        .map_err(|e| format!("Failed to get app data directory: {e}"))?;
 
     // Ensure .morgana directory exists
     let morgana_dir = app_data_dir.join(".morgana");
     if !morgana_dir.exists() {
         fs::create_dir_all(&morgana_dir)
-            .map_err(|e| format!("Failed to create .morgana directory: {}", e))?;
+            .map_err(|e| format!("Failed to create .morgana directory: {e}"))?;
     }
 
     // Create database path
@@ -63,11 +63,11 @@ pub async fn initialize_asset_database(app_handle: tauri::AppHandle) -> Result<(
 
     // Initialize scanner with database
     let scanner = AssetScanner::new(&db_path)
-        .map_err(|e| format!("Failed to initialize asset scanner: {}", e))?;
+        .map_err(|e| format!("Failed to initialize asset scanner: {e}"))?;
 
     // Store scanner in app state
     let state: tauri::State<AssetDatabaseState> = app_handle.state();
-    let mut scanner_lock = state.scanner.lock().unwrap();
+    let mut scanner_lock = state.scanner.lock().unwrap_or_else(|e| e.into_inner());
     *scanner_lock = Some(scanner);
 
     info!("Asset database initialized successfully");
@@ -79,7 +79,7 @@ pub async fn scan_assets_database(app_handle: tauri::AppHandle) -> Result<ScanRe
     info!("Starting comprehensive asset database scan");
 
     let state: tauri::State<AssetDatabaseState> = app_handle.state();
-    let mut scanner_guard = state.scanner.lock().unwrap();
+    let mut scanner_guard = state.scanner.lock().unwrap_or_else(|e| e.into_inner());
 
     let scanner = scanner_guard
         .as_mut()
@@ -99,7 +99,7 @@ pub async fn scan_assets_database(app_handle: tauri::AppHandle) -> Result<ScanRe
     // Perform scan
     let result = scanner
         .scan_directory(&assets_dir, Some(progress_callback))
-        .map_err(|e| format!("Asset scan failed: {}", e))?;
+        .map_err(|e| format!("Asset scan failed: {e}"))?;
 
     info!(
         "Asset scan completed: {} assets processed",
@@ -114,7 +114,7 @@ pub async fn search_assets_database(
     app_handle: tauri::AppHandle,
 ) -> Result<Vec<AssetSearchResult>, String> {
     let state: tauri::State<AssetDatabaseState> = app_handle.state();
-    let scanner_guard = state.scanner.lock().unwrap();
+    let scanner_guard = state.scanner.lock().unwrap_or_else(|e| e.into_inner());
 
     let scanner = scanner_guard
         .as_ref()
@@ -127,7 +127,7 @@ pub async fn search_assets_database(
             params.asset_type.as_deref(),
             params.collection.as_deref(),
         )
-        .map_err(|e| format!("Search failed: {}", e))?;
+        .map_err(|e| format!("Search failed: {e}"))?;
 
     Ok(results)
 }
@@ -137,7 +137,7 @@ pub async fn get_asset_database_stats(
     app_handle: tauri::AppHandle,
 ) -> Result<DatabaseStats, String> {
     let state: tauri::State<AssetDatabaseState> = app_handle.state();
-    let scanner_guard = state.scanner.lock().unwrap();
+    let scanner_guard = state.scanner.lock().unwrap_or_else(|e| e.into_inner());
 
     let scanner = scanner_guard
         .as_ref()
@@ -145,7 +145,7 @@ pub async fn get_asset_database_stats(
 
     scanner
         .get_stats()
-        .map_err(|e| format!("Failed to get stats: {}", e))
+        .map_err(|e| format!("Failed to get stats: {e}"))
 }
 
 #[tauri::command]
@@ -153,7 +153,7 @@ pub async fn get_asset_collections(
     app_handle: tauri::AppHandle,
 ) -> Result<Vec<database::Collection>, String> {
     let state: tauri::State<AssetDatabaseState> = app_handle.state();
-    let scanner_guard = state.scanner.lock().unwrap();
+    let scanner_guard = state.scanner.lock().unwrap_or_else(|e| e.into_inner());
 
     let scanner = scanner_guard
         .as_ref()
@@ -162,7 +162,7 @@ pub async fn get_asset_collections(
     scanner
         .database()
         .get_collections()
-        .map_err(|e| format!("Failed to get collections: {}", e))
+        .map_err(|e| format!("Failed to get collections: {e}"))
 }
 
 fn find_assets_directory() -> Option<PathBuf> {
@@ -182,12 +182,9 @@ fn find_assets_directory() -> Option<PathBuf> {
 pub fn scan_assets() -> Result<Vec<AssetFile>, String> {
     let assets_dir = find_assets_directory()
         .ok_or_else(|| {
-            let current_dir = std::env::current_dir()
-                .map(|p| p.display().to_string())
-                .unwrap_or_else(|_| "unknown".to_string());
+            let current_dir = std::env::current_dir().map_or_else(|_| "unknown".to_string(), |p| p.display().to_string());
             format!(
-                "Assets directory not found. Please create an 'Assets' folder in the project root. Current working directory: {}",
-                current_dir
+                "Assets directory not found. Please create an 'Assets' folder in the project root. Current working directory: {current_dir}"
             )
         })?;
 
@@ -250,7 +247,7 @@ fn scan_directory_recursive(dir: &Path, assets: &mut Vec<AssetFile>) -> Result<(
         .map_err(|e| format!("Failed to read directory {}: {}", dir.display(), e))?;
 
     for entry in entries {
-        let entry = entry.map_err(|e| format!("Failed to read directory entry: {}", e))?;
+        let entry = entry.map_err(|e| format!("Failed to read directory entry: {e}"))?;
         let path = entry.path();
 
         if path.is_dir() {
@@ -275,7 +272,7 @@ fn scan_directory_recursive(dir: &Path, assets: &mut Vec<AssetFile>) -> Result<(
 
 fn create_asset_from_file(path: &Path) -> Result<Option<AssetFile>, String> {
     let metadata =
-        fs::metadata(path).map_err(|e| format!("Failed to read file metadata: {}", e))?;
+        fs::metadata(path).map_err(|e| format!("Failed to read file metadata: {e}"))?;
 
     let filename = path
         .file_name()
@@ -301,15 +298,15 @@ fn create_asset_from_file(path: &Path) -> Result<Option<AssetFile>, String> {
 
     let last_modified = metadata
         .modified()
-        .map_err(|e| format!("Failed to get modification time: {}", e))?
+        .map_err(|e| format!("Failed to get modification time: {e}"))?
         .duration_since(std::time::UNIX_EPOCH)
-        .map_err(|e| format!("Invalid modification time: {}", e))?
+        .map_err(|e| format!("Invalid modification time: {e}"))?
         .as_secs();
 
     Ok(Some(AssetFile {
-        id: format!("{:x}", id),
+        id: format!("{id:x}"),
         name: filename.to_string(),
-        path: path_str.clone(),
+        path: path_str,
         asset_type,
         size: metadata.len(),
         last_modified,

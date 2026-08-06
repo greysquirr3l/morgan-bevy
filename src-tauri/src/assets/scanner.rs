@@ -42,17 +42,17 @@ impl AssetScanner {
         let start_time = std::time::Instant::now();
         let assets_path = assets_dir.as_ref();
 
-        info!("Starting asset scan of directory: {:?}", assets_path);
+        info!("Starting asset scan of directory: {assets_path:?}");
 
         if !assets_path.exists() {
-            return Err(format!("Assets directory does not exist: {:?}", assets_path).into());
+            return Err(format!("Assets directory does not exist: {assets_path:?}").into());
         }
 
         // Discover all asset files first
         let discovered_assets = self.discover_assets(assets_path)?;
         let total_assets = discovered_assets.len();
 
-        info!("Discovered {} potential assets", total_assets);
+        info!("Discovered {total_assets} potential assets");
 
         let mut scan_result = ScanResult {
             total_assets,
@@ -67,7 +67,7 @@ impl AssetScanner {
             std::collections::HashMap::new();
 
         for asset_path in discovered_assets {
-            let collection = self.determine_collection(&asset_path, assets_path);
+            let collection = Self::determine_collection(&asset_path, assets_path);
             assets_by_collection
                 .entry(collection)
                 .or_default()
@@ -78,7 +78,7 @@ impl AssetScanner {
 
         // Process each collection
         for (collection_name, asset_paths) in assets_by_collection {
-            info!("Processing collection: {}", collection_name);
+            info!("Processing collection: {collection_name}");
             scan_result.collections_found.push(collection_name.clone());
 
             // Process assets in this collection
@@ -100,13 +100,13 @@ impl AssetScanner {
 
                 match self.process_asset(&asset_path, &collection_name) {
                     Ok(_) => {
-                        let asset_type = self.database.determine_asset_type(&asset_path);
+                        let asset_type = AssetDatabase::determine_asset_type(&asset_path);
                         *scan_result.assets_by_type.entry(asset_type).or_insert(0) += 1;
                     }
                     Err(e) => {
                         let error_msg =
                             format!("Failed to process {}: {}", asset_path.display(), e);
-                        warn!("{}", error_msg);
+                        warn!("{error_msg}");
                         scan_result.errors.push(error_msg);
                     }
                 }
@@ -164,7 +164,7 @@ impl AssetScanner {
                     }
                 }
                 self.walk_directory(&path, assets)?;
-            } else if self.is_asset_file(&path) {
+            } else if Self::is_asset_file(&path) {
                 assets.push(path);
             }
         }
@@ -173,7 +173,7 @@ impl AssetScanner {
     }
 
     /// Determine if a file is an asset we should track
-    fn is_asset_file(&self, path: &Path) -> bool {
+    fn is_asset_file(path: &Path) -> bool {
         // Skip hidden files and known non-assets
         if let Some(file_name) = path.file_name().and_then(|n| n.to_str()) {
             if file_name.starts_with('.')
@@ -196,7 +196,7 @@ impl AssetScanner {
     }
 
     /// Determine collection name based on file path
-    fn determine_collection(&self, asset_path: &Path, assets_root: &Path) -> String {
+    fn determine_collection(asset_path: &Path, assets_root: &Path) -> String {
         if let Ok(relative_path) = asset_path.strip_prefix(assets_root) {
             if let Some(first_component) = relative_path.components().next() {
                 return first_component.as_os_str().to_string_lossy().to_string();
@@ -228,13 +228,13 @@ impl AssetScanner {
     }
 
     /// Get database reference for direct operations
-    pub fn database(&self) -> &AssetDatabase {
+    pub const fn database(&self) -> &AssetDatabase {
         &self.database
     }
 
     /// Get mutable database reference
     #[allow(dead_code)]
-    pub fn database_mut(&mut self) -> &mut AssetDatabase {
+    pub const fn database_mut(&mut self) -> &mut AssetDatabase {
         &mut self.database
     }
 
@@ -249,12 +249,10 @@ impl AssetScanner {
         let collection_path = assets_dir.as_ref().join(collection_name);
 
         if !collection_path.exists() {
-            return Err(
-                format!("Collection directory does not exist: {:?}", collection_path).into(),
-            );
+            return Err(format!("Collection directory does not exist: {collection_path:?}").into());
         }
 
-        info!("Rescanning collection: {}", collection_name);
+        info!("Rescanning collection: {collection_name}");
 
         // For now, we'll just scan the collection directory
         // In a more advanced implementation, we might want to:
@@ -321,11 +319,11 @@ mod tests {
         let db_path = temp_dir.path().join("test_assets.db");
         let scanner = AssetScanner::new(&db_path).unwrap();
 
-        assert!(scanner.is_asset_file(Path::new("test.fbx")));
-        assert!(scanner.is_asset_file(Path::new("texture.png")));
-        assert!(scanner.is_asset_file(Path::new("audio.wav")));
-        assert!(!scanner.is_asset_file(Path::new("script.cs")));
-        assert!(!scanner.is_asset_file(Path::new("model.fbx.meta")));
-        assert!(!scanner.is_asset_file(Path::new(".hidden")));
+        assert!(AssetScanner::is_asset_file(Path::new("test.fbx")));
+        assert!(AssetScanner::is_asset_file(Path::new("texture.png")));
+        assert!(AssetScanner::is_asset_file(Path::new("audio.wav")));
+        assert!(!AssetScanner::is_asset_file(Path::new("script.cs")));
+        assert!(!AssetScanner::is_asset_file(Path::new("model.fbx.meta")));
+        assert!(!AssetScanner::is_asset_file(Path::new(".hidden")));
     }
 }

@@ -1582,7 +1582,7 @@ impl Theme {
         }
     }
 
-    pub fn get_theme(name: &str) -> Option<Theme> {
+    pub fn get_theme(name: &str) -> Option<Self> {
         match name.to_lowercase().as_str() {
             "office" => Some(Self::office()),
             "dungeon" => Some(Self::dungeon()),
@@ -1627,8 +1627,7 @@ pub fn tile_to_char(theme: &Theme, tile_key: &str) -> char {
     theme
         .tiles
         .get(tile_key)
-        .map(|tile| tile.visual.icon)
-        .unwrap_or('?')
+        .map_or('?', |tile| tile.visual.icon)
 }
 
 /// Convert 2D grid character to tile key

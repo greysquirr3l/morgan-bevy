@@ -6,6 +6,7 @@ use chrono::{DateTime, Utc};
 use log::info;
 use serde::{Deserialize, Serialize};
 use serde_json;
+use std::fmt::Write as _;
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -29,7 +30,7 @@ pub struct ExportedFile {
 pub struct LevelExporter;
 
 impl LevelExporter {
-    pub fn new() -> Self {
+    pub const fn new() -> Self {
         Self
     }
 
@@ -55,7 +56,7 @@ impl LevelExporter {
         }
 
         for format in formats {
-            let file_path = self.get_export_file_path(base_path, format, &level_data.name)?;
+            let file_path = Self::get_export_file_path(base_path, format, &level_data.name)?;
 
             let export_result = match format {
                 ExportFormat::JSON => self.export_json(level_data, &file_path).await,
@@ -74,12 +75,12 @@ impl LevelExporter {
                         file_size,
                         success: true,
                     });
-                    info!("Exported to: {:?}", file_path);
+                    info!("Exported to: {file_path:?}");
                 }
                 Err(e) => {
                     result
                         .errors
-                        .push(format!("Failed to export {:?}: {}", format, e));
+                        .push(format!("Failed to export {format:?}: {e}"));
                     result.exported_files.push(ExportedFile {
                         format: format.clone(),
                         file_path: file_path.to_string_lossy().to_string(),
@@ -95,7 +96,6 @@ impl LevelExporter {
     }
 
     fn get_export_file_path(
-        &self,
         base_path: &Path,
         format: &ExportFormat,
         level_name: &str,
@@ -141,7 +141,7 @@ impl LevelExporter {
 
     async fn export_ron(&self, level_data: &LevelData, file_path: &PathBuf) -> Result<()> {
         // Convert to Bevy-compatible RON format
-        let bevy_level = self.convert_to_bevy_format(level_data)?;
+        let bevy_level = Self::convert_to_bevy_format(level_data)?;
         let ron_data = ron::ser::to_string_pretty(&bevy_level, ron::ser::PrettyConfig::default())?;
         fs::write(file_path, ron_data)?;
         Ok(())
@@ -168,12 +168,12 @@ impl LevelExporter {
         // transforms; geometry and material assignments are left to a
         // follow-up task (T89) once the rest of the editor's mesh
         // assignment is stable.
-        let fbx_bytes = self.generate_fbx_binary(level_data)?;
+        let fbx_bytes = Self::generate_fbx_binary(level_data)?;
         fs::write(file_path, fbx_bytes)?;
         Ok(())
     }
 
-    fn generate_fbx_binary(&self, level_data: &LevelData) -> Result<Vec<u8>> {
+    fn generate_fbx_binary(level_data: &LevelData) -> Result<Vec<u8>> {
         use super::binary_fbx::{FbxBuilder, FOOTER_MAGIC, MAGIC, VERSION_7700};
 
         let mut fb = FbxBuilder::new();
@@ -199,7 +199,7 @@ impl LevelExporter {
             let objects = fb.push_node("Objects");
             for (i, obj) in level_data.objects.iter().enumerate() {
                 let model_id = i64::try_from(i + 1)
-                    .map_err(|e| anyhow::anyhow!("FBX model id overflow: {}", e))?;
+                    .map_err(|e| anyhow::anyhow!("FBX model id overflow: {e}"))?;
 
                 // Each Model gets its own `Properties70` block describing
                 // its local transform. The P70 entries follow the
@@ -243,7 +243,7 @@ impl LevelExporter {
             let connections = fb.push_node("Connections");
             for i in 0..level_data.objects.len() {
                 let model_id = i64::try_from(i + 1)
-                    .map_err(|e| anyhow::anyhow!("FBX connection id overflow: {}", e))?;
+                    .map_err(|e| anyhow::anyhow!("FBX connection id overflow: {e}"))?;
                 // "OO" = Object-Object connection.
                 connections.push_string("C");
                 connections.push_string("OO");
@@ -254,7 +254,7 @@ impl LevelExporter {
 
         let bytes = fb
             .encode()
-            .map_err(|e| anyhow::anyhow!("FBX encode failed: {}", e))?;
+            .map_err(|e| anyhow::anyhow!("FBX encode failed: {e}"))?;
 
         // Sanity: the FBX writer must produce a non-trivial file.
         if bytes.len() < MAGIC.len() + 4 + 25 {
@@ -279,23 +279,29 @@ impl LevelExporter {
         // u32 sits 16 (magic) + 1 (pad) + 6 (Kaydara) + 1 (pad) = 24 bytes
         // before its start, so version_start = footer_start - 13.
         let version_start = footer_start - 13;
-        let footer_version = u32::from_le_bytes([
-            bytes[version_start],
-            bytes[version_start + 1],
-            bytes[version_start + 2],
-            bytes[version_start + 3],
-        ]);
+        let version_bytes: [u8; 4] = match bytes.get(version_start..version_start + 4) {
+            Some(slice) => match slice.try_into() {
+                Ok(arr) => arr,
+                Err(_) => {
+                    return Err(anyhow::anyhow!(
+                        "FBX version bytes slice had unexpected length"
+                    ));
+                }
+            },
+            None => {
+                return Err(anyhow::anyhow!("FBX output truncated before version field"));
+            }
+        };
+        let footer_version = u32::from_le_bytes(version_bytes);
         if footer_version != VERSION_7700 {
             return Err(anyhow::anyhow!(
-                "FBX footer version mismatch: expected {}, got {}",
-                VERSION_7700,
-                footer_version
+                "FBX footer version mismatch: expected {VERSION_7700}, got {footer_version}"
             ));
         }
         Ok(bytes)
     }
 
-    fn convert_to_bevy_format(&self, level_data: &LevelData) -> Result<BevyLevelData> {
+    fn convert_to_bevy_format(level_data: &LevelData) -> Result<BevyLevelData> {
         let mut bevy_entities = Vec::new();
 
         for obj in &level_data.objects {
@@ -344,65 +350,56 @@ impl LevelExporter {
             .unwrap_or("default");
         let seed = level_data
             .generation_seed
-            .map(|s| s.to_string())
-            .unwrap_or_else(|| "none".to_string());
-        code.push_str(&format!(
-            "// Generated level code for Bevy 0.19+\n\
+            .map_or_else(|| "none".to_string(), |s| s.to_string());
+        writeln!(code, "// Generated level code for Bevy 0.19+\n\
              // Auto-generated by Morgan-Bevy Level Editor ({})\n\
-             // Theme: {theme} | Algorithm: {algorithm} | Seed: {seed}\n\n",
+             // Theme: {theme} | Algorithm: {algorithm} | Seed: {seed}\n",
             env!("CARGO_PKG_VERSION"),
-        ));
+        )?;
         code.push_str("use bevy::prelude::*;\n");
         code.push_str("use bevy::asset::Handle;\n\n");
 
-        let fn_name = self.fn_safe_name(&level_data.name);
+        let fn_name = Self::fn_safe_name(&level_data.name);
 
         // Function signature
-        code.push_str(&format!(
-            "pub fn spawn_level_{fn_name}(commands: &mut Commands, asset_server: &Res<AssetServer>) {{\n",
-        ));
+        writeln!(code, "pub fn spawn_level_{fn_name}(commands: &mut Commands, asset_server: &Res<AssetServer>) {{",
+        )?;
 
         // Spawn each object
         for obj in &level_data.objects {
-            code.push_str(&format!(
-                "    // {}\n    commands.spawn((\n",
-                self.escape_rust_string(&obj.name)
-            ));
+            writeln!(code, "    // {}\n    commands.spawn((",
+                Self::escape_rust_string(&obj.name)
+            )?;
 
             // Transform component (Bevy 0.19 unchanged: from_translation +
             // with_rotation + with_scale).
-            code.push_str(&format!(
-                "        Transform::from_translation(Vec3::new({:.2}, {:.2}, {:.2}))\n",
+            writeln!(code, "        Transform::from_translation(Vec3::new({:.2}, {:.2}, {:.2}))",
                 obj.transform.position[0], obj.transform.position[1], obj.transform.position[2]
-            ));
-            code.push_str(&format!(
-                "            .with_rotation(Quat::from_xyzw({:.4}, {:.4}, {:.4}, {:.4}))\n",
+            )?;
+            writeln!(code, "            .with_rotation(Quat::from_xyzw({:.4}, {:.4}, {:.4}, {:.4}))",
                 obj.transform.rotation[0],
                 obj.transform.rotation[1],
                 obj.transform.rotation[2],
                 obj.transform.rotation[3]
-            ));
-            code.push_str(&format!(
-                "            .with_scale(Vec3::new({:.2}, {:.2}, {:.2})),\n",
+            )?;
+            writeln!(code, "            .with_scale(Vec3::new({:.2}, {:.2}, {:.2})),",
                 obj.transform.scale[0], obj.transform.scale[1], obj.transform.scale[2]
-            ));
+            )?;
 
             // Mesh component — Bevy 0.19 uses Mesh3d(handle) instead of
             // the pre-0.15 PbrBundle.
             if let Some(ref mesh) = obj.mesh {
-                code.push_str(&format!(
-                    "        Mesh3d(asset_server.load(\"{}\")),\n",
-                    self.escape_rust_string(mesh)
-                ));
+                writeln!(code, "        Mesh3d(asset_server.load(\"{}\")),",
+                    Self::escape_rust_string(mesh)
+                )?;
             }
 
             // Material component — Bevy 0.19 uses MeshMaterial3d(handle).
             // Requires bevy feature `bevy_pbr` (re-exported via the prelude).
             if let Some(ref material) = obj.material {
-                code.push_str(&format!(
-                    "        MeshMaterial3d(asset_server.load(\"{}\")),\n",
-                    self.escape_rust_string(material)
-                ));
+                writeln!(code, "        MeshMaterial3d(asset_server.load(\"{}\")),",
+                    Self::escape_rust_string(material)
+                )?;
             } else if obj.mesh.is_some() {
                 code.push_str(
                     "        MeshMaterial3d(asset_server.load(\"materials/default.mat\")),\n",
@@ -410,17 +407,15 @@ impl LevelExporter {
             }
 
             // Name component
-            code.push_str(&format!(
-                "        Name::new(\"{}\"),\n",
-                self.escape_rust_string(&obj.name)
-            ));
+            writeln!(code, "        Name::new(\"{}\"),",
+                Self::escape_rust_string(&obj.name)
+            )?;
 
             // Tags as comments for downstream tooling that wants them.
             for tag in &obj.tags {
-                code.push_str(&format!(
-                    "        // Tag: {}\n",
-                    self.escape_rust_string(tag)
-                ));
+                writeln!(code, "        // Tag: {}",
+                    Self::escape_rust_string(tag)
+                )?;
             }
 
             code.push_str("    ));\n\n");
@@ -430,26 +425,25 @@ impl LevelExporter {
         code.push_str("}\n\n");
 
         // Add convenience function for level bounds.
-        code.push_str(&format!(
-            "pub fn get_level_{fn_name}_bounds() -> (Vec3, Vec3) {{\n"
-        ));
-        code.push_str(&format!(
-            "    (Vec3::new({:.2}, {:.2}, {:.2}), Vec3::new({:.2}, {:.2}, {:.2}))\n",
+        writeln!(code, "pub fn get_level_{fn_name}_bounds() -> (Vec3, Vec3) {{"
+        )?;
+        write!(code,
+            "    (Vec3::new({:.2}, {:.2}, {:.2}), Vec3::new({:.2}, {:.2}, {:.2}))",
             level_data.bounds.min[0],
             level_data.bounds.min[1],
             level_data.bounds.min[2],
             level_data.bounds.max[0],
             level_data.bounds.max[1],
             level_data.bounds.max[2]
-        ));
+        )?;
         code.push_str("}\n");
 
         Ok(code)
     }
 
-    /// Convert a level name to a Rust identifier-safe snake_case token.
+    /// Convert a level name to a Rust identifier-safe `snake_case` token.
     /// Used to name the spawned `spawn_level_<name>` function.
-    fn fn_safe_name(&self, name: &str) -> String {
+    fn fn_safe_name(name: &str) -> String {
         let mut out = String::with_capacity(name.len());
         let mut prev_underscore = false;
         for ch in name.chars() {
@@ -474,7 +468,7 @@ impl LevelExporter {
 
     /// Escape a string for inclusion in a Rust string literal. Replaces `\`
     /// and `"` with their escape sequences so generated source parses.
-    fn escape_rust_string(&self, s: &str) -> String {
+    fn escape_rust_string(s: &str) -> String {
         let mut out = String::with_capacity(s.len());
         for ch in s.chars() {
             match ch {
@@ -508,7 +502,7 @@ impl LevelExporter {
 
         // Create nodes for each object
         for (i, obj) in level_data.objects.iter().enumerate() {
-            let transform_matrix = self.create_transform_matrix(&obj.transform);
+            let transform_matrix = Self::create_transform_matrix(&obj.transform);
             gltf.nodes.push(GltfNode {
                 name: Some(obj.name.clone()),
                 mesh: Some(i), // Each object gets its own mesh
@@ -516,18 +510,18 @@ impl LevelExporter {
             });
 
             // Create basic primitive mesh based on object type
-            let mesh = self.create_gltf_mesh_for_object(obj)?;
+            let mesh = Self::create_gltf_mesh_for_object(obj)?;
             gltf.meshes.push(mesh);
 
             // Create material for the object
-            let material = self.create_gltf_material_for_object(obj)?;
+            let material = Self::create_gltf_material_for_object(obj)?;
             gltf.materials.push(material);
         }
 
         Ok(gltf)
     }
 
-    fn create_transform_matrix(&self, transform: &Transform3D) -> [f32; 16] {
+    const fn create_transform_matrix(transform: &Transform3D) -> [f32; 16] {
         // Convert transform to 4x4 matrix (column-major)
         // This is a simplified transformation - in production you'd use proper matrix math
         [
@@ -550,7 +544,7 @@ impl LevelExporter {
         ]
     }
 
-    fn create_gltf_mesh_for_object(&self, obj: &GameObject) -> Result<GltfMesh> {
+    fn create_gltf_mesh_for_object(obj: &GameObject) -> Result<GltfMesh> {
         Ok(GltfMesh {
             name: Some(obj.name.clone()),
             primitives: vec![GltfPrimitive {
@@ -563,7 +557,7 @@ impl LevelExporter {
         })
     }
 
-    fn create_gltf_material_for_object(&self, obj: &GameObject) -> Result<GltfMaterial> {
+    fn create_gltf_material_for_object(obj: &GameObject) -> Result<GltfMaterial> {
         Ok(GltfMaterial {
             name: obj.material.clone().or_else(|| Some("default".to_string())),
             pbr_metallic_roughness: GltfPbrMetallicRoughness {
@@ -754,8 +748,7 @@ mod tests {
         // Regression for T39: the pre-0.15 PbrBundle must not appear in
         // generated source. Bevy 0.19 removed it; the migration guide
         // specifies Mesh3d + MeshMaterial3d + Transform + Visibility.
-        let code = LevelExporter
-            .generate_rust_code(&sample_level())
+        let code = LevelExporter.generate_rust_code(&sample_level())
             .expect("generate_rust_code should succeed for a valid level");
         assert!(
             !code.contains("PbrBundle"),
@@ -769,8 +762,7 @@ mod tests {
 
     #[test]
     fn generated_code_uses_bevy_0_19_component_shape() {
-        let code = LevelExporter
-            .generate_rust_code(&sample_level())
+        let code = LevelExporter.generate_rust_code(&sample_level())
             .expect("generate_rust_code should succeed");
         // Mesh3d + MeshMaterial3d are the Bevy 0.15+ replacements for
         // PbrBundle's mesh/material fields.
@@ -789,8 +781,7 @@ mod tests {
 
     #[test]
     fn generated_code_header_documents_bevy_0_19_and_metadata() {
-        let code = LevelExporter
-            .generate_rust_code(&sample_level())
+        let code = LevelExporter.generate_rust_code(&sample_level())
             .expect("generate_rust_code should succeed");
         assert!(code.contains("// Generated level code for Bevy 0.19+"));
         assert!(code.contains("Auto-generated by Morgan-Bevy Level Editor"));
@@ -803,8 +794,7 @@ mod tests {
 
     #[test]
     fn generated_function_name_is_identifier_safe() {
-        let code = LevelExporter
-            .generate_rust_code(&sample_level())
+        let code = LevelExporter.generate_rust_code(&sample_level())
             .expect("generate_rust_code should succeed");
         assert!(
             code.contains("pub fn spawn_level_office_level_01("),
@@ -822,9 +812,8 @@ mod tests {
         // a Rust string still has to escape `\`, `"`, control chars.
         let mut lvl = sample_level();
         lvl.objects[0].name = "Wall \"North\" with \\backslash".to_string();
-        let code = LevelExporter
-            .generate_rust_code(&lvl)
-            .expect("generate_rust_code should succeed");
+        let code =
+            LevelExporter.generate_rust_code(&lvl).expect("generate_rust_code should succeed");
         assert!(
             code.contains("Wall \\\"North\\\" with \\\\backslash"),
             "expected escaped quotes and backslashes; got:\n{code}"
@@ -833,19 +822,21 @@ mod tests {
 
     #[test]
     fn fn_safe_name_handles_edge_cases() {
-        let exp = LevelExporter;
         // Empty / all-punctuation collapses to "unnamed".
-        assert_eq!(exp.fn_safe_name(""), "unnamed");
-        assert_eq!(exp.fn_safe_name("   "), "unnamed");
-        assert_eq!(exp.fn_safe_name("---"), "unnamed");
+        assert_eq!(LevelExporter::fn_safe_name(""), "unnamed");
+        assert_eq!(LevelExporter::fn_safe_name("   "), "unnamed");
+        assert_eq!(LevelExporter::fn_safe_name("---"), "unnamed");
         // Leading digit gets a prefix.
-        assert_eq!(exp.fn_safe_name("3d-level"), "level_3d_level");
+        assert_eq!(LevelExporter::fn_safe_name("3d-level"), "level_3d_level");
         // Already-snake-case stays the same.
-        assert_eq!(exp.fn_safe_name("office_level"), "office_level");
+        assert_eq!(LevelExporter::fn_safe_name("office_level"), "office_level");
         // Mixed case + spaces → snake_case.
-        assert_eq!(exp.fn_safe_name("Office Level 01"), "office_level_01");
+        assert_eq!(
+            LevelExporter::fn_safe_name("Office Level 01"),
+            "office_level_01"
+        );
         // Special characters collapse to a single underscore.
-        assert_eq!(exp.fn_safe_name("foo!!!bar"), "foo_bar");
+        assert_eq!(LevelExporter::fn_safe_name("foo!!!bar"), "foo_bar");
     }
 
     #[test]
@@ -854,9 +845,8 @@ mod tests {
         // Strip the second object's mesh and material to a barebones record.
         lvl.objects[1].mesh = None;
         lvl.objects[1].material = None;
-        let code = LevelExporter
-            .generate_rust_code(&lvl)
-            .expect("generate_rust_code should succeed");
+        let code =
+            LevelExporter.generate_rust_code(&lvl).expect("generate_rust_code should succeed");
         // The light object should still spawn, just without Mesh3d / MeshMaterial3d.
         assert!(code.contains("Name::new(\"Main Light\")"));
         // After the light's spawn, the next object block should NOT have
@@ -874,9 +864,8 @@ mod tests {
     fn level_with_no_objects_still_emits_a_function() {
         let mut lvl = sample_level();
         lvl.objects.clear();
-        let code = LevelExporter
-            .generate_rust_code(&lvl)
-            .expect("generate_rust_code should succeed");
+        let code =
+            LevelExporter.generate_rust_code(&lvl).expect("generate_rust_code should succeed");
         // The function shell must still exist even when there are no
         // spawn calls inside it.
         assert!(code.contains("pub fn spawn_level_office_level_01("));
@@ -891,8 +880,7 @@ mod tests {
         // not the previous ASCII-text placeholder. Verify the magic
         // header at offset 0 and the footer magic at the tail.
         use super::super::binary_fbx::{FOOTER_MAGIC, MAGIC};
-        let bytes = LevelExporter
-            .generate_fbx_binary(&sample_level())
+        let bytes = LevelExporter::generate_fbx_binary(&sample_level())
             .expect("generate_fbx_binary should succeed");
         // TEMP debug: include the tail bytes in the panic message.
         let tail_len = 40.min(bytes.len());
@@ -914,8 +902,7 @@ mod tests {
         // game object. With our minimal sample (2 objects), we expect
         // to find at least two "Model\0Model::" name strings in the
         // output (one per object).
-        let bytes = LevelExporter
-            .generate_fbx_binary(&sample_level())
+        let bytes = LevelExporter::generate_fbx_binary(&sample_level())
             .expect("generate_fbx_binary should succeed");
         let needle_1 = b"Model::Wall North";
         let needle_2 = b"Model::Main Light";
@@ -934,8 +921,7 @@ mod tests {
         // The translation P70 entry encodes three f64 values. We can't
         // easily round-trip the exact bytes, but we can assert that
         // each translation is present alongside the label "Lcl Translation".
-        let bytes = LevelExporter
-            .generate_fbx_binary(&sample_level())
+        let bytes = LevelExporter::generate_fbx_binary(&sample_level())
             .expect("generate_fbx_binary should succeed");
         // Two objects, two translation labels.
         let occurrences = bytes
@@ -954,8 +940,7 @@ mod tests {
         // invalid file (header + Objects node + Connections + footer).
         let mut lvl = sample_level();
         lvl.objects.clear();
-        let bytes = LevelExporter
-            .generate_fbx_binary(&lvl)
+        let bytes = LevelExporter::generate_fbx_binary(&lvl)
             .expect("generate_fbx_binary should succeed for empty level");
         use super::super::binary_fbx::{FOOTER_MAGIC, MAGIC};
         assert_eq!(&bytes[..MAGIC.len()], MAGIC);

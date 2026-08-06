@@ -12,7 +12,7 @@ pub struct BoundingBox {
 }
 
 impl BoundingBox {
-    pub fn new(min: [f32; 3], max: [f32; 3]) -> Self {
+    pub const fn new(min: [f32; 3], max: [f32; 3]) -> Self {
         Self { min, max }
     }
     

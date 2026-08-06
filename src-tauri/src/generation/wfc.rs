@@ -60,22 +60,17 @@ pub enum Direction {
 }
 
 impl Direction {
-    pub fn all() -> Vec<Direction> {
-        vec![
-            Direction::North,
-            Direction::East,
-            Direction::South,
-            Direction::West,
-        ]
+    pub fn all() -> Vec<Self> {
+        vec![Self::North, Self::East, Self::South, Self::West]
     }
 
     #[allow(dead_code)]
-    pub fn opposite(&self) -> Direction {
+    pub const fn opposite(&self) -> Self {
         match self {
-            Direction::North => Direction::South,
-            Direction::South => Direction::North,
-            Direction::East => Direction::West,
-            Direction::West => Direction::East,
+            Self::North => Self::South,
+            Self::South => Self::North,
+            Self::East => Self::West,
+            Self::West => Self::East,
         }
     }
 }
@@ -89,7 +84,7 @@ pub struct WFCCell {
 }
 
 impl WFCCell {
-    pub fn new(possible_tiles: HashSet<String>) -> Self {
+    pub const fn new(possible_tiles: HashSet<String>) -> Self {
         Self {
             possible_tiles,
             collapsed: false,
@@ -167,7 +162,7 @@ impl TilesetLibrary {
                 direction: dir,
                 allowed_neighbors: ["wall", "door", "corner"]
                     .iter()
-                    .map(|s| s.to_string())
+                    .map(std::string::ToString::to_string)
                     .collect(),
             });
         }
@@ -179,7 +174,7 @@ impl TilesetLibrary {
                 direction: dir,
                 allowed_neighbors: ["floor", "door", "corner"]
                     .iter()
-                    .map(|s| s.to_string())
+                    .map(std::string::ToString::to_string)
                     .collect(),
             });
         }
@@ -191,7 +186,7 @@ impl TilesetLibrary {
                 direction: dir,
                 allowed_neighbors: ["wall", "floor", "door"]
                     .iter()
-                    .map(|s| s.to_string())
+                    .map(std::string::ToString::to_string)
                     .collect(),
             });
         }
@@ -203,7 +198,7 @@ impl TilesetLibrary {
                 direction: dir,
                 allowed_neighbors: ["wall", "floor", "corner"]
                     .iter()
-                    .map(|s| s.to_string())
+                    .map(std::string::ToString::to_string)
                     .collect(),
             });
         }
@@ -242,7 +237,10 @@ impl TilesetLibrary {
             constraints.push(ConstraintRule {
                 tile_id: "carpet".to_string(),
                 direction: dir,
-                allowed_neighbors: ["carpet", "desk"].iter().map(|s| s.to_string()).collect(),
+                allowed_neighbors: ["carpet", "desk"]
+                    .iter()
+                    .map(std::string::ToString::to_string)
+                    .collect(),
             });
         }
 
@@ -282,7 +280,7 @@ impl TilesetLibrary {
                 direction: dir,
                 allowed_neighbors: ["metal_floor", "console"]
                     .iter()
-                    .map(|s| s.to_string())
+                    .map(std::string::ToString::to_string)
                     .collect(),
             });
         }
@@ -314,13 +312,9 @@ impl WFCGenerator {
     }
 
     pub async fn generate(&mut self, params: WFCGenerationParams) -> Result<LevelData> {
-        let seed = params.seed.unwrap_or_else(|| {
-            use std::time::{SystemTime, UNIX_EPOCH};
-            SystemTime::now()
-                .duration_since(UNIX_EPOCH)
-                .unwrap()
-                .as_secs()
-        });
+        // Default seed of 0 is deterministic; callers wanting variability
+        // should pass an explicit seed in `WFCGenerationParams`.
+        let seed = params.seed.unwrap_or(0);
 
         self.rng = StdRng::seed_from_u64(seed);
         self.width = params.width as usize;
@@ -515,7 +509,7 @@ impl WFCGenerator {
         true
     }
 
-    fn get_neighbor_coords(
+    const fn get_neighbor_coords(
         &self,
         x: usize,
         y: usize,
@@ -601,7 +595,7 @@ impl WFCGenerator {
 
         Ok(LevelData {
             id: Uuid::new_v4().to_string(),
-            name: format!("WFC Level {} ({})", seed, tileset),
+            name: format!("WFC Level {seed} ({tileset})"),
             objects,
             layers: vec!["Generated".to_string()],
             generation_seed: Some(seed),
