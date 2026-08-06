@@ -5,6 +5,22 @@ All notable changes to the Morgan-Bevy 3D Level Editor project will be documente
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Security
+
+- **cargo-deny supply-chain policy** (`src-tauri/deny.toml`, `scripts/cargo-deny.sh`,
+  `docs/dev/supply-chain.md`). License allow-list (MIT, Apache-2.0, BSD-2/3, ISC,
+  MPL-2.0, Unicode-\*, Zlib, OpenSSL, CC0-1.0, 0BSD, MIT-0). Bans on multiple
+  versions (`warn`), wildcards (`deny`), unknown registries, unknown git sources.
+  Acknowledged unmaintained advisories (all transitive through tauri v2.11.5,
+  no safe upgrade available): RUSTSEC-2023-0089, 2024-0370, 2024-0411..0419,
+  2024-0420, 2024-0436, 2025-0075, 2025-0080, 2025-0081, 2025-0098, 2025-0100.
+  CI must run with fresh advisories (`cargo deny fetch && cargo deny check`) —
+  local cache can be stale. Track these and re-verify after every tauri bump.
+
+## [0.4.0] - 2025-11-24 - "Testing Infrastructure & Enhanced UI Release"
+
 ## [0.4.0] - 2025-11-24 - "Testing Infrastructure & Enhanced UI Release"
 
 ### Added
@@ -414,7 +430,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - WFC (Wave Function Collapse) foundation
     - Theme system for different architectural styles
     - Room subdivision and corridor generation logic
-  
+
   - **Export System Architecture**
     - Multi-format export trait system
     - JSON exporter for universal compatibility
@@ -463,7 +479,7 @@ morgan-bevy/
 ### Development Environment Features
 
 - **Cross-platform Support** - Windows, macOS, Linux compatibility
-- **Hot Reload** - Frontend and backend changes reload automatically  
+- **Hot Reload** - Frontend and backend changes reload automatically
 - **Type Safety** - Full TypeScript coverage with strict configuration
 - **Performance Monitoring** - Three.js stats integration
 - **Professional Tooling** - ESLint, Prettier, Tailwind CSS
@@ -487,10 +503,10 @@ morgan-bevy/
 
 ## Project Information
 
-**Repository**: [Morgan-Bevy](https://github.com/greysquirr3l/morgan-bevy)  
-**License**: MIT OR Apache-2.0  
-**Author**: Nick Campbell  
-**Started**: November 23, 2025  
+**Repository**: [Morgan-Bevy](https://github.com/greysquirr3l/morgan-bevy)
+**License**: MIT OR Apache-2.0
+**Author**: Nick Campbell
+**Started**: November 23, 2025
 
 **Core Philosophy**: "Generate smart, edit fast, export perfect."
 
@@ -505,7 +521,7 @@ morgan-bevy/
 ### Target Audience
 
 - Game developers using the Bevy engine
-- Level designers and 3D environment artists  
+- Level designers and 3D environment artists
 - Procedural generation enthusiasts
 - Indie game studios needing rapid prototyping tools
 

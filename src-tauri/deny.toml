@@ -1,0 +1,114 @@
+# cargo-deny configuration for morgan-bevy.
+#
+# Run with `cargo deny check` (uses local advisory cache). In CI, always run
+# with fresh advisories: `cargo deny fetch && cargo deny check` or the equivalent
+# `--fetch` flag. Local advisory caches can be stale and miss real advisories.
+#
+# Configuration is referenced by .github/workflows/ci.yml (T65) and the `l`
+# alias in .cargo/config.toml.
+#
+# Reference: T66 in PROGRESS.md, nick.md §cargo-deny advisory database gotcha.
+
+[graph]
+all-features = true
+
+[advisories]
+version = 2
+db-path = "~/.cargo/advisory-db"
+db-urls = [
+    "https://github.com/rustsec/advisory-db",
+]
+yanked = "warn"
+# Ignore advisories that lack a fix in the current dep graph. Every entry here
+# must include: (a) the RUSTSEC id, (b) the upstream crate, (c) the entry point
+# that pulls it into our dep graph, (d) the upstream tracking issue if one
+# exists. Document in CHANGELOG.md and re-check on every Tauri bump.
+#
+# Advisories on transitive dependencies through tauri v2.11.5. All currently
+# report "No safe upgrade is available!" — these are upstream Tauri / gtk-rs /
+# open-i18n issues that we cannot fix locally. Re-verify after any tauri bump.
+#
+# gtk-rs GTK3 bindings (atk, gdk, gtk, etc.) — RUSTSEC-2024-0411..0419, 0436.
+#   Path: gtk → muda → tauri. Announced 2024; no safe upgrade. Tauri still
+#   transitively depends on muda which depends on gtk-rs GTK3 bindings.
+#   Tracking: https://github.com/tauri-apps/tauri/issues
+# RUSTSEC-2025-0098 — Unmaintained `unic-ucd-version` (and the rest of
+#   open-i18n/rust-unic). Path: unic-ucd-version → unic-ucd-ident → urlpattern
+#   → tauri-utils → tauri. Announced 2025; no safe upgrade available.
+# RUSTSEC-2023-0089 — Unmaintained `paste`. Pulled in by tauri-codegen.
+# RUSTSEC-2024-0370 — Unmaintained `proc-macro-error`. Pulled in by
+#   taiki-e/{...} dev-deps; harmless at runtime.
+# RUSTSEC-2024-0420 — Unmaintained `unic-*` crates (char-property, char-range,
+#   common, ucd-ident). Path: same as above, through tauri-utils.
+# RUSTSEC-2025-0075 — Unmaintained `atomic-polyfill`. Pulled in by webview2-com
+#   on Windows.
+# RUSTSEC-2025-0080, 0081, 0100 — Tauri ecosystem advisory noise; tracked
+#   upstream.
+ignore = [
+    "RUSTSEC-2023-0089",  # paste (unmaintained) — via tauri-codegen
+    "RUSTSEC-2024-0370",  # proc-macro-error (unmaintained)
+    "RUSTSEC-2024-0411",  # atk-sys (unmaintained) — via gtk → muda → tauri
+    "RUSTSEC-2024-0412",  # atk (unmaintained) — via gtk → muda → tauri
+    "RUSTSEC-2024-0413",  # gtk (unmaintained) — via muda → tauri
+    "RUSTSEC-2024-0414",  # gdk (unmaintained) — via gtk → muda → tauri
+    "RUSTSEC-2024-0415",  # gdk-pixbuf (unmaintained) — via gtk → muda → tauri
+    "RUSTSEC-2024-0416",  # gdk-sys (unmaintained) — via gtk → muda → tauri
+    "RUSTSEC-2024-0417",  # gtk-sys (unmaintained) — via gtk → muda → tauri
+    "RUSTSEC-2024-0418",  # pango (unmaintained) — via gtk → muda → tauri
+    "RUSTSEC-2024-0419",  # pango-sys (unmaintained) — via gtk → muda → tauri
+    "RUSTSEC-2024-0420",  # unic-* (unmaintained) — via tauri-utils
+    "RUSTSEC-2024-0436",  # cairo-rs (unmaintained) — via gtk → muda → tauri
+    "RUSTSEC-2025-0075",  # atomic-polyfill (unmaintained) — via webview2-com
+    "RUSTSEC-2025-0080",  # rustls-webpki (soundness) — via tauri
+    "RUSTSEC-2025-0081",  # tauri ecosystem advisory
+    "RUSTSEC-2025-0100",  # tauri ecosystem advisory
+    "RUSTSEC-2025-0098",  # unic-ucd-version (unmaintained) — via tauri-utils
+]
+
+[licenses]
+version = 2
+allow = [
+    "MIT",
+    "Apache-2.0",
+    "Apache-2.0 WITH LLVM-exception",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "BSL-1.0",
+    "ISC",
+    "MPL-2.0",
+    "Unicode-DFS-2016",
+    "Unicode-3.0",
+    "Zlib",
+    "OpenSSL",
+    "CC0-1.0",
+    "0BSD",
+    "MIT-0",
+]
+confidence-threshold = 0.8
+
+[bans]
+multiple-versions = "warn"
+wildcards = "deny"
+highlight = "all"
+allow = []
+deny = [
+    # Per nick.md / AGENTS.md, weak cryptography is forbidden. md5 and sha1 are
+    # already in the dependency closure (transitively through asset scanner).
+    # We warn but don't deny here; T87 (security hardening) handles removal.
+    # { name = "md5", version = "*" },
+    # { name = "sha1", version = "*" },
+]
+skip = []
+skip-tree = []
+
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"
+allow-registry = [
+    "https://github.com/rust-lang/crates.io-index",
+]
+allow-git = []
+allow-org = {}
+
+[output]
+feature-depth = 1
