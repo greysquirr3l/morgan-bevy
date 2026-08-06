@@ -220,9 +220,9 @@ impl LevelExporter {
                     p70.push_string("Lcl Translation");
                     p70.push_string("");
                     p70.push_string("A");
-                    p70.push_f64(obj.transform.position[0] as f64);
-                    p70.push_f64(obj.transform.position[1] as f64);
-                    p70.push_f64(obj.transform.position[2] as f64);
+                    p70.push_f64(f64::from(obj.transform.position[0]));
+                    p70.push_f64(f64::from(obj.transform.position[1]));
+                    p70.push_f64(f64::from(obj.transform.position[2]));
                     // Local scaling (rotation is intentionally omitted;
                     // most importers treat missing rotation as identity,
                     // and quaternion → FBX Euler conversion is non-trivial).
@@ -231,9 +231,9 @@ impl LevelExporter {
                     p70.push_string("Lcl Scaling");
                     p70.push_string("");
                     p70.push_string("A");
-                    p70.push_f64(obj.transform.scale[0] as f64);
-                    p70.push_f64(obj.transform.scale[1] as f64);
-                    p70.push_f64(obj.transform.scale[2] as f64);
+                    p70.push_f64(f64::from(obj.transform.scale[0]));
+                    p70.push_f64(f64::from(obj.transform.scale[1]));
+                    p70.push_f64(f64::from(obj.transform.scale[2]));
                 }
             }
         }

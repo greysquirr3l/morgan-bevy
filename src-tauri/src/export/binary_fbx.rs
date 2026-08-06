@@ -144,7 +144,7 @@ impl NodeBuilder {
     fn encode(&self, start_offset: u64, out: &mut Vec<u8>) -> io::Result<()> {
         let end_offset = start_offset + self.encoded_size() as u64;
         write_u64_le(out, end_offset);
-        write_u64_le(out, self.prop_count as u64);
+        write_u64_le(out, u64::from(self.prop_count));
         write_u64_le(out, self.props.len() as u64);
         out.push(self.name.len() as u8);
         out.extend_from_slice(self.name.as_bytes());
@@ -282,6 +282,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(clippy::float_cmp, reason = "literal 2.5 is exactly representable in IEEE 754 f64; verifies bit-exact round-trip")]
     fn scalar_f64_property_round_trips() {
         // The f64 primitive is the one we depend on for transforms; verify
         // that the tag ('D') and 8-byte payload are present.
