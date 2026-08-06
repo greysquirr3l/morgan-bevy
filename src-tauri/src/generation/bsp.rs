@@ -197,8 +197,8 @@ impl BSPGenerator {
         // Decide whether to split horizontally or vertically
         let split_horizontal = match room.width.cmp(&room.height) {
             std::cmp::Ordering::Greater => rng.gen_bool(0.8), // Prefer vertical split when width > height
-            std::cmp::Ordering::Less => rng.gen_bool(0.2),    // Prefer horizontal split when height > width
-            std::cmp::Ordering::Equal => rng.gen_bool(0.5),  // Random when square
+            std::cmp::Ordering::Less => rng.gen_bool(0.2), // Prefer horizontal split when height > width
+            std::cmp::Ordering::Equal => rng.gen_bool(0.5), // Random when square
         };
 
         if split_horizontal && room.height >= params.min_room_size * 2 {

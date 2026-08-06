@@ -150,8 +150,7 @@ async fn get_available_themes() -> Result<Vec<Theme>, String> {
 #[tauri::command]
 async fn get_theme_by_id(theme_id: String) -> Result<Theme, String> {
     info!("Getting theme by ID: {theme_id}");
-    ThemeLibrary::get_theme(&theme_id)
-        .ok_or_else(|| format!("Theme not found: {theme_id}"))
+    ThemeLibrary::get_theme(&theme_id).ok_or_else(|| format!("Theme not found: {theme_id}"))
 }
 
 #[tauri::command]

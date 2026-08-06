@@ -178,6 +178,10 @@ impl AssetScanner {
     }
 
     /// Determine if a file is an asset we should track
+    #[expect(
+        clippy::case_sensitive_file_extension_comparisons,
+        reason = "Thumbs.db and .DS_Store are exact OS-reserved names; case matters"
+    )]
     fn is_asset_file(path: &Path) -> bool {
         // Skip hidden files and known non-assets
         if let Some(file_name) = path.file_name().and_then(|n| n.to_str()) {
