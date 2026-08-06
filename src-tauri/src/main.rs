@@ -499,19 +499,16 @@ async fn browse_for_texture() -> Result<Vec<String>, String> {
         .set_title("Select Texture Files")
         .pick_files();
 
-    match paths {
-        Some(file_paths) => {
-            let path_strings: Vec<String> = file_paths
-                .iter()
-                .map(|p| p.to_string_lossy().to_string())
-                .collect();
-            info!("Selected {} texture file(s)", path_strings.len());
-            Ok(path_strings)
-        }
-        None => {
-            info!("Texture selection cancelled by user");
-            Ok(vec![])
-        }
+    if let Some(file_paths) = paths {
+        let path_strings: Vec<String> = file_paths
+            .iter()
+            .map(|p| p.to_string_lossy().to_string())
+            .collect();
+        info!("Selected {} texture file(s)", path_strings.len());
+        Ok(path_strings)
+    } else {
+        info!("Texture selection cancelled by user");
+        Ok(vec![])
     }
 }
 

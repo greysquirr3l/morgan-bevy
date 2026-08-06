@@ -257,7 +257,7 @@ impl BSPGenerator {
 
             // Connect the two sides
             if let (Some(left_room), Some(right_room)) =
-                (self.find_room(left), self.find_room(right))
+                (Self::find_room_in(left), Self::find_room_in(right))
             {
                 self.connect_rooms(&left_room, &right_room, params)?;
             }
@@ -267,17 +267,21 @@ impl BSPGenerator {
     }
 
     fn find_room(&self, node: &BSPNode) -> Option<Room> {
+        Self::find_room_in(node)
+    }
+
+    fn find_room_in(node: &BSPNode) -> Option<Room> {
         if let Some(ref room) = node.room {
             Some(room.clone())
         } else {
             // Look for first available room in children
             if let Some(ref left) = node.left {
-                if let Some(room) = self.find_room(left) {
+                if let Some(room) = Self::find_room_in(left) {
                     return Some(room);
                 }
             }
             if let Some(ref right) = node.right {
-                if let Some(room) = self.find_room(right) {
+                if let Some(room) = Self::find_room_in(right) {
                     return Some(room);
                 }
             }

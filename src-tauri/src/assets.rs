@@ -309,7 +309,7 @@ fn create_asset_from_file(path: &Path) -> Result<Option<AssetFile>, String> {
     Ok(Some(AssetFile {
         id: format!("{:x}", id),
         name: filename.to_string(),
-        path: path_str.to_string(),
+        path: path_str.clone(),
         asset_type,
         size: metadata.len(),
         last_modified,

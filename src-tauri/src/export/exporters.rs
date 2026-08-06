@@ -574,6 +574,13 @@ struct GltfMaterial {
 }
 
 #[derive(serde::Serialize)]
+// `_factor` suffix matches the glTF 2.0 spec (`baseColorFactor`,
+// `metallicFactor`, `roughnessFactor`); the Rust field names intentionally
+// mirror the spec field names after the serde rename.
+#[expect(
+    clippy::struct_field_names,
+    reason = "glTF 2.0 spec mandates the `Factor` postfix"
+)]
 struct GltfPbrMetallicRoughness {
     #[serde(rename = "baseColorFactor")]
     base_color_factor: [f32; 4],
