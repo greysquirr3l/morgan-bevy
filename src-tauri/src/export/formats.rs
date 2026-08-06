@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use std::fmt;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum ExportFormat {
@@ -7,6 +8,19 @@ pub enum ExportFormat {
     RustCode,
     GLTF,
     FBX,
+}
+
+impl fmt::Display for ExportFormat {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let s = match self {
+            Self::JSON => "JSON",
+            Self::RON => "RON",
+            Self::RustCode => "RustCode",
+            Self::GLTF => "GLTF",
+            Self::FBX => "FBX",
+        };
+        f.write_str(s)
+    }
 }
 
 #[allow(dead_code)]

@@ -464,7 +464,7 @@ async fn save_project(project_data: ProjectData) -> Result<String, String> {
 
     std::fs::write(&path, json_data).map_err(|e| format!("Failed to write project file: {e}"))?;
 
-    info!("Successfully saved project to: {path:?}");
+    info!("Successfully saved project to: {}", path.display());
     Ok(path.to_string_lossy().to_string())
 }
 
@@ -487,7 +487,7 @@ async fn load_project() -> Result<ProjectData, String> {
     let project_data: ProjectData = serde_json::from_str(&json_data)
         .map_err(|e| format!("Failed to parse project file: {e}"))?;
 
-    info!("Successfully loaded project from: {path:?}");
+    info!("Successfully loaded project from: {}", path.display());
     Ok(project_data)
 }
 

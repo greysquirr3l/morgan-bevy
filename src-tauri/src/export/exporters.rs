@@ -74,12 +74,12 @@ impl LevelExporter {
                         file_size,
                         success: true,
                     });
-                    info!("Exported to: {file_path:?}");
+                    info!("Exported to: {}", file_path.display());
                 }
                 Err(e) => {
                     result
                         .errors
-                        .push(format!("Failed to export {format:?}: {e}"));
+                        .push(format!("Failed to export {format}: {e}"));
                     result.exported_files.push(ExportedFile {
                         format: format.clone(),
                         file_path: file_path.to_string_lossy().to_string(),

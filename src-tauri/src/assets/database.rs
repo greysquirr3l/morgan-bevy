@@ -62,12 +62,12 @@ impl AssetDatabase {
         }
 
         let connection = Connection::open(db_path)?;
-        let mut db = Self { connection };
+        let db = Self { connection };
         db.initialize_schema()?;
         Ok(db)
     }
 
-    fn initialize_schema(&mut self) -> SqlResult<()> {
+    fn initialize_schema(&self) -> SqlResult<()> {
         info!("Initializing asset database schema");
 
         // Enable foreign keys
@@ -152,7 +152,7 @@ impl AssetDatabase {
         Ok(())
     }
 
-    fn create_indexes(&mut self) -> SqlResult<()> {
+    fn create_indexes(&self) -> SqlResult<()> {
         // Search optimization indexes
         self.connection.execute(
             "CREATE INDEX IF NOT EXISTS idx_assets_name ON assets(name)",
@@ -189,7 +189,7 @@ impl AssetDatabase {
         Ok(())
     }
 
-    fn insert_default_collections(&mut self) -> SqlResult<()> {
+    fn insert_default_collections(&self) -> SqlResult<()> {
         let collections = [
             (
                 "Kenney",
@@ -281,7 +281,7 @@ impl AssetDatabase {
     }
 
     fn extract_and_store_metadata(
-        &mut self,
+        &self,
         asset_id: i64,
         asset_path: &Path,
     ) -> Result<(), Box<dyn std::error::Error>> {
@@ -312,7 +312,7 @@ impl AssetDatabase {
         Ok(())
     }
 
-    fn insert_metadata(&mut self, asset_id: i64, key: &str, value: &str) -> SqlResult<()> {
+    fn insert_metadata(&self, asset_id: i64, key: &str, value: &str) -> SqlResult<()> {
         self.connection.execute(
             "INSERT OR REPLACE INTO asset_metadata (asset_id, key, value) VALUES (?1, ?2, ?3)",
             params![asset_id, key, value],
@@ -320,7 +320,7 @@ impl AssetDatabase {
         Ok(())
     }
 
-    fn update_collection_count(&mut self, collection_name: &str) -> SqlResult<()> {
+    fn update_collection_count(&self, collection_name: &str) -> SqlResult<()> {
         self.connection.execute(
             "UPDATE collections SET
              asset_count = (SELECT COUNT(*) FROM assets WHERE collection = ?1),
@@ -446,7 +446,7 @@ impl AssetDatabase {
     }
 
     #[allow(dead_code)]
-    pub fn add_thumbnail(&mut self, asset_id: i64, thumbnail_path: &str) -> SqlResult<()> {
+    pub fn add_thumbnail(&self, asset_id: i64, thumbnail_path: &str) -> SqlResult<()> {
         self.connection.execute(
             "INSERT OR REPLACE INTO thumbnails (asset_id, thumbnail_path) VALUES (?1, ?2)",
             params![asset_id, thumbnail_path],

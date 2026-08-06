@@ -42,10 +42,14 @@ impl AssetScanner {
         let start_time = std::time::Instant::now();
         let assets_path = assets_dir.as_ref();
 
-        info!("Starting asset scan of directory: {assets_path:?}");
+        info!("Starting asset scan of directory: {}", assets_path.display());
 
         if !assets_path.exists() {
-            return Err(format!("Assets directory does not exist: {assets_path:?}").into());
+            return Err(format!(
+                "Assets directory does not exist: {}",
+                assets_path.display()
+            )
+            .into());
         }
 
         // Discover all asset files first
@@ -248,7 +252,11 @@ impl AssetScanner {
         let collection_path = assets_dir.as_ref().join(collection_name);
 
         if !collection_path.exists() {
-            return Err(format!("Collection directory does not exist: {collection_path:?}").into());
+            return Err(format!(
+                "Collection directory does not exist: {}",
+                collection_path.display()
+            )
+            .into());
         }
 
         info!("Rescanning collection: {collection_name}");
