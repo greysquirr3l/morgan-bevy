@@ -141,7 +141,7 @@ impl BSPGenerator {
         generator.create_corridors(&bsp_tree, params)?;
 
         // Convert grid to 3D objects
-        let objects = generator.grid_to_objects(params)?;
+        let objects = generator.grid_to_objects(params);
 
         let level_data = LevelData {
             id: Uuid::new_v4().to_string(),
@@ -404,7 +404,7 @@ impl BSPGenerator {
         clippy::cast_possible_truncation,
         reason = "f64 -> f32 for grid coordinates; precision is sufficient for level editor"
     )]
-    fn grid_to_objects(&self, params: &BSPGenerationParams) -> Result<Vec<GameObject>> {
+    fn grid_to_objects(&self, params: &BSPGenerationParams) -> Vec<GameObject> {
         let mut objects = Vec::new();
 
         for (y, row) in self.grid.iter().enumerate() {
@@ -443,7 +443,7 @@ impl BSPGenerator {
             }
         }
 
-        Ok(objects)
+        objects
     }
 
     #[expect(

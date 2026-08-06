@@ -146,7 +146,7 @@ impl LevelExporter {
 
     fn export_gltf(level_data: &LevelData, file_path: &PathBuf) -> Result<()> {
         // Convert level data to glTF format
-        let gltf_data = Self::convert_to_gltf_format(level_data)?;
+        let gltf_data = Self::convert_to_gltf_format(level_data);
         let gltf_json = serde_json::to_string_pretty(&gltf_data)?;
         fs::write(file_path, gltf_json)?;
         Ok(())
@@ -492,7 +492,7 @@ impl LevelExporter {
         out
     }
 
-    fn convert_to_gltf_format(level_data: &LevelData) -> Result<GltfDocument> {
+    fn convert_to_gltf_format(level_data: &LevelData) -> GltfDocument {
         let mut gltf = GltfDocument {
             asset: GltfAsset {
                 version: "2.0".to_string(),
@@ -526,7 +526,7 @@ impl LevelExporter {
             gltf.materials.push(material);
         }
 
-        Ok(gltf)
+        gltf
     }
 
     const fn create_transform_matrix(transform: &Transform3D) -> [f32; 16] {
