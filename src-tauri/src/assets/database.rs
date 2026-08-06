@@ -219,12 +219,12 @@ impl AssetDatabase {
     }
 
     pub fn insert_asset(
-        &mut self,
+        &self,
         asset_path: &Path,
         collection: &str,
     ) -> Result<i64, Box<dyn std::error::Error>> {
         let metadata = fs::metadata(asset_path)?;
-        let file_size = metadata.len() as i64;
+        let file_size = metadata.len().cast_signed();
 
         // Calculate checksum
         let checksum = Self::calculate_file_checksum(asset_path)?;

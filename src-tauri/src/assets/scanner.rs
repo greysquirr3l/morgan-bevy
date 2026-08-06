@@ -34,6 +34,10 @@ impl AssetScanner {
     }
 
     /// Scan a directory for assets and populate the database
+    #[expect(
+        clippy::needless_pass_by_value,
+        reason = "&Path is the public API; callers should pass &PathBuf as &Path"
+    )]
     pub fn scan_directory(
         &mut self,
         assets_dir: &Path,
@@ -187,13 +191,13 @@ impl AssetScanner {
             }
         }
 
-        match path.extension().and_then(|ext| ext.to_str()) {
+        matches!(
+            path.extension().and_then(|ext| ext.to_str()),
             Some(
-                "fbx" | "FBX" | "png" | "PNG" | "jpg" | "JPG" | "jpeg" | "JPEG" | "wav" | "WAV"
-                | "mp3" | "MP3" | "ogg" | "OGG" | "mat" | "MAT",
-            ) => true,
-            _ => false,
-        }
+                "fbx" | "FBX" | "png" | "PNG" | "jpg" | "JPG" | "jpeg" | "JPEG"
+                | "wav" | "WAV" | "mp3" | "MP3" | "ogg" | "OGG" | "mat" | "MAT"
+            )
+        )
     }
 
     /// Determine collection name based on file path
@@ -289,7 +293,7 @@ impl AssetScanner {
             total_size_bytes: total_size,
             collections: collections
                 .into_iter()
-                .map(|c| (c.name, c.asset_count as usize))
+                .map(|c| (c.name, usize::try_from(c.asset_count).unwrap_or(usize::MAX)))
                 .collect(),
         })
     }
