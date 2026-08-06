@@ -41,7 +41,22 @@ Assets/KenneyPremium/
 # Documentation & Implementation Notes
 IMPLEMENTATION_SUMMARY.md
 DEVELOPMENT_SUMMARY.md
+docs/dev/
 
 # Temporary files
 *.tmp
 *.temp
+
+# Coraline & Wiggum
+.coraline/
+.wiggum/
+tasks/
+PROGRESS.md
+IMPLEMENTATION_PLAN.md
+AGENTS.md
+INITIAL_PROMPT.md
+features.json
+TODO.md
+
+# Editor
+.vscode/
