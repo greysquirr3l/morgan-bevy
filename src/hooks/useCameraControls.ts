@@ -1,13 +1,21 @@
-import { useRef, RefObject } from 'react'
-import { useThree } from '@react-three/fiber'
-import { OrbitControls as OrbitControlsImpl } from 'three-stdlib'
-import * as THREE from 'three'
 import { useEditorStore } from '@/store/editorStore'
+import { useThree } from '@react-three/fiber'
+import { RefObject, useRef } from 'react'
+import * as THREE from 'three'
+import { OrbitControls as OrbitControlsImpl } from 'three-stdlib'
+import { useShallow } from 'zustand/react/shallow'
 
 export const useCameraControls = () => {
   const controlsRef: RefObject<OrbitControlsImpl> = useRef<OrbitControlsImpl>(null)
   const { camera } = useThree()
-  const { selectedObjects, sceneObjects } = useEditorStore()
+  // T83: useShallow — re-render only when selectedObjects/Map identity
+  // actually changes, not on every store mutation.
+  const { selectedObjects, sceneObjects } = useEditorStore(
+    useShallow(s => ({
+      selectedObjects: s.selectedObjects,
+      sceneObjects: s.sceneObjects,
+    }))
+  )
 
   const resetView = () => {
     if (!controlsRef.current) return
@@ -31,7 +39,7 @@ export const useCameraControls = () => {
       if (obj) {
         const center = new THREE.Vector3(...obj.position)
         const size = new THREE.Vector3(...obj.scale)
-        
+
         // Create a bounding box for this object
         const objBox = new THREE.Box3()
         objBox.setFromCenterAndSize(center, size)
@@ -49,7 +57,7 @@ export const useCameraControls = () => {
     // Position camera to see the entire selection
     const distance = radius / Math.sin(Math.PI / 6) // Assuming 60 degree FOV
     const direction = camera.position.clone().sub(center).normalize()
-    
+
     camera.position.copy(center).add(direction.multiplyScalar(Math.max(distance * 2, 5)))
     controlsRef.current.target.copy(center)
     controlsRef.current.update()
@@ -67,7 +75,7 @@ export const useCameraControls = () => {
       if (obj.type === 'mesh' && obj.visible) {
         const center = new THREE.Vector3(...obj.position)
         const size = new THREE.Vector3(...obj.scale)
-        
+
         // Create a bounding box for this object
         const objBox = new THREE.Box3()
         objBox.setFromCenterAndSize(center, size)
@@ -93,12 +101,12 @@ export const useCameraControls = () => {
     // Position camera to see all objects
     const distance = radius / Math.sin(Math.PI / 6) // Assuming 60 degree FOV
     const direction = camera.position.clone().sub(center).normalize()
-    
+
     // If camera is too close to center, use a default direction
     if (direction.length() < 0.1) {
       direction.set(1, 1, 1).normalize()
     }
-    
+
     camera.position.copy(center).add(direction.multiplyScalar(Math.max(distance * 1.5, 10)))
     controlsRef.current.target.copy(center)
     controlsRef.current.update()
@@ -108,6 +116,6 @@ export const useCameraControls = () => {
     controlsRef,
     resetView,
     focusSelection,
-    frameAll
+    frameAll,
   }
 }

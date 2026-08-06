@@ -1,14 +1,24 @@
 // Layer management component for scene organization
-import { useState } from 'react'
 import { useEditorStore } from '@/store/editorStore'
-import { Eye, EyeOff, Lock, Unlock, X, ChevronRight } from 'lucide-react'
+import { ChevronRight, Eye, EyeOff, Lock, Unlock, X } from 'lucide-react'
+import { useState } from 'react'
+import { useShallow } from 'zustand/react/shallow'
 
 interface LayersProps {
   hideHeader?: boolean
 }
 
 export default function Layers({ hideHeader = false }: LayersProps) {
-  const { layers, activeLayer, sceneObjects, setSelectedObjects } = useEditorStore()
+  // T83: useShallow so this component re-renders only when one of the
+  // destructured fields actually changes value.
+  const { layers, activeLayer, sceneObjects, setSelectedObjects } = useEditorStore(
+    useShallow(s => ({
+      layers: s.layers,
+      activeLayer: s.activeLayer,
+      sceneObjects: s.sceneObjects,
+      setSelectedObjects: s.setSelectedObjects,
+    }))
+  )
   const [isExpanded, setIsExpanded] = useState(true)
   const [editingLayerId, setEditingLayerId] = useState<string | null>(null)
 
@@ -22,7 +32,7 @@ export default function Layers({ hideHeader = false }: LayersProps) {
   }
 
   const toggleLayerLock = (layerId: string) => {
-    useEditorStore.setState((state) => {
+    useEditorStore.setState(state => {
       const layer = state.layers.find((l: any) => l.id === layerId)
       if (layer) {
         layer.locked = !layer.locked
@@ -38,7 +48,7 @@ export default function Layers({ hideHeader = false }: LayersProps) {
   }
 
   const setActiveLayer = (layerId: string) => {
-    useEditorStore.setState((state) => {
+    useEditorStore.setState(state => {
       state.activeLayer = layerId
     })
   }
@@ -61,7 +71,7 @@ export default function Layers({ hideHeader = false }: LayersProps) {
         name: 'New Layer',
         visible: true,
         locked: false,
-        color: '#ffffff'
+        color: '#ffffff',
       })
     })
     setEditingLayerId(newLayerId)
@@ -120,7 +130,7 @@ export default function Layers({ hideHeader = false }: LayersProps) {
             <span className="ml-2 text-sm font-medium">Layers ({layers.length})</span>
           </div>
           <button
-            onClick={(e) => {
+            onClick={e => {
               e.stopPropagation()
               addLayer()
             }}
@@ -135,11 +145,7 @@ export default function Layers({ hideHeader = false }: LayersProps) {
       {/* Add Layer button when header is hidden */}
       {hideHeader && (
         <div className="p-2 flex justify-end">
-          <button
-            onClick={addLayer}
-            className="text-xs hover:text-editor-accent"
-            title="Add Layer"
-          >
+          <button onClick={addLayer} className="text-xs hover:text-editor-accent" title="Add Layer">
             ＋ Add Layer
           </button>
         </div>
@@ -190,8 +196,8 @@ export default function Layers({ hideHeader = false }: LayersProps) {
                   defaultValue={layer.name}
                   className="w-full bg-editor-bg border border-editor-border rounded px-1 py-0 text-xs"
                   autoFocus
-                  onBlur={(e) => renameLayer(layer.id, e.target.value)}
-                  onKeyDown={(e) => {
+                  onBlur={e => renameLayer(layer.id, e.target.value)}
+                  onKeyDown={e => {
                     if (e.key === 'Enter') {
                       renameLayer(layer.id, e.currentTarget.value)
                     } else if (e.key === 'Escape') {

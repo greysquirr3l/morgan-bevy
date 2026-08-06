@@ -1,6 +1,7 @@
 import { useEditorStore } from '@/store/editorStore'
 import { TransformCommand } from '@/utils/commands'
 import { Search } from 'lucide-react'
+import { useShallow } from 'zustand/react/shallow'
 import MaterialEditor from '../MaterialEditor'
 
 // Helper function to get default tile character for tile types
@@ -19,6 +20,8 @@ const getTileChar = (tileType: string): string => {
 }
 
 export default function Inspector() {
+  // T83: useShallow so re-render fires only when one of the destructured
+  // fields actually changes value.
   const {
     selectedObjects,
     sceneObjects,
@@ -26,7 +29,16 @@ export default function Inspector() {
     updateObjectMaterial,
     updateObjectMesh,
     updateObjectProperties,
-  } = useEditorStore()
+  } = useEditorStore(
+    useShallow(s => ({
+      selectedObjects: s.selectedObjects,
+      sceneObjects: s.sceneObjects,
+      executeCommand: s.executeCommand,
+      updateObjectMaterial: s.updateObjectMaterial,
+      updateObjectMesh: s.updateObjectMesh,
+      updateObjectProperties: s.updateObjectProperties,
+    }))
+  )
 
   // Get data for the first selected object (for single selection)
   const primaryObject = selectedObjects.length > 0 ? sceneObjects.get(selectedObjects[0]) : null

@@ -1,8 +1,9 @@
-import { useState } from 'react'
-import { Play, Shuffle, Download } from 'lucide-react'
-import { invoke } from '@tauri-apps/api/core'
 import { useEditorStore } from '@/store/editorStore'
 import { CreateObjectCommand } from '@/utils/commands'
+import { invoke } from '@tauri-apps/api/core'
+import { Download, Play, Shuffle } from 'lucide-react'
+import { useState } from 'react'
+import { useShallow } from 'zustand/react/shallow'
 
 interface GenerationParams {
   algorithm: 'BSP' | 'WFC'
@@ -11,14 +12,14 @@ interface GenerationParams {
   depth: number
   seed: number | null
   theme: string
-  
+
   // BSP-specific
   minRoomSize?: number
   maxRoomSize?: number
   splitIterations?: number
   largeRoomProbability?: number
   corridorWidth?: number
-  
+
   // WFC-specific
   tileset?: string
   maxIterations?: number
@@ -68,12 +69,20 @@ export default function GenerationPanel(_props: GenerationPanelProps) {
     corridorWidth: 2,
     tileset: 'dungeon',
     maxIterations: 10000,
-    backtrackLimit: 100
+    backtrackLimit: 100,
   })
   const [lastGenerated, setLastGenerated] = useState<LevelData | null>(null)
-  const [recentSeeds, setRecentSeeds] = useState<Array<{seed: number, algorithm: string, timestamp: string}>>([])
-  
-  const { clearSelection, setSelectedObjects, executeCommand } = useEditorStore()
+  const [recentSeeds, setRecentSeeds] = useState<
+    Array<{ seed: number; algorithm: string; timestamp: string }>
+  >([])
+
+  const { clearSelection, setSelectedObjects, executeCommand } = useEditorStore(
+    useShallow(s => ({
+      clearSelection: s.clearSelection,
+      setSelectedObjects: s.setSelectedObjects,
+      executeCommand: s.executeCommand,
+    }))
+  )
 
   const generateRandomSeed = () => {
     const seed = Math.floor(Math.random() * 1000000)
@@ -82,15 +91,15 @@ export default function GenerationPanel(_props: GenerationPanelProps) {
 
   const handleGenerate = async () => {
     if (isGenerating) return
-    
+
     console.log('Starting generation with params:', params)
     setIsGenerating(true)
     try {
       const finalSeed = params.seed || Date.now()
       let levelData: LevelData
-      
+
       console.log(`Generating with ${params.algorithm} algorithm, seed: ${finalSeed}`)
-      
+
       if (params.algorithm === 'BSP') {
         const bspParams = {
           width: params.width,
@@ -100,7 +109,7 @@ export default function GenerationPanel(_props: GenerationPanelProps) {
           max_room_size: params.maxRoomSize || 12,
           corridor_width: params.corridorWidth || 2,
           theme: params.theme,
-          seed: finalSeed
+          seed: finalSeed,
         }
         console.log('BSP params:', bspParams)
         levelData = await invoke('generate_bsp_level', { params: bspParams })
@@ -112,17 +121,17 @@ export default function GenerationPanel(_props: GenerationPanelProps) {
           tileset: params.tileset || 'dungeon',
           max_iterations: params.maxIterations || 10000,
           backtrack_limit: params.backtrackLimit || 100,
-          seed: finalSeed
+          seed: finalSeed,
         }
         console.log('WFC params:', wfcParams)
         levelData = await invoke('generate_wfc_level', { params: wfcParams })
       }
-      
+
       console.log('Generated level data:', levelData)
-      
+
       // Clear existing selection
       clearSelection()
-      
+
       // Add generated objects to scene using command system
       const newObjectIds: string[] = []
       for (const obj of levelData.objects) {
@@ -133,49 +142,48 @@ export default function GenerationPanel(_props: GenerationPanelProps) {
         } else if (obj.mesh?.includes('pyramid') || obj.mesh?.includes('cone')) {
           meshType = 'pyramid'
         }
-        
+
         // Create using command system for proper object creation
         const command = new CreateObjectCommand(meshType, obj.transform.position)
         command.execute()
         executeCommand(command)
-        
+
         // Get the created object ID
         const createdId = command.objectId
         newObjectIds.push(createdId)
-        
+
         // Update the object properties to match the generated data
         const { updateObjectTransform, updateObjectName } = useEditorStore.getState()
         updateObjectName(createdId, obj.name)
-        
+
         // Convert quaternion to Euler angles
         const quaternion = obj.transform.rotation
         const [x, y, z, w] = quaternion
         const yaw = Math.atan2(2.0 * (w * y + x * z), 1.0 - 2.0 * (y * y + z * z))
         const rotation: [number, number, number] = [0, yaw * (180 / Math.PI), 0]
-        
+
         updateObjectTransform(createdId, {
           position: obj.transform.position,
           rotation,
-          scale: obj.transform.scale
+          scale: obj.transform.scale,
         })
       }
-      
+
       // Select all generated objects
       setSelectedObjects(newObjectIds)
-      
+
       // Update recent seeds
       const seedEntry = {
         seed: finalSeed,
         algorithm: params.algorithm,
-        timestamp: new Date().toLocaleString()
+        timestamp: new Date().toLocaleString(),
       }
       setRecentSeeds(prev => [seedEntry, ...prev.slice(0, 9)])
-      
+
       setLastGenerated(levelData)
       setParams(prev => ({ ...prev, seed: finalSeed }))
-      
+
       console.log(`Generated ${levelData.objects.length} objects using ${params.algorithm}`)
-      
     } catch (error) {
       console.error('Generation failed:', error)
       alert(`Generation failed: ${error}`)
@@ -184,27 +192,27 @@ export default function GenerationPanel(_props: GenerationPanelProps) {
     }
   }
 
-  const loadSeed = (seedEntry: {seed: number, algorithm: string}) => {
-    setParams(prev => ({ 
-      ...prev, 
-      seed: seedEntry.seed, 
-      algorithm: seedEntry.algorithm as 'BSP' | 'WFC'
+  const loadSeed = (seedEntry: { seed: number; algorithm: string }) => {
+    setParams(prev => ({
+      ...prev,
+      seed: seedEntry.seed,
+      algorithm: seedEntry.algorithm as 'BSP' | 'WFC',
     }))
   }
 
   const exportGeneration = () => {
     if (!lastGenerated) return
-    
+
     const exportData = {
       metadata: {
         version: '1.0.0',
         algorithm: params.algorithm,
-        exportedAt: new Date().toISOString()
+        exportedAt: new Date().toISOString(),
       },
       parameters: params,
-      levelData: lastGenerated
+      levelData: lastGenerated,
     }
-    
+
     const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
@@ -217,41 +225,39 @@ export default function GenerationPanel(_props: GenerationPanelProps) {
   return (
     <div className="px-3 py-2">
       <div className="flex justify-between items-start mb-3">
-        <div className="text-xs text-gray-400">
-          Objects: {lastGenerated?.objects.length || 0}
-        </div>
+        <div className="text-xs text-gray-400">Objects: {lastGenerated?.objects.length || 0}</div>
       </div>
-      
+
       {/* Algorithm Selection */}
       <div className="grid grid-cols-2 gap-3 mb-3">
         <div>
           <label className="block text-xs text-editor-textMuted mb-1">Algorithm</label>
           <div className="flex space-x-2">
             <label className="flex items-center space-x-1">
-              <input 
-                type="radio" 
-                name="algorithm" 
-                value="BSP" 
+              <input
+                type="radio"
+                name="algorithm"
+                value="BSP"
                 checked={params.algorithm === 'BSP'}
-                onChange={(e) => setParams(prev => ({ ...prev, algorithm: e.target.value as 'BSP' }))}
+                onChange={e => setParams(prev => ({ ...prev, algorithm: e.target.value as 'BSP' }))}
                 className="text-generation-bsp"
               />
               <span className="text-generation-bsp text-xs">BSP</span>
             </label>
             <label className="flex items-center space-x-1">
-              <input 
-                type="radio" 
-                name="algorithm" 
-                value="WFC" 
+              <input
+                type="radio"
+                name="algorithm"
+                value="WFC"
                 checked={params.algorithm === 'WFC'}
-                onChange={(e) => setParams(prev => ({ ...prev, algorithm: e.target.value as 'WFC' }))}
+                onChange={e => setParams(prev => ({ ...prev, algorithm: e.target.value as 'WFC' }))}
                 className="text-generation-wfc"
               />
               <span className="text-generation-wfc text-xs">WFC</span>
             </label>
           </div>
         </div>
-        
+
         {/* Dimensions */}
         <div>
           <label className="block text-xs text-editor-textMuted mb-1">Dimensions</label>
@@ -259,28 +265,34 @@ export default function GenerationPanel(_props: GenerationPanelProps) {
             <input
               type="number"
               value={params.width}
-              onChange={(e) => setParams(prev => ({ ...prev, width: parseInt(e.target.value) || 24 }))}
+              onChange={e =>
+                setParams(prev => ({ ...prev, width: parseInt(e.target.value) || 24 }))
+              }
               className="w-10 px-1 py-1 text-xs bg-editor-bg border border-editor-border rounded"
-              min="8" max="100"
+              min="8"
+              max="100"
             />
             <span className="text-xs text-editor-textMuted self-center">×</span>
             <input
               type="number"
               value={params.height}
-              onChange={(e) => setParams(prev => ({ ...prev, height: parseInt(e.target.value) || 24 }))}
+              onChange={e =>
+                setParams(prev => ({ ...prev, height: parseInt(e.target.value) || 24 }))
+              }
               className="w-10 px-1 py-1 text-xs bg-editor-bg border border-editor-border rounded"
-              min="8" max="100"
+              min="8"
+              max="100"
             />
           </div>
         </div>
       </div>
-      
+
       {/* Theme Selection */}
       <div className="mb-3">
         <label className="block text-xs text-editor-textMuted mb-1">Theme</label>
         <select
           value={params.theme}
-          onChange={(e) => setParams(prev => ({ ...prev, theme: e.target.value }))}
+          onChange={e => setParams(prev => ({ ...prev, theme: e.target.value }))}
           className="w-full px-2 py-1 text-xs bg-editor-bg border border-editor-border rounded"
         >
           <option value="office">Office</option>
@@ -289,7 +301,7 @@ export default function GenerationPanel(_props: GenerationPanelProps) {
           <option value="castle">Castle</option>
         </select>
       </div>
-      
+
       {/* Seed Management */}
       <div className="mb-3">
         <label className="block text-xs text-editor-textMuted mb-1">Seed</label>
@@ -297,7 +309,12 @@ export default function GenerationPanel(_props: GenerationPanelProps) {
           <input
             type="number"
             value={params.seed || ''}
-            onChange={(e) => setParams(prev => ({ ...prev, seed: e.target.value ? parseInt(e.target.value) : null }))}
+            onChange={e =>
+              setParams(prev => ({
+                ...prev,
+                seed: e.target.value ? parseInt(e.target.value) : null,
+              }))
+            }
             className="flex-1 px-2 py-1 text-xs bg-editor-bg border border-editor-border rounded"
             placeholder="Random seed"
           />
@@ -310,14 +327,14 @@ export default function GenerationPanel(_props: GenerationPanelProps) {
           </button>
         </div>
       </div>
-      
+
       {/* Generation Controls */}
       <div className="flex space-x-2 mb-3">
         <button
           onClick={handleGenerate}
           disabled={isGenerating}
           className={`flex-1 flex items-center justify-center space-x-1 px-3 py-1 text-xs rounded ${
-            isGenerating 
+            isGenerating
               ? 'bg-gray-600 text-gray-400 cursor-not-allowed'
               : params.algorithm === 'BSP'
                 ? 'bg-generation-bsp text-black hover:bg-green-500'
@@ -336,7 +353,7 @@ export default function GenerationPanel(_props: GenerationPanelProps) {
             </>
           )}
         </button>
-        
+
         {lastGenerated && (
           <button
             onClick={exportGeneration}
@@ -347,20 +364,24 @@ export default function GenerationPanel(_props: GenerationPanelProps) {
           </button>
         )}
       </div>
-      
+
       {/* Recent Seeds */}
       {recentSeeds.length > 0 && (
         <div>
           <div className="text-xs font-medium text-editor-textMuted mb-1">Recent Seeds</div>
           <div className="max-h-16 overflow-y-auto space-y-1">
             {recentSeeds.map((seedEntry, index) => (
-              <div 
+              <div
                 key={`${seedEntry.seed}-${index}`}
                 className="flex items-center justify-between p-1 bg-editor-bg rounded text-xs hover:bg-editor-border cursor-pointer"
                 onClick={() => loadSeed(seedEntry)}
               >
                 <div className="flex items-center space-x-2">
-                  <span className={seedEntry.algorithm === 'BSP' ? 'text-generation-bsp' : 'text-generation-wfc'}>
+                  <span
+                    className={
+                      seedEntry.algorithm === 'BSP' ? 'text-generation-bsp' : 'text-generation-wfc'
+                    }
+                  >
                     {seedEntry.algorithm}
                   </span>
                   <span className="text-editor-text">{seedEntry.seed}</span>

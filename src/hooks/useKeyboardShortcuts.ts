@@ -12,6 +12,7 @@ import {
 } from '@/utils/commands'
 import { transformConstraints } from '@/utils/transformConstraints'
 import { useEffect } from 'react'
+import { useShallow } from 'zustand/react/shallow'
 
 export function useKeyboardShortcuts() {
   const {
@@ -29,7 +30,24 @@ export function useKeyboardShortcuts() {
     canRedo,
     sceneObjects,
     toggleCoordinateSpace,
-  } = useEditorStore()
+  } = useEditorStore(
+    useShallow(s => ({
+      selectedObjects: s.selectedObjects,
+      clearSelection: s.clearSelection,
+      setTransformMode: s.setTransformMode,
+      toggleGrid: s.toggleGrid,
+      toggleStats: s.toggleStats,
+      setCameraMode: s.setCameraMode,
+      transformMode: s.transformMode,
+      executeCommand: s.executeCommand,
+      undo: s.undo,
+      redo: s.redo,
+      canUndo: s.canUndo,
+      canRedo: s.canRedo,
+      sceneObjects: s.sceneObjects,
+      toggleCoordinateSpace: s.toggleCoordinateSpace,
+    }))
+  )
 
   // Get camera controls from context
   const { cameraControlsRef } = useCameraContext()

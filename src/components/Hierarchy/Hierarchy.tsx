@@ -1,34 +1,46 @@
-import { useState } from 'react'
 import { useEditorStore } from '@/store/editorStore'
-import { 
-  Box, 
-  Circle, 
-  Triangle, 
-  Package, 
-  Lightbulb, 
-  Folder, 
-  HelpCircle, 
-  Eye, 
-  EyeOff, 
-  Lock, 
-  Unlock 
+import {
+  Box,
+  Circle,
+  Eye,
+  EyeOff,
+  Folder,
+  HelpCircle,
+  Lightbulb,
+  Lock,
+  Package,
+  Triangle,
+  Unlock,
 } from 'lucide-react'
+import { useState } from 'react'
+import { useShallow } from 'zustand/react/shallow'
 
 interface HierarchyProps {
   hideHeader?: boolean
 }
 
 export default function Hierarchy({ hideHeader = false }: HierarchyProps) {
-  const { 
-    selectedObjects, 
-    sceneObjects, 
-    setSelectedObjects, 
-    addToSelection, 
+  const {
+    selectedObjects,
+    sceneObjects,
+    setSelectedObjects,
+    addToSelection,
     removeFromSelection,
     updateObjectVisibility,
     updateObjectLock,
-    updateObjectName
-  } = useEditorStore()
+    updateObjectName,
+  } = useEditorStore(
+    useShallow(s => ({
+      selectedObjects: s.selectedObjects,
+      sceneObjects: s.sceneObjects,
+      setSelectedObjects: s.setSelectedObjects,
+      addToSelection: s.addToSelection,
+      removeFromSelection: s.removeFromSelection,
+      updateObjectVisibility: s.updateObjectVisibility,
+      updateObjectLock: s.updateObjectLock,
+      updateObjectName: s.updateObjectName,
+    }))
+  )
   const [searchTerm, setSearchTerm] = useState('')
   const [renamingId, setRenamingId] = useState<string | null>(null)
   const [renameValue, setRenameValue] = useState('')
@@ -85,10 +97,14 @@ export default function Hierarchy({ hideHeader = false }: HierarchyProps) {
   const getObjectIcon = (type: string, meshType?: string) => {
     if (type === 'mesh' && meshType) {
       switch (meshType) {
-        case 'cube': return <Box className="w-4 h-4 text-green-500" />
-        case 'sphere': return <Circle className="w-4 h-4 text-blue-500" />
-        case 'pyramid': return <Triangle className="w-4 h-4 text-red-500" />
-        default: return <Package className="w-4 h-4" />
+        case 'cube':
+          return <Box className="w-4 h-4 text-green-500" />
+        case 'sphere':
+          return <Circle className="w-4 h-4 text-blue-500" />
+        case 'pyramid':
+          return <Triangle className="w-4 h-4 text-red-500" />
+        default:
+          return <Package className="w-4 h-4" />
       }
     } else if (type === 'light') {
       return <Lightbulb className="w-4 h-4 text-yellow-500" />
@@ -108,20 +124,18 @@ export default function Hierarchy({ hideHeader = false }: HierarchyProps) {
             isSelected ? 'bg-editor-accent text-white' : ''
           }`}
           style={{ paddingLeft: `${level * 16 + 8}px` }}
-          onClick={(e) => handleObjectClick(obj.id, e)}
+          onClick={e => handleObjectClick(obj.id, e)}
           onDoubleClick={() => handleObjectDoubleClick(obj.id)}
         >
-          <span className="w-5 text-center mr-2">
-            {getObjectIcon(obj.type, obj.meshType)}
-          </span>
-          
+          <span className="w-5 text-center mr-2">{getObjectIcon(obj.type, obj.meshType)}</span>
+
           {renamingId === obj.id ? (
             <input
               type="text"
               value={renameValue}
-              onChange={(e) => setRenameValue(e.target.value)}
+              onChange={e => setRenameValue(e.target.value)}
               onBlur={() => handleRenameComplete(obj.id)}
-              onKeyDown={(e) => {
+              onKeyDown={e => {
                 if (e.key === 'Enter') {
                   handleRenameComplete(obj.id)
                 } else if (e.key === 'Escape') {
@@ -134,34 +148,26 @@ export default function Hierarchy({ hideHeader = false }: HierarchyProps) {
           ) : (
             <span className="flex-1 truncate">{obj.name}</span>
           )}
-          
+
           {/* Visibility and lock buttons */}
           <div className="flex items-center space-x-1 ml-2">
             <button
               className={`w-4 h-4 flex items-center justify-center hover:bg-editor-bg rounded transition-opacity ${
                 obj.visible ? 'opacity-60 hover:opacity-100' : 'opacity-100 text-red-500'
               }`}
-              onClick={(e) => toggleObjectVisibility(obj.id, e)}
+              onClick={e => toggleObjectVisibility(obj.id, e)}
               title={obj.visible ? 'Hide' : 'Show'}
             >
-              {obj.visible ? (
-                <Eye className="w-3 h-3" />
-              ) : (
-                <EyeOff className="w-3 h-3" />
-              )}
+              {obj.visible ? <Eye className="w-3 h-3" /> : <EyeOff className="w-3 h-3" />}
             </button>
             <button
               className={`w-4 h-4 flex items-center justify-center hover:bg-editor-bg rounded transition-opacity ${
                 obj.locked ? 'opacity-100 text-yellow-500' : 'opacity-60 hover:opacity-100'
               }`}
-              onClick={(e) => toggleObjectLock(obj.id, e)}
+              onClick={e => toggleObjectLock(obj.id, e)}
               title={obj.locked ? 'Unlock' : 'Lock'}
             >
-              {obj.locked ? (
-                <Lock className="w-3 h-3" />
-              ) : (
-                <Unlock className="w-3 h-3" />
-              )}
+              {obj.locked ? <Lock className="w-3 h-3" /> : <Unlock className="w-3 h-3" />}
             </button>
           </div>
         </div>
@@ -182,14 +188,14 @@ export default function Hierarchy({ hideHeader = false }: HierarchyProps) {
           <h3 className="text-lg font-medium">Hierarchy</h3>
         </div>
       )}
-      
+
       {/* Search and info */}
       <div className="p-3 border-b border-editor-border">
         <input
           type="text"
           placeholder="Search objects..."
           value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
+          onChange={e => setSearchTerm(e.target.value)}
           className="w-full px-2 py-1 text-xs bg-editor-bg border border-editor-border rounded focus:outline-none focus:border-editor-accent"
         />
         <div className="flex justify-between items-center mt-2 text-sm text-editor-textMuted">
