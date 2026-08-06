@@ -1,6 +1,7 @@
 // Test setup file for Vitest
-import { vi } from 'vitest'
+/* eslint-disable no-var */
 import '@testing-library/jest-dom'
+import { vi } from 'vitest'
 
 // Extend global interface for TypeScript
 declare global {
@@ -39,13 +40,13 @@ globalThis.mockTauri = {
   dialog: {
     open: vi.fn(),
     save: vi.fn(),
-  }
+  },
 }
 
 // Mock window.__TAURI__
 Object.defineProperty(window, '__TAURI__', {
   value: globalThis.mockTauri,
-  writable: true
+  writable: true,
 })
 
 // Mock Three.js WebGL context for headless testing
@@ -78,5 +79,5 @@ Object.defineProperty(HTMLCanvasElement.prototype, 'getContext', {
     getParameter: vi.fn(),
     getProgramParameter: vi.fn(() => true),
     getShaderParameter: vi.fn(() => true),
-  }))
+  })),
 })

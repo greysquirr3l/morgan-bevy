@@ -1,7 +1,7 @@
 // Material editor component for PBR material properties
-import { useState, useEffect } from 'react'
-import { Palette, Folder, X, Copy, Save, ChevronRight, Upload, Download, Eye, Star } from 'lucide-react'
 import { invoke } from '@tauri-apps/api/core'
+import { ChevronRight, Copy, Folder, Palette, Star, X } from 'lucide-react'
+import { useEffect, useState } from 'react'
 
 interface MaterialEditorProps {
   selectedObjects: string[]
@@ -20,16 +20,96 @@ interface MaterialPreset {
 }
 
 const DEFAULT_PRESETS: MaterialPreset[] = [
-  { name: 'Metal', baseColor: '#b0b0b0', metallic: 1.0, roughness: 0.2, emissive: '#000000', emissiveIntensity: 0.0, category: 'Basic' },
-  { name: 'Concrete', baseColor: '#808080', metallic: 0.0, roughness: 0.8, emissive: '#000000', emissiveIntensity: 0.0, category: 'Basic' },
-  { name: 'Plastic', baseColor: '#ffffff', metallic: 0.0, roughness: 0.5, emissive: '#000000', emissiveIntensity: 0.0, category: 'Basic' },
-  { name: 'Wood', baseColor: '#8b4513', metallic: 0.0, roughness: 0.7, emissive: '#000000', emissiveIntensity: 0.0, category: 'Basic' },
-  { name: 'Glass', baseColor: '#ffffff', metallic: 0.0, roughness: 0.0, emissive: '#000000', emissiveIntensity: 0.0, category: 'Basic' },
-  { name: 'Gold', baseColor: '#ffd700', metallic: 1.0, roughness: 0.1, emissive: '#000000', emissiveIntensity: 0.0, category: 'Metal' },
-  { name: 'Copper', baseColor: '#b87333', metallic: 1.0, roughness: 0.3, emissive: '#000000', emissiveIntensity: 0.0, category: 'Metal' },
-  { name: 'Chrome', baseColor: '#c0c0c0', metallic: 1.0, roughness: 0.05, emissive: '#000000', emissiveIntensity: 0.0, category: 'Metal' },
-  { name: 'Neon', baseColor: '#ff00ff', metallic: 0.0, roughness: 0.9, emissive: '#ff00ff', emissiveIntensity: 1.0, category: 'Emissive' },
-  { name: 'LED', baseColor: '#ffffff', metallic: 0.0, roughness: 0.8, emissive: '#00ffff', emissiveIntensity: 0.5, category: 'Emissive' }
+  {
+    name: 'Metal',
+    baseColor: '#b0b0b0',
+    metallic: 1.0,
+    roughness: 0.2,
+    emissive: '#000000',
+    emissiveIntensity: 0.0,
+    category: 'Basic',
+  },
+  {
+    name: 'Concrete',
+    baseColor: '#808080',
+    metallic: 0.0,
+    roughness: 0.8,
+    emissive: '#000000',
+    emissiveIntensity: 0.0,
+    category: 'Basic',
+  },
+  {
+    name: 'Plastic',
+    baseColor: '#ffffff',
+    metallic: 0.0,
+    roughness: 0.5,
+    emissive: '#000000',
+    emissiveIntensity: 0.0,
+    category: 'Basic',
+  },
+  {
+    name: 'Wood',
+    baseColor: '#8b4513',
+    metallic: 0.0,
+    roughness: 0.7,
+    emissive: '#000000',
+    emissiveIntensity: 0.0,
+    category: 'Basic',
+  },
+  {
+    name: 'Glass',
+    baseColor: '#ffffff',
+    metallic: 0.0,
+    roughness: 0.0,
+    emissive: '#000000',
+    emissiveIntensity: 0.0,
+    category: 'Basic',
+  },
+  {
+    name: 'Gold',
+    baseColor: '#ffd700',
+    metallic: 1.0,
+    roughness: 0.1,
+    emissive: '#000000',
+    emissiveIntensity: 0.0,
+    category: 'Metal',
+  },
+  {
+    name: 'Copper',
+    baseColor: '#b87333',
+    metallic: 1.0,
+    roughness: 0.3,
+    emissive: '#000000',
+    emissiveIntensity: 0.0,
+    category: 'Metal',
+  },
+  {
+    name: 'Chrome',
+    baseColor: '#c0c0c0',
+    metallic: 1.0,
+    roughness: 0.05,
+    emissive: '#000000',
+    emissiveIntensity: 0.0,
+    category: 'Metal',
+  },
+  {
+    name: 'Neon',
+    baseColor: '#ff00ff',
+    metallic: 0.0,
+    roughness: 0.9,
+    emissive: '#ff00ff',
+    emissiveIntensity: 1.0,
+    category: 'Emissive',
+  },
+  {
+    name: 'LED',
+    baseColor: '#ffffff',
+    metallic: 0.0,
+    roughness: 0.8,
+    emissive: '#00ffff',
+    emissiveIntensity: 0.5,
+    category: 'Emissive',
+  },
 ]
 
 export default function MaterialEditor({ selectedObjects, onMaterialChange }: MaterialEditorProps) {
@@ -39,7 +119,7 @@ export default function MaterialEditor({ selectedObjects, onMaterialChange }: Ma
     roughness: 0.8,
     emissive: '#000000',
     emissiveIntensity: 0.0,
-    texture: null as string | null
+    texture: null as string | null,
   })
 
   const [isExpanded, setIsExpanded] = useState(false)
@@ -83,7 +163,7 @@ export default function MaterialEditor({ selectedObjects, onMaterialChange }: Ma
       roughness: preset.roughness ?? material.roughness,
       emissive: preset.emissive || material.emissive,
       emissiveIntensity: preset.emissiveIntensity ?? material.emissiveIntensity,
-      texture: preset.texture || material.texture
+      texture: preset.texture || material.texture,
     }
     setMaterial(newMaterial)
     onMaterialChange?.(newMaterial)
@@ -91,7 +171,7 @@ export default function MaterialEditor({ selectedObjects, onMaterialChange }: Ma
 
   const saveCurrentAsPreset = () => {
     if (!presetName.trim()) return
-    
+
     const newPreset: MaterialPreset = {
       name: presetName.trim(),
       baseColor: material.baseColor,
@@ -100,9 +180,9 @@ export default function MaterialEditor({ selectedObjects, onMaterialChange }: Ma
       emissive: material.emissive,
       emissiveIntensity: material.emissiveIntensity,
       texture: material.texture || undefined,
-      category: 'Custom'
+      category: 'Custom',
     }
-    
+
     saveCustomPresets([...customPresets, newPreset])
     setPresetName('')
   }
@@ -114,7 +194,7 @@ export default function MaterialEditor({ selectedObjects, onMaterialChange }: Ma
 
   const browseForTexture = async () => {
     try {
-      const selected = await invoke('browse_for_texture') as string[]
+      const selected = (await invoke('browse_for_texture')) as string[]
       if (selected && selected.length > 0) {
         updateMaterial('texture', selected[0])
       }
@@ -124,8 +204,8 @@ export default function MaterialEditor({ selectedObjects, onMaterialChange }: Ma
   }
 
   const allPresets = [...DEFAULT_PRESETS, ...customPresets]
-  const filteredPresets = allPresets.filter(preset => 
-    selectedCategory === 'All' || preset.category === selectedCategory
+  const filteredPresets = allPresets.filter(
+    preset => selectedCategory === 'All' || preset.category === selectedCategory
   )
   const categories = ['All', ...Array.from(new Set(allPresets.map(p => p.category)))]
 
@@ -168,7 +248,7 @@ export default function MaterialEditor({ selectedObjects, onMaterialChange }: Ma
         <span className="ml-2 text-sm font-medium">Material</span>
         <div className="ml-auto flex items-center space-x-1">
           <button
-            onClick={(e) => {
+            onClick={e => {
               e.stopPropagation()
               setShowPresetLibrary(!showPresetLibrary)
             }}
@@ -196,7 +276,7 @@ export default function MaterialEditor({ selectedObjects, onMaterialChange }: Ma
                 <X className="w-3 h-3" />
               </button>
             </div>
-            
+
             {/* Category Filter */}
             <div className="flex flex-wrap gap-1">
               {categories.map(category => (
@@ -213,14 +293,11 @@ export default function MaterialEditor({ selectedObjects, onMaterialChange }: Ma
                 </button>
               ))}
             </div>
-            
+
             {/* Preset Grid */}
             <div className="grid grid-cols-3 gap-2 max-h-48 overflow-y-auto">
               {filteredPresets.map((preset, index) => (
-                <div
-                  key={`${preset.category}-${preset.name}-${index}`}
-                  className="relative group"
-                >
+                <div key={`${preset.category}-${preset.name}-${index}`} className="relative group">
                   <button
                     onClick={() => applyPreset(preset)}
                     className="w-full p-2 bg-editor-panel border border-editor-border rounded hover:border-editor-accent text-left"
@@ -229,16 +306,20 @@ export default function MaterialEditor({ selectedObjects, onMaterialChange }: Ma
                       className="w-full h-8 rounded mb-1"
                       style={{
                         background: `linear-gradient(45deg, ${preset.baseColor}, ${preset.emissive})`,
-                        filter: `brightness(${1 + preset.emissiveIntensity}) saturate(${2 - preset.roughness})`
+                        filter: `brightness(${1 + preset.emissiveIntensity}) saturate(${2 - preset.roughness})`,
                       }}
                     />
                     <div className="text-xs font-medium truncate">{preset.name}</div>
-                    <div className="text-xs text-editor-textMuted">M:{preset.metallic.toFixed(1)} R:{preset.roughness.toFixed(1)}</div>
+                    <div className="text-xs text-editor-textMuted">
+                      M:{preset.metallic.toFixed(1)} R:{preset.roughness.toFixed(1)}
+                    </div>
                   </button>
-                  
+
                   {preset.category === 'Custom' && (
                     <button
-                      onClick={() => deletePreset(customPresets.findIndex(p => p.name === preset.name))}
+                      onClick={() =>
+                        deletePreset(customPresets.findIndex(p => p.name === preset.name))
+                      }
                       className="absolute top-1 right-1 p-1 bg-red-600 text-white rounded opacity-0 group-hover:opacity-100 transition-opacity"
                     >
                       <X className="w-3 h-3" />
@@ -247,14 +328,14 @@ export default function MaterialEditor({ selectedObjects, onMaterialChange }: Ma
                 </div>
               ))}
             </div>
-            
+
             {/* Save Current as Preset */}
             <div className="border-t border-editor-border pt-2">
               <div className="flex items-center space-x-2">
                 <input
                   type="text"
                   value={presetName}
-                  onChange={(e) => setPresetName(e.target.value)}
+                  onChange={e => setPresetName(e.target.value)}
                   placeholder="Preset name..."
                   className="flex-1 px-2 py-1 text-xs bg-editor-bg border border-editor-border rounded focus:outline-none focus:border-editor-accent"
                 />
@@ -276,17 +357,19 @@ export default function MaterialEditor({ selectedObjects, onMaterialChange }: Ma
         {/* Quick Preset Selector */}
         <div>
           <label className="block text-xs text-editor-textMuted mb-1">Quick Presets</label>
-          <select 
+          <select
             className="w-full px-2 py-1 text-xs bg-editor-bg border border-editor-border rounded focus:outline-none focus:border-editor-accent"
             value=""
-            onChange={(e) => {
+            onChange={e => {
               const preset = DEFAULT_PRESETS.find(p => p.name === e.target.value)
               if (preset) applyPreset(preset)
             }}
           >
             <option value="">Select preset...</option>
             {DEFAULT_PRESETS.filter(p => p.category === 'Basic').map(preset => (
-              <option key={preset.name} value={preset.name}>{preset.name}</option>
+              <option key={preset.name} value={preset.name}>
+                {preset.name}
+              </option>
             ))}
           </select>
         </div>
@@ -298,13 +381,13 @@ export default function MaterialEditor({ selectedObjects, onMaterialChange }: Ma
             <input
               type="color"
               value={material.baseColor}
-              onChange={(e) => updateMaterial('baseColor', e.target.value)}
+              onChange={e => updateMaterial('baseColor', e.target.value)}
               className="w-8 h-6 border border-editor-border rounded-l cursor-pointer"
             />
             <input
               type="text"
               value={material.baseColor}
-              onChange={(e) => updateMaterial('baseColor', e.target.value)}
+              onChange={e => updateMaterial('baseColor', e.target.value)}
               className="flex-1 px-2 py-1 text-xs bg-editor-bg border border-editor-border rounded-r focus:outline-none focus:border-editor-accent"
             />
           </div>
@@ -321,7 +404,7 @@ export default function MaterialEditor({ selectedObjects, onMaterialChange }: Ma
             max="1"
             step="0.01"
             value={material.metallic}
-            onChange={(e) => updateMaterial('metallic', parseFloat(e.target.value))}
+            onChange={e => updateMaterial('metallic', parseFloat(e.target.value))}
             className="w-full accent-editor-accent"
           />
         </div>
@@ -337,7 +420,7 @@ export default function MaterialEditor({ selectedObjects, onMaterialChange }: Ma
             max="1"
             step="0.01"
             value={material.roughness}
-            onChange={(e) => updateMaterial('roughness', parseFloat(e.target.value))}
+            onChange={e => updateMaterial('roughness', parseFloat(e.target.value))}
             className="w-full accent-editor-accent"
           />
         </div>
@@ -349,13 +432,13 @@ export default function MaterialEditor({ selectedObjects, onMaterialChange }: Ma
             <input
               type="color"
               value={material.emissive}
-              onChange={(e) => updateMaterial('emissive', e.target.value)}
+              onChange={e => updateMaterial('emissive', e.target.value)}
               className="w-8 h-6 border border-editor-border rounded-l cursor-pointer"
             />
             <input
               type="text"
               value={material.emissive}
-              onChange={(e) => updateMaterial('emissive', e.target.value)}
+              onChange={e => updateMaterial('emissive', e.target.value)}
               className="flex-1 px-2 py-1 text-xs bg-editor-bg border border-editor-border rounded-r focus:outline-none focus:border-editor-accent"
             />
           </div>
@@ -372,7 +455,7 @@ export default function MaterialEditor({ selectedObjects, onMaterialChange }: Ma
             max="2"
             step="0.01"
             value={material.emissiveIntensity}
-            onChange={(e) => updateMaterial('emissiveIntensity', parseFloat(e.target.value))}
+            onChange={e => updateMaterial('emissiveIntensity', parseFloat(e.target.value))}
             className="w-full accent-editor-accent"
           />
         </div>
@@ -385,14 +468,14 @@ export default function MaterialEditor({ selectedObjects, onMaterialChange }: Ma
               <div className="flex-1 px-2 py-1 text-xs bg-editor-bg border border-editor-border rounded text-editor-textMuted">
                 {material.texture ? material.texture.split('/').pop() : 'No texture'}
               </div>
-              <button 
+              <button
                 onClick={browseForTexture}
                 className="px-2 py-1 text-xs bg-editor-bg border border-editor-border rounded hover:bg-editor-border"
                 title="Browse texture"
               >
                 <Folder className="w-4 h-4" />
               </button>
-              <button 
+              <button
                 onClick={() => updateMaterial('texture', null)}
                 className="px-2 py-1 text-xs bg-editor-bg border border-editor-border rounded hover:bg-editor-border"
                 title="Clear texture"
@@ -400,7 +483,7 @@ export default function MaterialEditor({ selectedObjects, onMaterialChange }: Ma
                 <X className="w-4 h-4" />
               </button>
             </div>
-            
+
             {/* Texture Preview */}
             {material.texture && (
               <div className="relative">
@@ -408,8 +491,8 @@ export default function MaterialEditor({ selectedObjects, onMaterialChange }: Ma
                   src={material.texture}
                   alt="Texture Preview"
                   className="w-full h-16 object-cover border border-editor-border rounded"
-                  onError={(e) => {
-                    (e.target as HTMLImageElement).style.display = 'none'
+                  onError={e => {
+                    ;(e.target as HTMLImageElement).style.display = 'none'
                   }}
                 />
               </div>
@@ -421,45 +504,46 @@ export default function MaterialEditor({ selectedObjects, onMaterialChange }: Ma
         <div>
           <label className="block text-xs text-editor-textMuted mb-1">Preview</label>
           <div className="space-y-2">
-            <div 
+            <div
               className="w-full h-16 border border-editor-border rounded relative overflow-hidden"
               style={{
                 background: `linear-gradient(45deg, ${material.baseColor}, ${material.emissive})`,
-                filter: `brightness(${1 + material.emissiveIntensity}) saturate(${2 - material.roughness})`
+                filter: `brightness(${1 + material.emissiveIntensity}) saturate(${2 - material.roughness})`,
               }}
             >
               {material.texture && (
-                <div 
+                <div
                   className="absolute inset-0 opacity-50 bg-repeat"
                   style={{
                     backgroundImage: `url(${material.texture})`,
-                    backgroundSize: '32px 32px'
+                    backgroundSize: '32px 32px',
                   }}
                 />
               )}
             </div>
             <div className="text-xs text-editor-textMuted">
-              Metallic: {material.metallic.toFixed(2)} | Roughness: {material.roughness.toFixed(2)} | Emissive: {material.emissiveIntensity.toFixed(2)}
+              Metallic: {material.metallic.toFixed(2)} | Roughness: {material.roughness.toFixed(2)}{' '}
+              | Emissive: {material.emissiveIntensity.toFixed(2)}
             </div>
           </div>
         </div>
 
         {/* Enhanced Apply Section */}
         <div className="flex space-x-2">
-          <button 
+          <button
             className="flex-1 px-2 py-1 text-xs bg-editor-accent text-white rounded hover:bg-editor-accent/80"
             onClick={() => onMaterialChange?.(material)}
           >
             Apply to Selected
           </button>
-          <button 
+          <button
             className="px-2 py-1 text-xs bg-editor-bg border border-editor-border rounded hover:bg-editor-border"
             onClick={() => navigator.clipboard?.writeText(JSON.stringify(material))}
             title="Copy material to clipboard"
           >
             <Copy className="w-4 h-4" />
           </button>
-          <button 
+          <button
             className="px-2 py-1 text-xs bg-editor-bg border border-editor-border rounded hover:bg-editor-border"
             onClick={() => setShowPresetLibrary(true)}
             title="Open material library"
