@@ -350,12 +350,12 @@ impl BSPGenerator {
             point2_x,
             point2_y,
             params.corridor_width,
-        )?;
+        );
 
         Ok(())
     }
 
-    fn create_l_corridor(&mut self, x1: u32, y1: u32, x2: u32, y2: u32, width: u32) -> Result<()> {
+    fn create_l_corridor(&mut self, x1: u32, y1: u32, x2: u32, y2: u32, width: u32) {
         let rng = self.rng_mut();
 
         // Choose corner point randomly
@@ -392,7 +392,6 @@ impl BSPGenerator {
             }
         }
 
-        Ok(())
     }
 
     #[expect(

@@ -54,7 +54,7 @@ impl AssetScanner {
         }
 
         // Discover all asset files first
-        let discovered_assets = self.discover_assets(assets_path)?;
+        let discovered_assets = Self::discover_assets(assets_path)?;
         let total_assets = discovered_assets.len();
 
         info!("Discovered {total_assets} potential assets");
@@ -133,9 +133,8 @@ impl AssetScanner {
     }
 
     /// Discover all asset files in a directory tree
-    fn discover_assets<P: AsRef<Path>>(
-        &self,
-        root_path: P,
+    fn discover_assets(
+        root_path: &Path,
     ) -> Result<Vec<PathBuf>, Box<dyn std::error::Error>> {
         let mut assets = Vec::new();
         Self::walk_directory(root_path.as_ref(), &mut assets)?;

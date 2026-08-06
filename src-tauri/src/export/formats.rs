@@ -45,7 +45,7 @@ impl ExportFormat {
         }
     }
 
-    pub const fn supports_materials(&self) -> bool {
+    pub const fn supports_materials() -> bool {
         true
     }
 
