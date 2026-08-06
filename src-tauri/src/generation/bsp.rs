@@ -100,10 +100,6 @@ impl BSPGenerator {
     }
 
     #[expect(
-        clippy::cast_precision_loss,
-        reason = "level dimensions are user-supplied u32; precision loss is acceptable for a level editor"
-    )]
-    #[expect(
         clippy::cast_possible_truncation,
         reason = "level dimensions fit in f32 for the editor's visualisation"
     )]
@@ -159,9 +155,9 @@ impl BSPGenerator {
             bounds: BoundingBox {
                 min: [0.0, 0.0, 0.0],
                 max: [
-                    (params.width as f64) as f32,
-                    (params.depth as f64) as f32,
-                    (params.height as f64) as f32,
+                    f64::from(params.width) as f32,
+                    f64::from(params.depth) as f32,
+                    f64::from(params.height) as f32,
                 ],
             },
         };

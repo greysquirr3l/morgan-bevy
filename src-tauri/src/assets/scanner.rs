@@ -133,16 +133,12 @@ impl AssetScanner {
         root_path: P,
     ) -> Result<Vec<PathBuf>, Box<dyn std::error::Error>> {
         let mut assets = Vec::new();
-        self.walk_directory(root_path.as_ref(), &mut assets)?;
+        Self::walk_directory(root_path.as_ref(), &mut assets)?;
         Ok(assets)
     }
 
     /// Recursively walk directory and collect asset files
-    fn walk_directory(
-        &self,
-        dir: &Path,
-        assets: &mut Vec<PathBuf>,
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    fn walk_directory(dir: &Path, assets: &mut Vec<PathBuf>) -> Result<(), Box<dyn std::error::Error>> {
         if !dir.is_dir() {
             return Ok(());
         }
@@ -163,7 +159,7 @@ impl AssetScanner {
                         continue;
                     }
                 }
-                self.walk_directory(&path, assets)?;
+                Self::walk_directory(&path, assets)?;
             } else if Self::is_asset_file(&path) {
                 assets.push(path);
             }

@@ -200,10 +200,9 @@ async fn generate_bsp_level(
     match BSPGenerator::generate(params) {
         Ok(level_data) => {
             // Update application state
-            let mut app_state = state
-                .lock()
-                .unwrap_or_else(std::sync::PoisonError::into_inner);
-            app_state.spatial_index.clear();
+            let __lock_result = state.lock();
+            let mut app_state = match __lock_result { Ok(g) => g, Err(e) => e.into_inner()(e) };
+                        app_state.spatial_index.clear();
             for obj in &level_data.objects {
                 app_state.spatial_index.insert(&obj.id, &obj.transform);
             }
@@ -233,10 +232,9 @@ async fn generate_wfc_level(
     match generator.generate(params) {
         Ok(level_data) => {
             // Update application state
-            let mut app_state = state
-                .lock()
-                .unwrap_or_else(std::sync::PoisonError::into_inner);
-            app_state.spatial_index.clear();
+            let __lock_result = state.lock();
+            let mut app_state = match __lock_result { Ok(g) => g, Err(e) => e.into_inner()(e) };
+                        app_state.spatial_index.clear();
             for obj in &level_data.objects {
                 app_state.spatial_index.insert(&obj.id, &obj.transform);
             }
@@ -295,9 +293,7 @@ async fn query_objects_in_bounds(
     bounds: BoundingBox,
     state: State<'_, std::sync::Mutex<AppState>>,
 ) -> Result<Vec<String>, String> {
-    let app_state = state
-        .lock()
-        .unwrap_or_else(std::sync::PoisonError::into_inner);
+    let app_state = match state.lock() { Ok(g) => g, Err(e) => e.into_inner() };
     let object_ids = app_state.spatial_index.query_bounds(&bounds);
     Ok(object_ids)
 }
@@ -308,10 +304,8 @@ async fn update_object_transform(
     transform: Transform3D,
     state: State<'_, std::sync::Mutex<AppState>>,
 ) -> Result<(), String> {
-    let mut app_state = state
-        .lock()
-        .unwrap_or_else(std::sync::PoisonError::into_inner);
-
+    let __lock_result = state.lock();
+    let mut app_state = match __lock_result { Ok(g) => g, Err(e) => e.into_inner()(e) };
     if let Some(ref mut level) = app_state.current_level {
         if let Some(obj) = level.objects.iter_mut().find(|o| o.id == object_id) {
             obj.transform = transform.clone();
@@ -330,9 +324,7 @@ async fn update_object_transform(
 async fn get_current_level(
     state: State<'_, std::sync::Mutex<AppState>>,
 ) -> Result<Option<LevelData>, String> {
-    let app_state = state
-        .lock()
-        .unwrap_or_else(std::sync::PoisonError::into_inner);
+    let app_state = match state.lock() { Ok(g) => g, Err(e) => e.into_inner() };
     Ok(app_state.current_level.clone())
 }
 
@@ -363,9 +355,8 @@ async fn load_level_from_file(
         .map_err(|e| format!("Failed to parse level data: {e}"))?;
 
     // Update application state
-    let mut app_state = state
-        .lock()
-        .unwrap_or_else(std::sync::PoisonError::into_inner);
+    let __lock_result = state.lock();
+    let mut app_state = match __lock_result { Ok(g) => g, Err(e) => e.into_inner()(e) };
     app_state.spatial_index.clear();
     for obj in &level_data.objects {
         app_state.spatial_index.insert(&obj.id, &obj.transform);
