@@ -269,11 +269,7 @@ async fn export_level(
 ) -> Result<export::exporters::ExportResult, String> {
     info!("Exporting level to {formats:?} formats at path: {output_path}");
 
-    let exporter = LevelExporter::new();
-    match exporter
-        .export_multi_format(&level_data, &formats, &output_path)
-        .await
-    {
+    match LevelExporter::export_multi_format(&level_data, &formats, &output_path) {
         Ok(export_result) => {
             info!(
                 "Successfully exported {} objects in {}ms",
@@ -429,11 +425,7 @@ async fn export_level_simple(
         }
     };
 
-    let exporter = LevelExporter::new();
-    match exporter
-        .export_multi_format(&level_data, &[export_format], &base_path.to_string_lossy())
-        .await
-    {
+    match LevelExporter::export_multi_format(&level_data, &[export_format], &base_path.to_string_lossy()) {
         Ok(result) => {
             if let Some(file) = result.exported_files.first() {
                 if file.success {

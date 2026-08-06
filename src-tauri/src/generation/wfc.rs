@@ -385,8 +385,8 @@ impl WFCGenerator {
                 // Collapse the cell
                 if let Some(tile_id) = self.choose_tile_for_cell(x, y) {
                     if let Some(cell) = self.cell_mut(y, x) {
-                    cell.collapse(tile_id);
-                }
+                        cell.collapse(tile_id);
+                    }
 
                     // Propagate constraints
                     if !self.propagate_constraints(x, y) {

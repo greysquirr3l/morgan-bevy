@@ -445,6 +445,14 @@ impl BSPGenerator {
         Ok(objects)
     }
 
+    #[expect(
+        clippy::cast_sign_loss,
+        reason = "grid coordinates are non-negative f32 from u32 indices"
+    )]
+    #[expect(
+        clippy::cast_possible_truncation,
+        reason = "grid coordinates are non-negative integers in f32"
+    )]
     fn create_floor_object(x: f32, y: f32, theme: &str) -> Result<GameObject> {
         Ok(GameObject {
             id: Uuid::new_v4().to_string(),
@@ -462,6 +470,14 @@ impl BSPGenerator {
         })
     }
 
+    #[expect(
+        clippy::cast_sign_loss,
+        reason = "grid coordinates are non-negative f32 from u32 indices"
+    )]
+    #[expect(
+        clippy::cast_possible_truncation,
+        reason = "grid coordinates are non-negative integers in f32"
+    )]
     fn create_wall_object(x: f32, y: f32, theme: &str) -> Result<GameObject> {
         Ok(GameObject {
             id: Uuid::new_v4().to_string(),
@@ -483,6 +499,14 @@ impl BSPGenerator {
         })
     }
 
+    #[expect(
+        clippy::cast_sign_loss,
+        reason = "grid coordinates are non-negative f32 from u32 indices"
+    )]
+    #[expect(
+        clippy::cast_possible_truncation,
+        reason = "grid coordinates are non-negative integers in f32"
+    )]
     fn create_corridor_object(x: f32, y: f32, theme: &str) -> Result<GameObject> {
         Ok(GameObject {
             id: Uuid::new_v4().to_string(),
@@ -500,6 +524,14 @@ impl BSPGenerator {
         })
     }
 
+    #[expect(
+        clippy::cast_sign_loss,
+        reason = "grid coordinates are non-negative f32 from u32 indices"
+    )]
+    #[expect(
+        clippy::cast_possible_truncation,
+        reason = "grid coordinates are non-negative integers in f32"
+    )]
     fn create_door_object(x: f32, y: f32, theme: &str) -> Result<GameObject> {
         Ok(GameObject {
             id: Uuid::new_v4().to_string(),

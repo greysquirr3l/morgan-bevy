@@ -34,8 +34,7 @@ impl LevelExporter {
         Self
     }
 
-    pub async fn export_multi_format(
-        &self,
+    pub fn export_multi_format(
         level_data: &LevelData,
         formats: &[ExportFormat],
         output_path: &str,
