@@ -191,6 +191,10 @@ async fn render_tiles_to_grid(
 // Level Generation Commands
 
 #[tauri::command]
+#[expect(
+    clippy::significant_drop_tightening,
+    reason = "MutexGuard held across async Tauri command; lock_result binding is intentional"
+)]
 async fn generate_bsp_level(
     params: BSPGenerationParams,
     state: State<'_, std::sync::Mutex<AppState>>,
@@ -201,7 +205,7 @@ async fn generate_bsp_level(
         Ok(level_data) => {
             // Update application state
             let __lock_result = state.lock();
-            let mut app_state = match __lock_result { Ok(g) => g, Err(e) => e.into_inner()(e) };
+            let mut app_state = match __lock_result { Ok(g) => g, Err(e) => e.into_inner() };
                         app_state.spatial_index.clear();
             for obj in &level_data.objects {
                 app_state.spatial_index.insert(&obj.id, &obj.transform);
@@ -222,6 +226,10 @@ async fn generate_bsp_level(
 }
 
 #[tauri::command]
+#[expect(
+    clippy::significant_drop_tightening,
+    reason = "MutexGuard held across async Tauri command; lock_result binding is intentional"
+)]
 async fn generate_wfc_level(
     params: WFCGenerationParams,
     state: State<'_, std::sync::Mutex<AppState>>,
@@ -233,7 +241,7 @@ async fn generate_wfc_level(
         Ok(level_data) => {
             // Update application state
             let __lock_result = state.lock();
-            let mut app_state = match __lock_result { Ok(g) => g, Err(e) => e.into_inner()(e) };
+            let mut app_state = match __lock_result { Ok(g) => g, Err(e) => e.into_inner() };
                         app_state.spatial_index.clear();
             for obj in &level_data.objects {
                 app_state.spatial_index.insert(&obj.id, &obj.transform);
@@ -289,23 +297,32 @@ async fn export_level(
 }
 
 #[tauri::command]
+#[expect(
+    clippy::significant_drop_tightening,
+    reason = "MutexGuard held across async Tauri command; lock_result binding is intentional"
+)]
 async fn query_objects_in_bounds(
     bounds: BoundingBox,
     state: State<'_, std::sync::Mutex<AppState>>,
 ) -> Result<Vec<String>, String> {
-    let app_state = match state.lock() { Ok(g) => g, Err(e) => e.into_inner() };
+    let __lock_result = state.lock();
+    let app_state = match __lock_result { Ok(g) => g, Err(e) => e.into_inner() };
     let object_ids = app_state.spatial_index.query_bounds(&bounds);
     Ok(object_ids)
 }
 
 #[tauri::command]
+#[expect(
+    clippy::significant_drop_tightening,
+    reason = "MutexGuard held across async Tauri command; lock_result binding is intentional"
+)]
 async fn update_object_transform(
     object_id: String,
     transform: Transform3D,
     state: State<'_, std::sync::Mutex<AppState>>,
 ) -> Result<(), String> {
     let __lock_result = state.lock();
-    let mut app_state = match __lock_result { Ok(g) => g, Err(e) => e.into_inner()(e) };
+    let mut app_state = match __lock_result { Ok(g) => g, Err(e) => e.into_inner() };
     if let Some(ref mut level) = app_state.current_level {
         if let Some(obj) = level.objects.iter_mut().find(|o| o.id == object_id) {
             obj.transform = transform.clone();
@@ -321,10 +338,15 @@ async fn update_object_transform(
 }
 
 #[tauri::command]
+#[expect(
+    clippy::significant_drop_tightening,
+    reason = "MutexGuard held across async Tauri command; lock_result binding is intentional"
+)]
 async fn get_current_level(
     state: State<'_, std::sync::Mutex<AppState>>,
 ) -> Result<Option<LevelData>, String> {
-    let app_state = match state.lock() { Ok(g) => g, Err(e) => e.into_inner() };
+    let __lock_result = state.lock();
+    let app_state = match __lock_result { Ok(g) => g, Err(e) => e.into_inner() };
     Ok(app_state.current_level.clone())
 }
 
@@ -342,6 +364,10 @@ async fn save_level_to_file(level_data: LevelData, file_path: String) -> Result<
 }
 
 #[tauri::command]
+#[expect(
+    clippy::significant_drop_tightening,
+    reason = "MutexGuard held across async Tauri command; lock_result binding is intentional"
+)]
 async fn load_level_from_file(
     file_path: String,
     state: State<'_, std::sync::Mutex<AppState>>,
@@ -356,7 +382,7 @@ async fn load_level_from_file(
 
     // Update application state
     let __lock_result = state.lock();
-    let mut app_state = match __lock_result { Ok(g) => g, Err(e) => e.into_inner()(e) };
+    let mut app_state = match __lock_result { Ok(g) => g, Err(e) => e.into_inner() };
     app_state.spatial_index.clear();
     for obj in &level_data.objects {
         app_state.spatial_index.insert(&obj.id, &obj.transform);

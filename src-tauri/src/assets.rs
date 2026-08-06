@@ -42,6 +42,10 @@ impl AssetDatabaseState {
 }
 
 #[tauri::command]
+#[expect(
+    clippy::significant_drop_tightening,
+    reason = "MutexGuard held across async Tauri command; lock_result binding is intentional"
+)]
 pub async fn initialize_asset_database(app_handle: tauri::AppHandle) -> Result<(), String> {
     info!("Initializing asset database");
 
@@ -68,7 +72,7 @@ pub async fn initialize_asset_database(app_handle: tauri::AppHandle) -> Result<(
     // Store scanner in app state
     let state: tauri::State<AssetDatabaseState> = app_handle.state();
     let __lock_result = state.scanner.lock();
-    let mut scanner_lock = match __lock_result { Ok(g) => g, Err(e) => std::sync::PoisonError::into_inner(e)(e) };
+    let mut scanner_lock = match __lock_result { Ok(g) => g, Err(e) => e.into_inner() };
     *scanner_lock = Some(scanner);
 
     info!("Asset database initialized successfully");
@@ -76,12 +80,16 @@ pub async fn initialize_asset_database(app_handle: tauri::AppHandle) -> Result<(
 }
 
 #[tauri::command]
+#[expect(
+    clippy::significant_drop_tightening,
+    reason = "MutexGuard held across async Tauri command; lock_result binding is intentional"
+)]
 pub async fn scan_assets_database(app_handle: tauri::AppHandle) -> Result<ScanResult, String> {
     info!("Starting comprehensive asset database scan");
 
     let state: tauri::State<AssetDatabaseState> = app_handle.state();
     let __lock_result = state.scanner.lock();
-    let mut scanner_guard = match __lock_result { Ok(g) => g, Err(e) => std::sync::PoisonError::into_inner(e)(e) };
+    let mut scanner_guard = match __lock_result { Ok(g) => g, Err(e) => e.into_inner() };
 
     let scanner = scanner_guard
         .as_mut()
@@ -111,12 +119,17 @@ pub async fn scan_assets_database(app_handle: tauri::AppHandle) -> Result<ScanRe
 }
 
 #[tauri::command]
+#[expect(
+    clippy::significant_drop_tightening,
+    reason = "MutexGuard held across async Tauri command; lock_result binding is intentional"
+)]
 pub async fn search_assets_database(
     params: AssetSearchParams,
     app_handle: tauri::AppHandle,
 ) -> Result<Vec<AssetSearchResult>, String> {
     let state: tauri::State<AssetDatabaseState> = app_handle.state();
-    let scanner_guard = match state.scanner.lock() { Ok(g) => g, Err(e) => std::sync::PoisonError::into_inner(e) };
+    let __lock_result = state.scanner.lock();
+    let scanner_guard = match __lock_result { Ok(g) => g, Err(e) => e.into_inner() };
 
     let scanner = scanner_guard
         .as_ref()
@@ -135,11 +148,16 @@ pub async fn search_assets_database(
 }
 
 #[tauri::command]
+#[expect(
+    clippy::significant_drop_tightening,
+    reason = "MutexGuard held across async Tauri command; lock_result binding is intentional"
+)]
 pub async fn get_asset_database_stats(
     app_handle: tauri::AppHandle,
 ) -> Result<DatabaseStats, String> {
     let state: tauri::State<AssetDatabaseState> = app_handle.state();
-    let scanner_guard = match state.scanner.lock() { Ok(g) => g, Err(e) => std::sync::PoisonError::into_inner(e) };
+    let __lock_result = state.scanner.lock();
+    let scanner_guard = match __lock_result { Ok(g) => g, Err(e) => e.into_inner() };
 
     let scanner = scanner_guard
         .as_ref()
@@ -151,11 +169,16 @@ pub async fn get_asset_database_stats(
 }
 
 #[tauri::command]
+#[expect(
+    clippy::significant_drop_tightening,
+    reason = "MutexGuard held across async Tauri command; lock_result binding is intentional"
+)]
 pub async fn get_asset_collections(
     app_handle: tauri::AppHandle,
 ) -> Result<Vec<database::Collection>, String> {
     let state: tauri::State<AssetDatabaseState> = app_handle.state();
-    let scanner_guard = match state.scanner.lock() { Ok(g) => g, Err(e) => std::sync::PoisonError::into_inner(e) };
+    let __lock_result = state.scanner.lock();
+    let scanner_guard = match __lock_result { Ok(g) => g, Err(e) => e.into_inner() };
 
     let scanner = scanner_guard
         .as_ref()
