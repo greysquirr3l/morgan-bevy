@@ -5,7 +5,7 @@
 //!
 //! This crate provides the Tauri backend for the Morgan-Bevy editor, handling:
 //! - Asset management and scanning
-//! - Spatial indexing for 3D operations  
+//! - Spatial indexing for 3D operations
 //! - BSP and WFC procedural generation algorithms
 //! - Export system for multiple formats (JSON, RON, Rust code)
 //! - File I/O and project management
@@ -520,6 +520,11 @@ fn main() {
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_shell::init())
+        // Auto-updater (T68). Pulls artifacts from GitHub Releases
+        // per tauri.conf.json's `plugins.updater` block. Users are
+        // notified in-app via the standard Tauri dialog; restart to
+        // apply.
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .manage(std::sync::Mutex::new(AppState::default()))
         .manage(AssetDatabaseState::new())
         .invoke_handler(tauri::generate_handler![

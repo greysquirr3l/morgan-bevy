@@ -143,7 +143,7 @@ export function useKeyboardShortcuts() {
             event.preventDefault()
             // Select all objects
             const { setSelectedObjects } = useEditorStore.getState()
-            const allObjectIds = Object.keys(sceneObjects)
+            const allObjectIds = Array.from(sceneObjects.keys())
             setSelectedObjects(allObjectIds)
             console.log('Select all objects:', allObjectIds.length)
             break
@@ -180,7 +180,7 @@ export function useKeyboardShortcuts() {
             if (event.shiftKey) {
               // Ctrl+Shift+G: Ungroup
               if (selectedObjects.length === 1) {
-                const obj = sceneObjects[selectedObjects[0]]
+                const obj = sceneObjects.get(selectedObjects[0])
                 if (obj && obj.type === 'group') {
                   const command = new UngroupCommand(obj.id)
                   command.execute()
@@ -225,11 +225,11 @@ export function useKeyboardShortcuts() {
           case 'n':
             event.preventDefault()
             // Ctrl+N: New Scene
-            if (Object.keys(sceneObjects).length > 0) {
+            if (Array.from(sceneObjects.keys()).length > 0) {
               const confirmClear = window.confirm('Are you sure? This will clear the current scene.')
               if (confirmClear) {
                 useEditorStore.setState({
-                  sceneObjects: {},
+                  sceneObjects: new Map(),
                   selectedObjects: [],
                   undoHistory: [],
                   redoHistory: [],
@@ -239,7 +239,7 @@ export function useKeyboardShortcuts() {
               }
             } else {
               useEditorStore.setState({
-                sceneObjects: {},
+                sceneObjects: new Map(),
                 selectedObjects: [],
                 undoHistory: [],
                 redoHistory: [],

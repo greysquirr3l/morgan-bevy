@@ -22,7 +22,7 @@ export default function PrefabManager() {
   const { selectedObjects, sceneObjects, executeCommand } = useEditorStore()
 
   const getSelectedObjectsData = () => {
-    return selectedObjects.map(id => sceneObjects[id]).filter(Boolean)
+    return selectedObjects.map(id => sceneObjects.get(id)).filter(Boolean)
   }
 
   const savePrefab = () => {

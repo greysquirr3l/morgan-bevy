@@ -19,14 +19,14 @@ export default function FileMenu({ isOpen, onClose, position, onManualSave }: Fi
   if (!isOpen) return null
 
   const handleNewScene = () => {
-    if (Object.keys(sceneObjects).length > 0) {
+    if (Array.from(sceneObjects.keys()).length > 0) {
       const confirmClear = window.confirm('Are you sure? This will clear the current scene.')
       if (!confirmClear) return
     }
     
     // Clear scene and reset to default
     useEditorStore.setState({
-      sceneObjects: {},
+      sceneObjects: new Map(),
       selectedObjects: [],
       undoHistory: [],
       redoHistory: [],
@@ -78,7 +78,7 @@ export default function FileMenu({ isOpen, onClose, position, onManualSave }: Fi
           version: '1.0.0',
           editor: 'Morgan-Bevy',
           exportedAt: new Date().toISOString(),
-          objectCount: Object.keys(sceneObjects).length,
+          objectCount: Array.from(sceneObjects.keys()).length,
           layerCount: layers.length
         },
         scene: {
@@ -329,7 +329,7 @@ export default function FileMenu({ isOpen, onClose, position, onManualSave }: Fi
         {/* Scene Info */}
         <div className="border-t border-editor-border my-1" />
         <div className="px-3 py-2 text-xs text-editor-textMuted">
-          <div>Objects: {Object.keys(sceneObjects).length}</div>
+          <div>Objects: {Array.from(sceneObjects.keys()).length}</div>
           <div>Layers: {layers.length}</div>
         </div>
       </div>

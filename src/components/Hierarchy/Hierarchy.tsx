@@ -50,7 +50,7 @@ export default function Hierarchy({ hideHeader = false }: HierarchyProps) {
   const handleObjectDoubleClick = (id: string) => {
     // Start rename mode
     setRenamingId(id)
-    setRenameValue(sceneObjects[id]?.name || '')
+    setRenameValue(sceneObjects.get(id)?.name || '')
   }
 
   const handleRenameComplete = (id: string) => {
@@ -68,7 +68,7 @@ export default function Hierarchy({ hideHeader = false }: HierarchyProps) {
 
   const toggleObjectVisibility = (id: string, event: React.MouseEvent) => {
     event.stopPropagation()
-    const obj = sceneObjects[id]
+    const obj = sceneObjects.get(id)
     if (obj) {
       updateObjectVisibility(id, !obj.visible)
     }
@@ -76,7 +76,7 @@ export default function Hierarchy({ hideHeader = false }: HierarchyProps) {
 
   const toggleObjectLock = (id: string, event: React.MouseEvent) => {
     event.stopPropagation()
-    const obj = sceneObjects[id]
+    const obj = sceneObjects.get(id)
     if (obj) {
       updateObjectLock(id, !obj.locked)
     }

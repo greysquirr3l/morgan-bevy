@@ -40,5 +40,18 @@
     "longDescription": "A hybrid 3D level editor for Bevy game development combining procedural generation with professional manual editing capabilities.",
     "shortDescription": "3D Level Editor for Bevy",
     "targets": "all"
+  },
+  "plugins": {
+    "updater": {
+      "active": true,
+      "dialog": true,
+      "endpoints": [
+        "https://github.com/greysquirr3l/morgan-bevy/releases/latest/download/latest.json"
+      ],
+      "pubkey": "REPLACE_WITH_YOUR_TAURI_UPDATER_PUBLIC_KEY",
+      "windows": {
+        "installMode": "passive"
+      }
+    }
   }
 }

@@ -23,7 +23,7 @@ export interface ClipboardData {
 class ClipboardManager {
   private data: ClipboardData | null = null
   private static instance: ClipboardManager
-  
+
   static getInstance(): ClipboardManager {
     if (!ClipboardManager.instance) {
       ClipboardManager.instance = new ClipboardManager()
@@ -35,8 +35,10 @@ class ClipboardManager {
   copy(objectIds: string[]): boolean {
     try {
       const { sceneObjects } = useEditorStore.getState()
-      const objectsToSerialize = objectIds.map(id => sceneObjects[id]).filter(Boolean)
-      
+      const objectsToSerialize = objectIds
+        .map(id => sceneObjects.get(id))
+        .filter((obj): obj is NonNullable<typeof obj> => obj !== undefined)
+
       if (objectsToSerialize.length === 0) {
         return false
       }
@@ -44,12 +46,13 @@ class ClipboardManager {
       this.data = {
         version: '1.0.0',
         timestamp: Date.now(),
-        objects: objectsToSerialize.map(obj => ({...obj})) // Deep copy
+        objects: objectsToSerialize.map(obj => ({ ...obj })), // Deep copy
       }
 
       // Also try to put data in system clipboard as JSON (for cross-session copy/paste)
       if (navigator.clipboard && navigator.clipboard.writeText) {
-        navigator.clipboard.writeText(JSON.stringify(this.data))
+        navigator.clipboard
+          .writeText(JSON.stringify(this.data))
           .catch(err => console.warn('Could not write to system clipboard:', err))
       }
 
@@ -71,7 +74,7 @@ class ClipboardManager {
         try {
           const text = await navigator.clipboard.readText()
           clipboardData = JSON.parse(text)
-          
+
           // Validate clipboard data format
           if (!clipboardData || !clipboardData.objects || !Array.isArray(clipboardData.objects)) {
             throw new Error('Invalid clipboard data format')
@@ -92,9 +95,11 @@ class ClipboardManager {
 
       // Calculate offset for pasted objects
       const offset = position || [2, 0, 0] // Default offset if no position specified
-      
+
       // Find center of copied objects to offset from
-      let centerX = 0, centerY = 0, centerZ = 0
+      let centerX = 0,
+        centerY = 0,
+        centerZ = 0
       clipboardData.objects.forEach(obj => {
         centerX += obj.position[0]
         centerY += obj.position[1]
@@ -110,19 +115,19 @@ class ClipboardManager {
         const newPosition: [number, number, number] = [
           objData.position[0] - centerX + offset[0],
           objData.position[1] - centerY + offset[1],
-          objData.position[2] - centerZ + offset[2]
+          objData.position[2] - centerZ + offset[2],
         ]
 
         // Use store's setState to directly add the object
         useEditorStore.setState((state: any) => {
-          state.sceneObjects[newId] = {
+          state.sceneObjects.set(newId, {
             ...objData,
             id: newId,
             name: `${objData.name}_paste`,
             position: newPosition,
             parentId: undefined, // Clear parent relationships for now
-            children: [] // Clear children relationships for now
-          }
+            children: [], // Clear children relationships for now
+          })
         })
 
         pastedIds.push(newId)
@@ -149,7 +154,7 @@ class ClipboardManager {
     if (!this.data) return null
     return {
       count: this.data.objects.length,
-      timestamp: this.data.timestamp
+      timestamp: this.data.timestamp,
     }
   }
 

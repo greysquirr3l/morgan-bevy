@@ -1,0 +1,161 @@
+# release.yml
+#
+# Builds signed installers for windows, macos, and linux on tag push.
+# Triggered by `workflow_run` on auto-tag.yml (per nick.md — direct
+# `on: push: tags` does NOT fire when the tag is pushed by GITHUB_TOKEN,
+# which is exactly what auto-tag.yml does).
+#
+# A `resolve-tag` job runs first to derive the tag from the upstream
+# workflow_run's head_sha. This handles all trigger types — workflow_run,
+# push, and workflow_dispatch.
+#
+# Build artifacts are uploaded to a GitHub Release. Release notes are
+# generated from CHANGELOG.md.
+#
+# Per AGENTS.md: any CI step that creates commits (none in this workflow)
+# must set the greysquirr3l identity.
+
+name: release
+
+on:
+  workflow_run:
+    workflows: ['auto-tag']
+    types: [completed]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag to release (e.g. v0.5.0). Leave blank for the latest tag.'
+        required: false
+
+permissions:
+  contents: write
+  pull-requests: read
+
+jobs:
+  resolve-tag:
+    name: Resolve tag
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.resolve.outputs.tag }}
+      sha: ${{ steps.resolve.outputs.sha }}
+    steps:
+      - name: Resolve tag from upstream or dispatch input
+        id: resolve
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          DISPATCH_TAG: ${{ inputs.tag }}
+        run: |
+          set -euo pipefail
+          # workflow_dispatch path
+          if [ -n "$DISPATCH_TAG" ]; then
+            echo "tag=$DISPATCH_TAG" >> "$GITHUB_OUTPUT"
+            sha=$(git rev-parse "$DISPATCH_TAG" 2>/dev/null || gh api "repos/$GITHUB_REPOSITORY/git/refs/tags/$DISPATCH_TAG" --jq '.object.sha')
+            echo "sha=$sha" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          # workflow_run path: resolve the tag pushed by auto-tag.
+          # The head_sha of the auto-tag workflow_run is the commit that
+          # was tagged. Find the tag pointing at it.
+          head_sha="${{ github.event.workflow_run.head_sha }}"
+          tag=$(gh api "repos/$GITHUB_REPOSITORY/git/refs/tags" \
+            --jq ".[] | select(.object.sha == \"$head_sha\") | .ref" \
+            | sed 's#refs/tags/##' | head -n 1)
+          if [ -z "$tag" ]; then
+            echo "::error::No tag found for sha $head_sha"
+            exit 1
+          fi
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "sha=$head_sha" >> "$GITHUB_OUTPUT"
+
+  build:
+    name: Build (${{ matrix.target }})
+    needs: resolve-tag
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: x86_64-unknown-linux-gnu
+            os: ubuntu-latest
+            args: ''
+          - target: x86_64-apple-darwin
+            os: macos-latest
+            args: '--target x86_64-apple-darwin'
+          - target: aarch64-apple-darwin
+            os: macos-latest
+            args: '--target aarch64-apple-darwin'
+          - target: x86_64-pc-windows-msvc
+            os: windows-latest
+            args: '--target x86_64-pc-windows-msvc'
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: stable
+          targets: ${{ matrix.target }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Cache cargo
+        uses: Swatin/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+
+      - name: Install frontend deps
+        run: npm ci
+
+      - name: Build tauri app
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # macOS code-sign / notarisation (optional — only set if you have
+          # the matching Apple Developer ID secrets configured).
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          # Windows code-sign (optional).
+          WINDOWS_CERTIFICATE: ${{ secrets.WINDOWS_CERTIFICATE }}
+          WINDOWS_CERTIFICATE_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
+        with:
+          tagName: ${{ needs.resolve-tag.outputs.tag }}
+          releaseName: 'Morgan-Bevy ${{ needs.resolve-tag.outputs.tag }}'
+          releaseBody: |
+            See [CHANGELOG.md](https://github.com/${{ github.repository }}/blob/${{ needs.resolve-tag.outputs.tag }}/CHANGELOG.md) for release notes.
+          releaseDraft: true
+          prerelease: false
+          args: ${{ matrix.args }}
+
+  publish:
+    name: Publish release notes
+    needs: [resolve-tag, build]
+    runs-on: ubuntu-latest
+    if: success()
+    steps:
+      - name: Update release body with file list
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ needs.resolve-tag.outputs.tag }}
+        run: |
+          # Pull the latest CHANGELOG section matching this tag from the
+          # repository and prepend it to the draft release.
+          body=$(gh api "repos/$GITHUB_REPOSITORY/contents/CHANGELOG.md?ref=$TAG" --jq '.content' | base64 -d)
+          # Extract the section for this tag (between "# [...]" headers).
+          section=$(printf '%s\n' "$body" | awk -v tag="## \[$TAG" '
+            $0 ~ tag { found=1 }
+            found && /^## \[/ && $0 !~ tag { exit }
+            found { print }
+          ')
+          if [ -n "$section" ]; then
+            gh release edit "$TAG" --notes "$section"
+            echo "Updated release notes for $TAG"
+          else
+            echo "::warning::No CHANGELOG section found for $TAG"
+          fi

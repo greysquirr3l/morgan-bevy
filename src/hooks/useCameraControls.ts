@@ -27,7 +27,7 @@ export const useCameraControls = () => {
     const sphere = new THREE.Sphere()
 
     selectedObjects.forEach((id: string) => {
-      const obj = sceneObjects[id]
+      const obj = sceneObjects.get(id)
       if (obj) {
         const center = new THREE.Vector3(...obj.position)
         const size = new THREE.Vector3(...obj.scale)

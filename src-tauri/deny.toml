@@ -83,6 +83,11 @@ allow = [
     "CC0-1.0",
     "0BSD",
     "MIT-0",
+    # CDLA-Permissive-2.0 — used by `webpki-root-certs` (transitive via
+    # `rustls-platform-verifier` from `tauri-plugin-updater`'s HTTPS cert
+    # store). Permissive community-data license, not OSI-approved but
+    # equivalent in obligations to Apache-2.0. Safe to ship.
+    "CDLA-Permissive-2.0",
 ]
 confidence-threshold = 0.8
 

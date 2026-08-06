@@ -97,7 +97,11 @@ export class DeleteObjectCommand implements Command {
 
   constructor(objectId: string) {
     const { sceneObjects } = useEditorStore.getState()
-    this.objectData = sceneObjects[objectId]
+    const data = sceneObjects.get(objectId)
+    if (!data) {
+      throw new Error(`DeleteObjectCommand: object ${objectId} not found`)
+    }
+    this.objectData = data
     this.description = `Delete ${this.objectData.name}`
   }
 
@@ -108,9 +112,9 @@ export class DeleteObjectCommand implements Command {
 
   undo(): void {
     // Manually restore object to store using setState
-    useEditorStore.setState((state) => {
+    useEditorStore.setState(state => {
       // Use immer's draft to safely modify the state
-      state.sceneObjects[this.objectData.id] = this.objectData
+      state.sceneObjects.set(this.objectData.id, this.objectData)
     })
   }
 }
@@ -216,7 +220,7 @@ export class UngroupCommand implements Command {
   constructor(groupId: string) {
     this.groupId = groupId
     const state = useEditorStore.getState()
-    this.groupData = { ...state.sceneObjects[groupId] }
+    this.groupData = { ...state.sceneObjects.get(groupId) }
     this.childIds = this.groupData.children || []
     this.description = `Ungroup ${this.childIds.length} object(s)`
   }
@@ -228,17 +232,18 @@ export class UngroupCommand implements Command {
 
   undo(): void {
     // Recreate the group
-    useEditorStore.setState((state) => {
+    useEditorStore.setState(state => {
       // Restore group object
-      state.sceneObjects[this.groupId] = { ...this.groupData }
-      
+      state.sceneObjects.set(this.groupId, { ...this.groupData })
+
       // Re-parent children
       this.childIds.forEach(childId => {
-        if (state.sceneObjects[childId]) {
-          state.sceneObjects[childId].parentId = this.groupId
+        const child = state.sceneObjects.get(childId)
+        if (child) {
+          child.parentId = this.groupId
         }
       })
-      
+
       // Select the group
       state.selectedObjects = [this.groupId]
     })
@@ -253,7 +258,10 @@ export class PasteCommand implements Command {
   }> = []
   public description: string
 
-  constructor(private clipboardData: any, private position?: [number, number, number]) {
+  constructor(
+    private clipboardData: any,
+    private position?: [number, number, number]
+  ) {
     this.description = `Paste ${clipboardData?.objects?.length || 0} object(s)`
   }
 
@@ -264,9 +272,11 @@ export class PasteCommand implements Command {
 
     // Calculate offset for pasted objects
     const offset = this.position || [2, 0, 0]
-    
+
     // Find center of copied objects to offset from
-    let centerX = 0, centerY = 0, centerZ = 0
+    let centerX = 0,
+      centerY = 0,
+      centerZ = 0
     this.clipboardData.objects.forEach((obj: any) => {
       centerX += obj.position[0]
       centerY += obj.position[1]
@@ -283,7 +293,7 @@ export class PasteCommand implements Command {
         const newPosition: [number, number, number] = [
           objData.position[0] - centerX + offset[0],
           objData.position[1] - centerY + offset[1],
-          objData.position[2] - centerZ + offset[2]
+          objData.position[2] - centerZ + offset[2],
         ]
 
         const newObjectData = {
@@ -292,10 +302,10 @@ export class PasteCommand implements Command {
           name: `${objData.name}_paste`,
           position: newPosition,
           parentId: undefined,
-          children: []
+          children: [],
         }
 
-        state.sceneObjects[newId] = newObjectData
+        state.sceneObjects.set(newId, newObjectData)
         this.pastedObjects.push({ id: newId, objectData: newObjectData })
       }
     })
@@ -304,7 +314,7 @@ export class PasteCommand implements Command {
   undo(): void {
     useEditorStore.setState((state: any) => {
       this.pastedObjects.forEach(({ id }) => {
-        delete state.sceneObjects[id]
+        state.sceneObjects.delete(id)
       })
     })
   }
@@ -321,32 +331,32 @@ export class SaveCommand implements Command {
 
   execute(): void {
     const state = useEditorStore.getState()
-    
+
     // Create save data
     this.savedData = {
       metadata: {
         version: '1.0.0',
         editor: 'Morgan-Bevy',
         savedAt: new Date().toISOString(),
-        objectCount: Object.keys(state.sceneObjects).length,
-        layerCount: state.layers.length
+        objectCount: state.sceneObjects.size,
+        layerCount: state.layers.length,
       },
       scene: {
-        objects: state.sceneObjects,
+        objects: Array.from(state.sceneObjects.entries()),
         layers: state.layers,
         activeLayer: state.activeLayer,
         settings: {
           gridSize: state.gridSize,
           snapToGrid: state.snapToGrid,
           transformMode: state.transformMode,
-          coordinateSpace: state.coordinateSpace
-        }
-      }
+          coordinateSpace: state.coordinateSpace,
+        },
+      },
     }
 
     // Save to localStorage
     localStorage.setItem('morgan-bevy-scene', JSON.stringify(this.savedData))
-    
+
     // Also create downloadable backup
     const blob = new Blob([JSON.stringify(this.savedData, null, 2)], { type: 'application/json' })
     const url = URL.createObjectURL(blob)
@@ -375,7 +385,7 @@ export class LoadCommand implements Command {
 
   execute(): void {
     const state = useEditorStore.getState()
-    
+
     // Store current state for undo
     this.previousState = {
       sceneObjects: { ...state.sceneObjects },
@@ -386,8 +396,8 @@ export class LoadCommand implements Command {
         gridSize: state.gridSize,
         snapToGrid: state.snapToGrid,
         transformMode: state.transformMode,
-        coordinateSpace: state.coordinateSpace
-      }
+        coordinateSpace: state.coordinateSpace,
+      },
     }
 
     // Load new scene data
@@ -397,7 +407,7 @@ export class LoadCommand implements Command {
         state.layers = this.newData.scene.layers || state.layers
         state.activeLayer = this.newData.scene.activeLayer || 'default'
         state.selectedObjects = []
-        
+
         if (this.newData.scene.settings) {
           state.gridSize = this.newData.scene.settings.gridSize || state.gridSize
           state.snapToGrid = this.newData.scene.settings.snapToGrid || false

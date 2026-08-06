@@ -51,7 +51,7 @@ export default function TransformGizmos({ selectedObjects }: TransformGizmosProp
       let validObjects = 0
       
       selectedObjects.forEach(objectId => {
-        const obj = sceneObjects[objectId]
+        const obj = sceneObjects.get(objectId)
         if (obj) {
           center.add(new THREE.Vector3(...obj.position))
           validObjects++
@@ -105,7 +105,7 @@ export default function TransformGizmos({ selectedObjects }: TransformGizmosProp
   const handleMouseDown = () => {
     // Store initial transforms for undo/redo
     selectedObjects.forEach(objectId => {
-      const obj = sceneObjects[objectId]
+      const obj = sceneObjects.get(objectId)
       if (obj) {
         initialTransforms.current[objectId] = {
           position: [...obj.position] as [number, number, number],
@@ -182,7 +182,7 @@ export default function TransformGizmos({ selectedObjects }: TransformGizmosProp
   const handleMouseUp = () => {
     // Create undo/redo commands for the transform operations
     selectedObjects.forEach(objectId => {
-      const obj = sceneObjects[objectId]
+      const obj = sceneObjects.get(objectId)
       const initial = initialTransforms.current[objectId]
       
       if (obj && initial) {
@@ -211,7 +211,7 @@ export default function TransformGizmos({ selectedObjects }: TransformGizmosProp
       let validObjects = 0
       
       selectedObjects.forEach(objectId => {
-        const obj = sceneObjects[objectId]
+        const obj = sceneObjects.get(objectId)
         if (obj) {
           center.add(new THREE.Vector3(...obj.position))
           validObjects++

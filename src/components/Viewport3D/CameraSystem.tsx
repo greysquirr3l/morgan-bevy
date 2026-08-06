@@ -237,7 +237,7 @@ export function useCameraControls() {
     let maxX = -Infinity, maxY = -Infinity, maxZ = -Infinity
 
     selectedObjects.forEach(id => {
-      const obj = sceneObjects[id]
+      const obj = sceneObjects.get(id)
       if (obj && obj.position) {
         const [x, y, z] = obj.position
         minX = Math.min(minX, x)

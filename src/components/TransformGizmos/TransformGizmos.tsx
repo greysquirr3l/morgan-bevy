@@ -34,7 +34,7 @@ export default function TransformGizmos() {
       if (!selectedObjectId || !selectedMesh) return
       
       // Store initial transform state for undo
-      const currentObject = sceneObjects[selectedObjectId]
+      const currentObject = sceneObjects.get(selectedObjectId)
       if (currentObject) {
         initialTransformRef.current = {
           position: [...currentObject.position] as [number, number, number],

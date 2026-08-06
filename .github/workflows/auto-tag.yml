@@ -1,0 +1,63 @@
+# auto-tag.yml
+#
+# Triggers on CI success (`workflow_run` of ci.yml) and pushes a new
+# semver tag if HEAD is a release commit.
+#
+# Per nick.md: tag pushes via GITHUB_TOKEN do NOT trigger downstream
+# `on: push: tags` workflows (loop prevention). The downstream release
+# workflow chains off this one via `on: workflow_run`, which sidesteps
+# the loop-prevention block.
+#
+# The git identity is explicitly set to greysquirr3l (per AGENTS.md).
+
+name: auto-tag
+
+on:
+  workflow_run:
+    workflows: ['ci']
+    types: [completed]
+
+permissions:
+  contents: write
+  pull-requests: read
+
+jobs:
+  auto-tag:
+    name: Auto-tag on CI green
+    if: >-
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.head_branch == 'main'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Configure git identity (greysquirr3l)
+        # AGENTS.md: never leave the default github-actions[bot] identity in
+        # any commit.
+        run: |
+          git config user.name 'greysquirr3l'
+          git config user.email '[email protected]'
+
+      - name: Read latest tag
+        id: read-tag
+        run: |
+          latest=$(git tag --sort=-v:refname | head -n 1 || echo 'v0.0.0')
+          echo "latest=$latest" >> "$GITHUB_OUTPUT"
+
+      - name: Compute next tag
+        id: next-tag
+        run: |
+          latest="${{ steps.read-tag.outputs.latest }}"
+          next=$(LATEST_TAG="$latest" bash scripts/next-tag.sh)
+          echo "next=$next" >> "$GITHUB_OUTPUT"
+
+      - name: Push tag
+        env:
+          TAG: ${{ steps.next-tag.outputs.next }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          git tag "$TAG" HEAD
+          git push origin "$TAG"
