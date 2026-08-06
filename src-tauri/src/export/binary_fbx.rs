@@ -225,6 +225,14 @@ impl Default for FbxBuilder {
 
 #[cfg(test)]
 mod tests {
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::indexing_slicing,
+    clippy::items_after_statements,
+    reason = "test code is allowed to use unwrap/expect for concise assertions"
+)]
+
     use super::*;
 
     fn magic_offset(buf: &[u8]) -> Option<usize> {

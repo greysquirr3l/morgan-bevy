@@ -141,7 +141,7 @@ impl BSPGenerator {
         let bsp_tree = generator.generate_bsp_tree(root_room, params)?;
 
         // Convert BSP tree to rooms and corridors
-        generator.place_rooms(&bsp_tree, params)?;
+        generator.place_rooms(&bsp_tree)?;
         generator.create_corridors(&bsp_tree, params)?;
 
         // Convert grid to 3D objects
@@ -158,7 +158,7 @@ impl BSPGenerator {
                 "Collision".to_string(),
             ],
             generation_seed: Some(seed),
-            generation_params: Some(serde_json::to_value(&params)?),
+            generation_params: Some(serde_json::to_value(params)?),
             bounds: BoundingBox {
                 min: [0.0, 0.0, 0.0],
                 max: [
@@ -257,7 +257,7 @@ impl BSPGenerator {
         Ok(node)
     }
 
-    fn place_rooms(&mut self, node: &BSPNode, params: &BSPGenerationParams) -> Result<()> {
+    fn place_rooms(&mut self, node: &BSPNode) -> Result<()> {
         if let Some(ref room) = node.room {
             // Place floor tiles
             for y in room.y..room.y + room.height {
@@ -288,10 +288,10 @@ impl BSPGenerator {
 
         // Recursively process children
         if let Some(ref left) = node.left {
-            self.place_rooms(left, params)?;
+            self.place_rooms(left)?;
         }
         if let Some(ref right) = node.right {
-            self.place_rooms(right, params)?;
+            self.place_rooms(right)?;
         }
 
         Ok(())
@@ -307,7 +307,7 @@ impl BSPGenerator {
             if let (Some(left_room), Some(right_room)) =
                 (Self::find_room_in(left), Self::find_room_in(right))
             {
-                self.connect_rooms(&left_room, &right_room, params)?;
+                self.connect_rooms(&left_room, &right_room, params);
             }
         }
 
@@ -338,7 +338,7 @@ impl BSPGenerator {
         room1: &Room,
         room2: &Room,
         params: &BSPGenerationParams,
-    ) -> Result<()> {
+    ) {
         let rng = self.rng_mut();
 
         // Find connection points (random points on room edges)
@@ -357,7 +357,6 @@ impl BSPGenerator {
             params.corridor_width,
         );
 
-        Ok(())
     }
 
     fn create_l_corridor(&mut self, x1: u32, y1: u32, x2: u32, y2: u32, width: u32) {

@@ -523,22 +523,29 @@ async fn browse_for_texture() -> Result<Vec<String>, String> {
         .set_title("Select Texture Files")
         .pick_files();
 
-    if let Some(file_paths) = paths {
-        let path_strings: Vec<String> = file_paths
-            .iter()
-            .map(|p| p.to_string_lossy().to_string())
-            .collect();
-        info!("Selected {} texture file(s)", path_strings.len());
-        Ok(path_strings)
-    } else {
-        info!("Texture selection cancelled by user");
-        Ok(vec![])
-    }
+    paths.map_or_else(
+        || {
+            info!("Texture selection cancelled by user");
+            Ok(vec![])
+        },
+        |file_paths| {
+            let path_strings: Vec<String> = file_paths
+                .iter()
+                .map(|p| p.to_string_lossy().to_string())
+                .collect();
+            info!("Selected {} texture file(s)", path_strings.len());
+            Ok(path_strings)
+        },
+    )
 }
 
 #[expect(
     clippy::expect_used,
     reason = "main() is the process entry point; if Tauri fails to start, the user has no UI to report errors"
+)]
+#[expect(
+    clippy::large_stack_frames,
+    reason = "tauri::generate_context!() expands to a large config struct; this is the documented pattern"
 )]
 fn main() {
     env_logger::init();

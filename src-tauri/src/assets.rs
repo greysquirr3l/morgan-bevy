@@ -226,10 +226,10 @@ pub fn browse_assets_folder() -> Result<String, String> {
         .set_title("Select Assets Folder")
         .pick_folder();
 
-    match folder {
-        Some(path) => Ok(path.to_string_lossy().to_string()),
-        None => Err("No folder selected".to_string()),
-    }
+    folder.map_or_else(
+        || Err("No folder selected".to_string()),
+        |path| Ok(path.to_string_lossy().to_string()),
+    )
 }
 
 #[tauri::command]

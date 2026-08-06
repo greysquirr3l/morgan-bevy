@@ -1332,6 +1332,10 @@ impl Theme {
         }
     }
 
+    #[expect(
+        clippy::too_many_lines,
+        reason = "castle() defines a full theme palette; data-driven refactor would obscure intent"
+    )]
     pub fn castle() -> Self {
         let mut materials = HashMap::new();
         materials.insert(

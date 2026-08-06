@@ -39,7 +39,7 @@ impl AssetScanner {
         reason = "&Path is the public API; callers should pass &PathBuf as &Path"
     )]
     pub fn scan_directory(
-        &mut self,
+        &self,
         assets_dir: &Path,
         progress_callback: Option<Box<dyn Fn(ScanProgress) + Send + Sync>>,
     ) -> Result<ScanResult, Box<dyn std::error::Error>> {
@@ -139,7 +139,7 @@ impl AssetScanner {
     /// Discover all asset files in a directory tree
     fn discover_assets(root_path: &Path) -> Result<Vec<PathBuf>, Box<dyn std::error::Error>> {
         let mut assets = Vec::new();
-        Self::walk_directory(root_path.as_ref(), &mut assets)?;
+        Self::walk_directory(root_path, &mut assets)?;
         Ok(assets)
     }
 
@@ -250,13 +250,13 @@ impl AssetScanner {
 
     /// Rescan a specific collection
     #[allow(dead_code)]
-    pub fn rescan_collection<P: AsRef<Path>>(
-        &mut self,
-        assets_dir: P,
+    pub fn rescan_collection(
+        &self,
+        assets_dir: &Path,
         collection_name: &str,
         progress_callback: Option<Box<dyn Fn(ScanProgress) + Send + Sync>>,
     ) -> Result<ScanResult, Box<dyn std::error::Error>> {
-        let collection_path = assets_dir.as_ref().join(collection_name);
+        let collection_path = assets_dir.join(collection_name);
 
         if !collection_path.exists() {
             return Err(format!(
@@ -315,6 +315,14 @@ pub struct DatabaseStats {
 
 #[cfg(test)]
 mod tests {
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::indexing_slicing,
+    clippy::items_after_statements,
+    reason = "test code is allowed to use unwrap/expect for concise assertions"
+)]
+
     use super::*;
     use tempfile::tempdir;
 
@@ -328,10 +336,14 @@ mod tests {
     }
 
     #[test]
+    #[expect(
+        clippy::unwrap_used,
+        reason = "tests use unwrap for concise failure messages"
+    )]
     fn test_is_asset_file() {
         let temp_dir = tempdir().unwrap();
         let db_path = temp_dir.path().join("test_assets.db");
-        let scanner = AssetScanner::new(&db_path).unwrap();
+        let _scanner = AssetScanner::new(&db_path).unwrap();
 
         assert!(AssetScanner::is_asset_file(Path::new("test.fbx")));
         assert!(AssetScanner::is_asset_file(Path::new("texture.png")));

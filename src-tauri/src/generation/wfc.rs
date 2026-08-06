@@ -65,7 +65,7 @@ impl Direction {
     }
 
     #[allow(dead_code)]
-    pub const fn opposite(&self) -> Self {
+    pub const fn opposite(self) -> Self {
         match self {
             Self::North => Self::South,
             Self::South => Self::North,
@@ -641,6 +641,14 @@ impl WFCGenerator {
 
 #[cfg(test)]
 mod tests {
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::indexing_slicing,
+    clippy::items_after_statements,
+    reason = "test code is allowed to use unwrap/expect for concise assertions"
+)]
+
     use super::*;
 
     #[test]
@@ -649,7 +657,7 @@ mod tests {
             let params = WFCGenerationParams::default();
             let mut generator = WFCGenerator::new();
 
-            let result = generator.generate(params).await;
+            let result = generator.generate(&params);
             assert!(result.is_ok());
 
             let level_data = result.unwrap();
