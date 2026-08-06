@@ -446,7 +446,7 @@ impl WFCGenerator {
             None
         } else {
             let idx = self.rng.gen_range(0..candidates.len());
-            Some(candidates[idx])
+            candidates.get(idx).copied()
         }
     }
 
@@ -480,7 +480,7 @@ impl WFCGenerator {
         }
 
         // Fallback to first tile
-        Some(weighted_tiles[0].0.clone())
+        Some(weighted_tiles.first()?.0.clone())
     }
 
     fn propagate_constraints(&mut self, start_x: usize, start_y: usize) -> bool {

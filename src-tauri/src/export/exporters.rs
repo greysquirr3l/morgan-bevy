@@ -254,12 +254,12 @@ impl LevelExporter {
                 bytes.len()
             ));
         }
-        if &bytes[..MAGIC.len()] != MAGIC {
+        if bytes.get(..MAGIC.len()) != Some(MAGIC) {
             return Err(anyhow::anyhow!("FBX output missing magic header"));
         }
         // Footer-magic check (last 16 bytes).
         let footer_start = bytes.len() - FOOTER_MAGIC.len();
-        if &bytes[footer_start..] != FOOTER_MAGIC {
+        if bytes.get(footer_start..) != Some(FOOTER_MAGIC) {
             return Err(anyhow::anyhow!("FBX output missing footer magic"));
         }
         // Version check: the writer's footer layout (after all top-level
