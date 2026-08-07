@@ -135,12 +135,18 @@ pub enum SystemsMode {
 /// this once before emitting and uses it to gate the systems +
 /// plugin + companion types it writes into the generated file.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[allow(clippy::struct_excessive_bools, reason = "MarkerSet is a bitset")]
 pub struct MarkerSet {
     pub door: bool,
     pub collectible: bool,
     pub spawn_point: bool,
     pub trigger_volume: bool,
     pub nav_mesh_hint: bool,
+    // T91: four new markers (light, animation, audio, vfx).
+    pub light: bool,
+    pub animation: bool,
+    pub audio: bool,
+    pub vfx: bool,
 }
 
 impl MarkerSet {
@@ -153,6 +159,10 @@ impl MarkerSet {
             spawn_point: false,
             trigger_volume: false,
             nav_mesh_hint: false,
+            light: false,
+            animation: false,
+            audio: false,
+            vfx: false,
         }
     }
 
@@ -166,6 +176,10 @@ impl MarkerSet {
             && !self.spawn_point
             && !self.trigger_volume
             && !self.nav_mesh_hint
+            && !self.light
+            && !self.animation
+            && !self.audio
+            && !self.vfx
     }
 
     /// Returns `true` if any marker is set.
@@ -179,7 +193,7 @@ impl MarkerSet {
     /// emitters should preserve it.
     #[must_use]
     pub fn system_names(&self) -> Vec<&'static str> {
-        let mut out = Vec::with_capacity(5);
+        let mut out = Vec::with_capacity(9);
         if self.door {
             out.push("door_proximity_open");
         }
@@ -194,6 +208,18 @@ impl MarkerSet {
         }
         if self.nav_mesh_hint {
             out.push("nav_mesh_collector");
+        }
+        if self.light {
+            out.push("light_observer");
+        }
+        if self.animation {
+            out.push("animation_player_observer");
+        }
+        if self.audio {
+            out.push("audio_observer");
+        }
+        if self.vfx {
+            out.push("vfx_observer");
         }
         out
     }
@@ -215,17 +241,28 @@ impl Plugin for MorganLevelSystems {
         // consumers can read them.
         app.add_message::<PickupEvent>()
             .add_message::<TriggerActivated>()
+            .add_message::<AudioStartEvent>()
+            .add_message::<AudioEndEvent>()
             .init_resource::<PlayerStart>()
             .init_resource::<NavMeshSource>()
+            .init_resource::<Lights>()
+            .init_resource::<Animations>()
+            .init_resource::<VfxEntries>()
             // The door proximity, collectible pickup, and nav mesh
             // collector are plain systems.
             .add_systems(
                 Update,
                 (door_proximity_open, collectible_pickup, nav_mesh_collector),
             )
-            // The spawn point observer is a Bevy 0.19 observer
-            // triggered on `On<Add, SpawnPoint>`.
-            .add_observer(spawn_point_observer);
+            // Observers: fired on `On<Add, MarkerType>`. The editor
+            // gates each observer by the corresponding `MarkerSet`
+            // bit; the unconditional `add_observer` here keeps the
+            // plugin self-contained for tests.
+            .add_observer(spawn_point_observer)
+            .add_observer(light_observer)
+            .add_observer(animation_player_observer)
+            .add_observer(audio_observer)
+            .add_observer(vfx_observer);
     }
 }
 
@@ -334,6 +371,141 @@ pub fn nav_mesh_collector(
     hints: Query<Entity, With<NavMeshHint>>,
 ) {
     source.surfaces = hints.iter().map(EntityId::from_entity).collect();
+}
+
+// ---------------------------------------------------------------------------
+// T91 systems — lighting, animation, audio, VFX.
+//
+// These systems stay **dep-light** by design: the companion crate
+// does not pull in `bevy_color`, `bevy_animation`, `bevy_sprite`,
+// etc. The observer records the marker's data into a `Scene`
+// resource (or emits a `Message`) that the consumer's downstream
+// project reads via their own Bevy setup. The marker components
+// themselves (`Light`, `Animation`, `Audio`, `Vfx`) are the
+// source of truth; the observer just makes them discoverable.
+// ---------------------------------------------------------------------------
+
+use crate::markers::{Animation, Audio, Light, Vfx};
+
+/// Message fired when an `Audio` marker is added. Carries the
+/// path + volume + looping bit so the consumer can wire an
+/// `AudioPlayer` themselves.
+#[derive(Message, Debug, Clone, Serialize, Deserialize)]
+pub struct AudioStartEvent {
+    pub entity: EntityId,
+    pub path: String,
+    pub volume: f32,
+    pub looping: bool,
+}
+
+/// Message fired when an `Audio::OneShot` marker is added.
+///
+/// The companion observer emits this in addition to
+/// `AudioStartEvent` so the consumer can despawn the entity
+/// when the buffer finishes (or schedule a follow-up cleanup).
+#[derive(Message, Debug, Clone, Serialize, Deserialize)]
+pub struct AudioEndEvent {
+    pub entity: EntityId,
+}
+
+/// `On<Add, Light>` observer — records every light marker in a
+/// `Lights` resource.
+///
+/// The consumer reads the resource on their own schedule to attach
+/// the matching Bevy light component. We don't directly attach
+/// `PointLight` / `SpotLight` / `DirectionalLight` here because that
+/// would require pulling `bevy_pbr` into the companion crate.
+#[derive(Resource, Debug, Default, Clone, Serialize, Deserialize)]
+pub struct Lights {
+    pub entries: Vec<(EntityId, Light)>,
+}
+
+#[expect(
+    clippy::needless_pass_by_value,
+    reason = "On<Add, T> is a Bevy system param; it must be by-value"
+)]
+pub fn light_observer(add: On<Add, Light>, lights: Query<&Light>, mut resources: ResMut<Lights>) {
+    if let Ok(light) = lights.get(add.entity) {
+        resources.entries.push((EntityId::from_entity(add.entity), light.clone()));
+    }
+}
+
+/// `On<Add, Animation>` observer — records the animation in a
+/// resource. The consumer wires `bevy_animation::AnimationPlayer`
+/// from their own setup.
+#[derive(Resource, Debug, Default, Clone, Serialize, Deserialize)]
+pub struct Animations {
+    pub entries: Vec<(EntityId, Animation)>,
+}
+
+#[expect(
+    clippy::needless_pass_by_value,
+    reason = "On<Add, T> is a Bevy system param; it must be by-value"
+)]
+pub fn animation_player_observer(
+    add: On<Add, Animation>,
+    animations: Query<&Animation>,
+    mut resources: ResMut<Animations>,
+) {
+    if let Ok(anim) = animations.get(add.entity) {
+        resources.entries.push((EntityId::from_entity(add.entity), anim.clone()));
+    }
+}
+
+/// `On<Add, Audio>` observer — fires events for the consumer's
+/// audio system to react to.
+///
+/// For `Ambient` sources: a single `AudioStartEvent`. For `OneShot`:
+/// an `AudioStartEvent` followed by an `AudioEndEvent` so the
+/// consumer can despawn the entity when the buffer finishes.
+#[expect(
+    clippy::needless_pass_by_value,
+    reason = "On<Add, T> is a Bevy system param; it must be by-value"
+)]
+pub fn audio_observer(
+    add: On<Add, Audio>,
+    audios: Query<&Audio>,
+    mut start_events: MessageWriter<AudioStartEvent>,
+    mut end_events: MessageWriter<AudioEndEvent>,
+) {
+    if let Ok(audio) = audios.get(add.entity) {
+        start_events.write(AudioStartEvent {
+            entity: EntityId::from_entity(add.entity),
+            path: audio.path().to_string(),
+            volume: audio.volume(),
+            looping: audio.is_looping(),
+        });
+        if audio.is_oneshot() {
+            end_events.write(AudioEndEvent {
+                entity: EntityId::from_entity(add.entity),
+            });
+        }
+    }
+}
+
+/// `On<Add, Vfx>` observer — records the VFX marker in a
+/// resource.
+///
+/// The consumer reads the resource to attach the matching Bevy
+/// component: a `Sprite` for `Billboard`, or a particle handle
+/// for `Particle` (e.g. via `bevy_hanabi`).
+#[derive(Resource, Debug, Default, Clone, Serialize, Deserialize)]
+pub struct VfxEntries {
+    pub entries: Vec<(EntityId, Vfx)>,
+}
+
+#[expect(
+    clippy::needless_pass_by_value,
+    reason = "On<Add, T> is a Bevy system param; it must be by-value"
+)]
+pub fn vfx_observer(
+    add: On<Add, Vfx>,
+    vfxes: Query<&Vfx>,
+    mut resources: ResMut<VfxEntries>,
+) {
+    if let Ok(vfx) = vfxes.get(add.entity) {
+        resources.entries.push((EntityId::from_entity(add.entity), vfx.clone()));
+    }
 }
 
 #[cfg(test)]

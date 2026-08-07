@@ -27,15 +27,18 @@ use serde::{Deserialize, Serialize};
 
 pub mod components;
 pub mod loader;
+pub mod markers;
 pub mod plugin;
 pub mod systems;
 
 pub use components::{Collectible, Door, Interactable, NavMeshHint, SpawnPoint, TriggerVolume};
 pub use loader::{level_bounds, load_level, load_level_world, AssetServerLike, HandleId};
+pub use markers::{Animation, Audio, Light, Vfx};
 pub use plugin::MorganLevelPlugin;
 pub use systems::{
-    EntityId, MarkerSet, MorganLevelSystems, NavMeshSource, Open, PickupEvent, Player, PlayerStart,
-    SystemsMode, TriggerActivated,
+    Animations, AudioEndEvent, AudioStartEvent, EntityId, Lights, MarkerSet, MorganLevelSystems,
+    NavMeshSource, Open, PickupEvent, Player, PlayerStart, SystemsMode, TriggerActivated,
+    VfxEntries,
 };
 
 /// Re-export of `bevy_app` so consumers can `use bevy_morgan_integration::App`
