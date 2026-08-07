@@ -221,7 +221,7 @@ export class UngroupCommand implements Command {
     this.groupId = groupId
     const state = useEditorStore.getState()
     this.groupData = { ...state.sceneObjects.get(groupId) }
-    this.childIds = this.groupData.children || []
+    this.childIds = this.groupData.children ?? []
     this.description = `Ungroup ${this.childIds.length} object(s)`
   }
 

@@ -225,7 +225,7 @@ export default function GenerationPanel(_props: GenerationPanelProps) {
   return (
     <div className="px-3 py-2">
       <div className="flex justify-between items-start mb-3">
-        <div className="text-xs text-gray-400">Objects: {lastGenerated?.objects.length || 0}</div>
+        <div className="text-xs text-gray-400">Objects: {lastGenerated?.objects.length ?? 0}</div>
       </div>
 
       {/* Algorithm Selection */}
