@@ -14,6 +14,7 @@ import PerformanceTestPanel from '@/components/PerformanceTestPanel'
 import PrefabManager from '@/components/PrefabManager/PrefabManager'
 import Viewport3D from '@/components/Viewport3D/Viewport3D'
 import { CameraProvider, useCameraContext } from '@/contexts/CameraContext'
+import { useAutoSave } from '@/hooks/useAutoSave'
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts'
 import { useResizablePanels } from '@/hooks/useResizablePanels'
 import { useEditorStore, useSceneObjects } from '@/store/editorStore'
@@ -419,6 +420,11 @@ function AppContent() {
 
   // Initialize keyboard shortcuts
   useKeyboardShortcuts()
+
+  // Auto-save: snapshot the editor state to localStorage every 60s
+  // (with a 5s debounce on burst mutations). The store is the source
+  // of truth; the snapshot is a recovery aid, not a feature.
+  useAutoSave()
 
   // Initialize resizable panels
   const { panels, handleMouseDown, toggleLeftPanel, toggleRightPanel, getCenterWidth } =
