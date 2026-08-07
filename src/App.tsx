@@ -17,6 +17,7 @@ import { CameraProvider, useCameraContext } from '@/contexts/CameraContext'
 import { useAutoSave } from '@/hooks/useAutoSave'
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts'
 import { useResizablePanels } from '@/hooks/useResizablePanels'
+import { useStartupFile } from '@/hooks/useStartupFile'
 import { useEditorStore, useSceneObjects } from '@/store/editorStore'
 import { PanelLeft, PanelRight } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
@@ -428,6 +429,12 @@ function AppContent() {
   // (with a 5s debounce on burst mutations). The store is the source
   // of truth; the snapshot is a recovery aid, not a feature.
   useAutoSave()
+
+  // Startup file: load the `.morgan` file the OS handed us at launch
+  // (registered file association → `morgan://open-project` event).
+  // Mounted alongside `useAutoSave`; both are zero-state side-effect
+  // hooks at the root of the editor.
+  useStartupFile()
 
   // Initialize resizable panels
   const { panels, handleMouseDown, toggleLeftPanel, toggleRightPanel, getCenterWidth } =

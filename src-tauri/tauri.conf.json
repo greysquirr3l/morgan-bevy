@@ -39,7 +39,24 @@
     ],
     "longDescription": "A hybrid 3D level editor for Bevy game development combining procedural generation with professional manual editing capabilities.",
     "shortDescription": "3D Level Editor for Bevy",
-    "targets": "all"
+    "targets": "all",
+    "fileAssociations": [
+      {
+        "ext": ["morgan"],
+        "name": "Morgan-Bevy Project",
+        "description": "A Morgan-Bevy 3D level project file",
+        "mimeType": "application/x-morgan-project",
+        "role": "Editor",
+        "rank": "Owner"
+      },
+      {
+        "ext": ["morgan-project"],
+        "name": "Morgan-Bevy Project (legacy)",
+        "description": "A Morgan-Bevy 3D level project file (legacy extension)",
+        "mimeType": "application/x-morgan-project",
+        "role": "Editor"
+      }
+    ]
   },
   "plugins": {
     "updater": {

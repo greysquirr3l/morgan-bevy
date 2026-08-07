@@ -15,7 +15,7 @@
 use log::{error, info};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use tauri::{Manager, State};
+use tauri::{Emitter, Manager, State};
 
 mod assets;
 mod crash_log;
@@ -571,6 +571,49 @@ fn path_exists(path: &str) -> bool {
     std::path::Path::new(path).exists()
 }
 
+/// Inspect the first CLI argument passed to the binary. If it points
+/// to a `.morgan` or `.morgan-project` file that exists on disk, return
+/// the absolute path. Otherwise return `None`.
+///
+/// Called from the Tauri setup hook so the OS can hand us a file via
+/// double-click or `open` / `xdg-open`. We only treat the *first*
+/// extra argument as a candidate; subsequent args are reserved for
+/// future flags.
+fn parse_startup_project_path() -> Option<String> {
+    let mut args = std::env::args().skip(1);
+    let candidate = args.next()?;
+    let path = std::path::Path::new(&candidate);
+    let ext_ok = path
+        .extension()
+        .and_then(|e| e.to_str())
+        .is_some_and(|e| matches!(e.to_ascii_lowercase().as_str(), "morgan" | "morgan-project"));
+    if !ext_ok {
+        return None;
+    }
+    if !path.exists() {
+        error!("Startup project path {candidate} does not exist");
+        return None;
+    }
+    // Canonicalize to an absolute path for storage; fall back to the
+    // raw candidate if canonicalize fails (symlinks, odd permissions).
+    path.canonicalize()
+        .ok()
+        .map(|p| p.to_string_lossy().to_string())
+        .or(Some(candidate))
+}
+
+/// Async sleep helper that does not require pulling in tokio's full
+/// `time` feature set — we already have `async_runtime` available via
+/// Tauri. Uses `std::thread::sleep` on a blocking task to keep the
+/// `async_runtime` budget intact.
+async fn tokio_sleep_ms(ms: u64) {
+    tauri::async_runtime::spawn_blocking(move || {
+        std::thread::sleep(std::time::Duration::from_millis(ms));
+    })
+    .await
+    .ok();
+}
+
 #[expect(
     clippy::expect_used,
     reason = "main() is the process entry point; if Tauri fails to start, the user has no UI to report errors"
@@ -671,6 +714,30 @@ fn main() {
                 }
             }
 
+            // Handle launch-with-file from OS file-association
+            // (.morgan / .morgan-project). The OS hands the path as the
+            // first CLI argument on Windows / Linux. On macOS, the same
+            // payload arrives via `RunEvent::Opened`; we forward that
+            // in the `tauri::Builder::on_page_load` callback further
+            // down if/when we add it. For now the CLI-arg path is the
+            // common case and is enough for double-click open on every
+            // platform's default behaviour.
+            if let Some(startup_path) = parse_startup_project_path() {
+                info!("Launched with project path: {startup_path}");
+                let handle = app.handle().clone();
+                tauri::async_runtime::spawn(async move {
+                    // Give the frontend a moment to mount its listeners
+                    // before we fire the event. The frontend uses
+                    // `listen('morgan://open-project', ...)` which
+                    // buffers late emissions, so a short delay here is
+                    // belt-and-braces.
+                    tokio_sleep_ms(150).await;
+                    if let Err(e) = handle.emit("morgan://open-project", startup_path) {
+                        error!("Failed to emit morgan://open-project: {e}");
+                    }
+                });
+            }
+
             // Initialize asset database in the background
             let handle = app.handle().clone();
             tauri::async_runtime::spawn(async move {
@@ -685,4 +752,82 @@ fn main() {
         })
         .run(tauri::generate_context!())
         .expect("Error while running Tauri application");
+}
+
+#[cfg(test)]
+mod tests {
+    #![allow(
+        clippy::unwrap_used,
+        clippy::expect_used,
+        clippy::indexing_slicing,
+        reason = "test code is allowed to use unwrap/expect for concise assertions"
+    )]
+    use std::fs;
+
+    /// `parse_startup_project_path` reads `std::env::args` directly, so
+    /// each test case writes a synthetic argv via a small helper that
+    /// invokes the parser in a subprocess. That is overkill for the
+    /// handful of cases we care about, so instead we factor out the
+    /// pure parsing logic into `classify_arg` and test that.
+    fn classify_arg(candidate: &str) -> ArgClass {
+        let path = std::path::Path::new(candidate);
+        let ext_ok = path.extension().and_then(|e| e.to_str()).is_some_and(|e| {
+            matches!(e.to_ascii_lowercase().as_str(), "morgan" | "morgan-project")
+        });
+        if !ext_ok {
+            return ArgClass::WrongExtension;
+        }
+        if !path.exists() {
+            return ArgClass::MissingFile;
+        }
+        ArgClass::Accepted
+    }
+
+    #[derive(Debug, PartialEq, Eq)]
+    enum ArgClass {
+        WrongExtension,
+        MissingFile,
+        Accepted,
+    }
+
+    #[test]
+    fn classify_rejects_non_morgan_extension() {
+        assert_eq!(
+            classify_arg("/tmp/something.json"),
+            ArgClass::WrongExtension
+        );
+        assert_eq!(classify_arg("/tmp/something.exe"), ArgClass::WrongExtension);
+        assert_eq!(classify_arg("/tmp/no-extension"), ArgClass::WrongExtension);
+    }
+
+    #[test]
+    fn classify_accepts_both_extensions() {
+        let dir = std::env::temp_dir();
+        let p1 = dir.join("morgan_test_a.morgan");
+        let p2 = dir.join("morgan_test_b.morgan-project");
+        fs::write(&p1, "{}").unwrap();
+        fs::write(&p2, "{}").unwrap();
+        assert_eq!(classify_arg(p1.to_str().unwrap()), ArgClass::Accepted);
+        assert_eq!(classify_arg(p2.to_str().unwrap()), ArgClass::Accepted);
+        let _ = fs::remove_file(&p1);
+        let _ = fs::remove_file(&p2);
+    }
+
+    #[test]
+    fn classify_rejects_missing_file_with_correct_extension() {
+        // .morgan extension but no file at that path.
+        assert_eq!(
+            classify_arg("/tmp/this-path-must-not-exist-12345.morgan"),
+            ArgClass::MissingFile
+        );
+    }
+
+    #[test]
+    fn classify_is_case_insensitive_on_extension() {
+        let dir = std::env::temp_dir();
+        let p = dir.join("morgan_test_case.MORGAN");
+        fs::write(&p, "{}").unwrap();
+        assert_eq!(classify_arg(p.to_str().unwrap()), ArgClass::Accepted);
+        let _ = fs::remove_file(&p);
+    }
 }

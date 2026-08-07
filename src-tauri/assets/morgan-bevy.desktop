@@ -1,0 +1,14 @@
+[Desktop Entry]
+Type=Application
+Version=1.0
+Name=Morgan-Bevy
+GenericName=3D Level Editor
+Comment=Hybrid Rust + React 3D level editor for Bevy game development with procedural generation (BSP/WFC)
+Exec=morgan-bevy %F
+Icon=morgan-bevy
+Terminal=false
+StartupNotify=true
+StartupWMClass=Morgan-Bevy
+Categories=Development;Graphics;3DGraphics;
+MimeType=application/x-morgan-project;
+Keywords=3D;Level;Editor;Bevy;Game;Procedural;BSP;WFC;
