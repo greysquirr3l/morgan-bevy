@@ -18,11 +18,11 @@ automated audit + manual review.
 
 ## Findings & fixes
 
-| # | Severity | Finding | Fix |
-|---|----------|---------|-----|
-| 1 | low | `localStorage` keys used `morgan-bevy-foo` (hyphen) instead of `morgan-bevy.foo` (dot). The dot convention is documented in the spec; the validator treats the hyphen as a violation. Affected keys: `morgan-bevy-debug-logs`, `morgan-bevy-autosave`, `morgan-bevy-store-debug`, `morgan-bevy-setViewportMode-calls`, `morgan-bevy-scene`. All renamed to the dotted form. 11 callsite changes across `App.tsx`, `useAutoSave.ts`, `editorStore.ts`, `commands.ts`. | Renamed |
-| 2 | informational | SQL `format!` calls in `database.rs` look like injection vectors to a naive grep but are all static SQL literals (e.g. `format!("PRAGMA table_info({table})")` with non-user `table` variable). The audit now distinguishes interpolated variables from literal text. | Audit rewritten |
-| 3 | informational | The audit's Tauri command type check was matching multi-line signatures incorrectly, producing false positives like `export_level_simple: level_data: LevelData, format: String, output_path: Option<String>`. The regex now matches an entire signature spanning newlines. | Audit rewritten |
+| #   | Severity      | Finding                                                                                                                                                                                                                                                                                                                                                                                                                                                              | Fix             |
+| --- | ------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------- |
+| 1   | low           | `localStorage` keys used `morgan-bevy-foo` (hyphen) instead of `morgan-bevy.foo` (dot). The dot convention is documented in the spec; the validator treats the hyphen as a violation. Affected keys: `morgan-bevy-debug-logs`, `morgan-bevy-autosave`, `morgan-bevy-store-debug`, `morgan-bevy-setViewportMode-calls`, `morgan-bevy-scene`. All renamed to the dotted form. 11 callsite changes across `App.tsx`, `useAutoSave.ts`, `editorStore.ts`, `commands.ts`. | Renamed         |
+| 2   | informational | SQL `format!` calls in `database.rs` look like injection vectors to a naive grep but are all static SQL literals (e.g. `format!("PRAGMA table_info({table})")` with non-user `table` variable). The audit now distinguishes interpolated variables from literal text.                                                                                                                                                                                                | Audit rewritten |
+| 3   | informational | The audit's Tauri command type check was matching multi-line signatures incorrectly, producing false positives like `export_level_simple: level_data: LevelData, format: String, output_path: Option<String>`. The regex now matches an entire signature spanning newlines.                                                                                                                                                                                          | Audit rewritten |
 
 ## Automated audit coverage
 
@@ -52,18 +52,18 @@ automated audit + manual review.
 
 ## OWASP Top 10 cross-reference
 
-| OWASP item | Concerned | Status |
-|------------|-----------|--------|
-| A01 — Broken Access Control | n/a (desktop, no server) | n/a |
-| A02 — Cryptographic Failures | Tauri HTTPS for the updater endpoint | Under T68 |
-| A03 — Injection | SQL injection, IPC path traversal | **Covered** — see above |
-| A04 — Insecure Design | Threat model | Out of scope (no public surface) |
-| A05 — Security Misconfiguration | CSP, tauri.conf.json `security` block | **Covered** — `csp: null` is intentional (the desktop shell doesn't need a CSP since the renderer is the only source of HTML, and the audit asserts no `innerHTML` writes) |
-| A06 — Vulnerable Components | cargo-deny with fresh advisories | **Covered** by T66 |
-| A07 — Identification & Auth Failures | n/a (no login) | n/a |
-| A08 — Software & Data Integrity | cargo-deny, npm ci, tauri-action build | **Covered** — T66 + T65 |
-| A09 — Logging Failures | `crash_log.rs` (T69) | **Covered** |
-| A10 — SSRF | n/a (desktop, no fetch-from-user) | n/a |
+| OWASP item                           | Concerned                              | Status                                                                                                                                                                     |
+| ------------------------------------ | -------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| A01 — Broken Access Control          | n/a (desktop, no server)               | n/a                                                                                                                                                                        |
+| A02 — Cryptographic Failures         | Tauri HTTPS for the updater endpoint   | Under T68                                                                                                                                                                  |
+| A03 — Injection                      | SQL injection, IPC path traversal      | **Covered** — see above                                                                                                                                                    |
+| A04 — Insecure Design                | Threat model                           | Out of scope (no public surface)                                                                                                                                           |
+| A05 — Security Misconfiguration      | CSP, tauri.conf.json `security` block  | **Covered** — `csp: null` is intentional (the desktop shell doesn't need a CSP since the renderer is the only source of HTML, and the audit asserts no `innerHTML` writes) |
+| A06 — Vulnerable Components          | cargo-deny with fresh advisories       | **Covered** by T66                                                                                                                                                         |
+| A07 — Identification & Auth Failures | n/a (no login)                         | n/a                                                                                                                                                                        |
+| A08 — Software & Data Integrity      | cargo-deny, npm ci, tauri-action build | **Covered** — T66 + T65                                                                                                                                                    |
+| A09 — Logging Failures               | `crash_log.rs` (T69)                   | **Covered**                                                                                                                                                                |
+| A10 — SSRF                           | n/a (desktop, no fetch-from-user)      | n/a                                                                                                                                                                        |
 
 ## Cross-reference to other tasks
 
@@ -77,13 +77,13 @@ automated audit + manual review.
 
 ## Sign-off
 
-| Gate | Result |
-|------|--------|
-| `just lint-web` | 0 errors, 15 warnings |
-| `just test-web` | 268 / 268 vitest pass |
-| `just test-rust` | 48 / 48 cargo pass |
-| `cargo deny` | 0 errors across bans / licenses / sources / advisories |
-| Audit self-test | 10 / 10 vitest pass |
+| Gate             | Result                                                 |
+| ---------------- | ------------------------------------------------------ |
+| `just lint-web`  | 0 errors, 15 warnings                                  |
+| `just test-web`  | 268 / 268 vitest pass                                  |
+| `just test-rust` | 48 / 48 cargo pass                                     |
+| `cargo deny`     | 0 errors across bans / licenses / sources / advisories |
+| Audit self-test  | 10 / 10 vitest pass                                    |
 
 Test count: 276 vitest (was 215 before this session) + 48 cargo.
 The security audit is fast (~30 ms total) and runs on every
