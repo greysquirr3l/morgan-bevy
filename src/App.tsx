@@ -20,6 +20,7 @@ import { useResizablePanels } from '@/hooks/useResizablePanels'
 import { useEditorStore, useSceneObjects } from '@/store/editorStore'
 import { PanelLeft, PanelRight } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
+import HelpModal from './components/HelpModal'
 import Inspector from './components/Inspector/Inspector'
 
 // Robust debug logging system
@@ -348,6 +349,7 @@ function AppContent() {
   const [showSaveIndicator, setShowSaveIndicator] = useState(false)
   const [activeMenu, setActiveMenu] = useState<string | null>(null)
   const [menuPosition, setMenuPosition] = useState({ x: 0, y: 0 })
+  const [helpOpen, setHelpOpen] = useState(false)
   const lastViewportChangeRef = useRef(0)
 
   // Keyboard shortcuts modal
@@ -500,7 +502,7 @@ function AppContent() {
         break
       case 'toggle-grid':
         // Focus the viewport and toggle grid
-        (document.querySelector('.viewport-container') as HTMLElement)?.focus()
+        void (document.querySelector('.viewport-container') as HTMLElement | null)?.focus()
         break
       case 'reset-camera':
         cameraControlsRef.current?.resetView()
@@ -558,10 +560,11 @@ function AppContent() {
       case 'keyboard-shortcuts':
         openKeyboardShortcuts()
         break
+      case 'help':
+        setHelpOpen(true)
+        break
       case 'about':
-        alert(
-          'Morgan-Bevy 3D Level Editor\n\nA hybrid Rust/TypeScript 3D level editor for Bevy game development that combines procedural generation with professional manual editing capabilities.'
-        )
+        setHelpOpen(true)
         break
     }
     closeMenus()
@@ -1221,6 +1224,12 @@ function AppContent() {
               <div className="py-1">
                 <button
                   className="w-full text-left px-4 py-2 text-sm hover:bg-editor-hover"
+                  onClick={() => handleHelpAction('help')}
+                >
+                  Help &amp; Documentation
+                </button>
+                <button
+                  className="w-full text-left px-4 py-2 text-sm hover:bg-editor-hover"
                   onClick={() => handleHelpAction('keyboard-shortcuts')}
                 >
                   Keyboard Shortcuts
@@ -1277,6 +1286,9 @@ function AppContent() {
 
       {/* Keyboard Shortcuts Modal */}
       <KeyboardShortcutsModal isOpen={keyboardShortcutsOpen} onClose={closeKeyboardShortcuts} />
+
+      {/* Help Modal */}
+      <HelpModal isOpen={helpOpen} onClose={() => setHelpOpen(false)} />
     </div>
   )
 }
