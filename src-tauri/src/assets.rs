@@ -1,7 +1,7 @@
 pub mod database;
 pub mod scanner;
 
-use database::AssetSearchResult;
+use database::{AssetRecord, AssetSearchResult, SmartFolderFilter};
 use log::info;
 use scanner::{AssetScanner, DatabaseStats, ScanProgress, ScanResult};
 use serde::{Deserialize, Serialize};
@@ -203,6 +203,164 @@ pub async fn get_asset_collections(
         .database()
         .get_collections()
         .map_err(|e| format!("Failed to get collections: {e}"))
+}
+
+// ─── T32: tags, favorites, smart folders ────────────────────────────────
+
+/// T32: attach a tag to an asset. Empty / whitespace tags are no-ops.
+#[tauri::command]
+#[expect(
+    clippy::significant_drop_tightening,
+    reason = "MutexGuard held across async Tauri command; matches existing scan_assets_database pattern"
+)]
+pub async fn add_asset_tag(
+    asset_id: i64,
+    tag_name: String,
+    app_handle: tauri::AppHandle,
+) -> Result<(), String> {
+    let state: tauri::State<AssetDatabaseState> = app_handle.state();
+    let __lock_result = state.scanner.lock();
+    let scanner_guard = match __lock_result {
+        Ok(g) => g,
+        Err(e) => e.into_inner(),
+    };
+    let scanner = scanner_guard
+        .as_ref()
+        .ok_or("Asset database not initialized")?;
+    scanner
+        .database()
+        .add_asset_tag(asset_id, &tag_name)
+        .map_err(|e| format!("Failed to add tag: {e}"))
+}
+
+/// T32: detach a tag from an asset.
+#[tauri::command]
+#[expect(
+    clippy::significant_drop_tightening,
+    reason = "MutexGuard held across async Tauri command; matches existing scan_assets_database pattern"
+)]
+pub async fn remove_asset_tag(
+    asset_id: i64,
+    tag_name: String,
+    app_handle: tauri::AppHandle,
+) -> Result<(), String> {
+    let state: tauri::State<AssetDatabaseState> = app_handle.state();
+    let __lock_result = state.scanner.lock();
+    let scanner_guard = match __lock_result {
+        Ok(g) => g,
+        Err(e) => e.into_inner(),
+    };
+    let scanner = scanner_guard
+        .as_ref()
+        .ok_or("Asset database not initialized")?;
+    scanner
+        .database()
+        .remove_asset_tag(asset_id, &tag_name)
+        .map_err(|e| format!("Failed to remove tag: {e}"))
+}
+
+/// T32: every distinct tag with a use count, ordered most-used first.
+/// Used to power the autocomplete UI in the asset browser.
+#[tauri::command]
+#[expect(
+    clippy::significant_drop_tightening,
+    reason = "MutexGuard held across async Tauri command; matches existing scan_assets_database pattern"
+)]
+pub async fn list_all_asset_tags(
+    app_handle: tauri::AppHandle,
+) -> Result<Vec<(String, i64)>, String> {
+    let state: tauri::State<AssetDatabaseState> = app_handle.state();
+    let __lock_result = state.scanner.lock();
+    let scanner_guard = match __lock_result {
+        Ok(g) => g,
+        Err(e) => e.into_inner(),
+    };
+    let scanner = scanner_guard
+        .as_ref()
+        .ok_or("Asset database not initialized")?;
+    scanner
+        .database()
+        .list_all_tags()
+        .map_err(|e| format!("Failed to list tags: {e}"))
+}
+
+/// T32: flip the favorite flag on an asset; returns the new value.
+#[tauri::command]
+#[expect(
+    clippy::significant_drop_tightening,
+    reason = "MutexGuard held across async Tauri command; matches existing scan_assets_database pattern"
+)]
+pub async fn toggle_asset_favorite(
+    asset_id: i64,
+    app_handle: tauri::AppHandle,
+) -> Result<bool, String> {
+    let state: tauri::State<AssetDatabaseState> = app_handle.state();
+    let __lock_result = state.scanner.lock();
+    let scanner_guard = match __lock_result {
+        Ok(g) => g,
+        Err(e) => e.into_inner(),
+    };
+    let scanner = scanner_guard
+        .as_ref()
+        .ok_or("Asset database not initialized")?;
+    scanner
+        .database()
+        .toggle_asset_favorite(asset_id)
+        .map_err(|e| format!("Failed to toggle favorite: {e}"))
+}
+
+/// T32: save (create or update) a named smart folder. The filter is
+/// serialized as JSON in the `SQLite` row, so adding fields to
+/// `SmartFolderFilter` is a non-breaking change for old databases.
+#[tauri::command]
+#[expect(
+    clippy::significant_drop_tightening,
+    reason = "MutexGuard held across async Tauri command; matches existing scan_assets_database pattern"
+)]
+pub async fn save_smart_folder(
+    name: String,
+    filter: SmartFolderFilter,
+    app_handle: tauri::AppHandle,
+) -> Result<i64, String> {
+    let state: tauri::State<AssetDatabaseState> = app_handle.state();
+    let __lock_result = state.scanner.lock();
+    let scanner_guard = match __lock_result {
+        Ok(g) => g,
+        Err(e) => e.into_inner(),
+    };
+    let scanner = scanner_guard
+        .as_ref()
+        .ok_or("Asset database not initialized")?;
+    scanner
+        .database()
+        .save_smart_folder(&name, &filter)
+        .map_err(|e| format!("Failed to save smart folder: {e}"))
+}
+
+/// T32: evaluate a smart folder's filter and return the matching
+/// asset records. Computed at query time (no materialised view).
+#[tauri::command]
+#[expect(
+    clippy::significant_drop_tightening,
+    reason = "MutexGuard held across async Tauri command; matches existing scan_assets_database pattern"
+)]
+pub async fn evaluate_smart_folder(
+    filter: SmartFolderFilter,
+    app_handle: tauri::AppHandle,
+) -> Result<Vec<AssetRecord>, String> {
+    let state: tauri::State<AssetDatabaseState> = app_handle.state();
+    let __lock_result = state.scanner.lock();
+    let scanner_guard = match __lock_result {
+        Ok(g) => g,
+        Err(e) => e.into_inner(),
+    };
+    let scanner = scanner_guard
+        .as_ref()
+        .ok_or("Asset database not initialized")?;
+    scanner
+        .database()
+        .evaluate_smart_folder(&filter)
+        .map_err(|e| format!("Failed to evaluate smart folder: {e}"))
 }
 
 fn find_assets_directory() -> Option<PathBuf> {

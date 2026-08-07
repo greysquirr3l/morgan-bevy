@@ -149,3 +149,92 @@ export interface AssetFilter {
 }
 
 export const ASSET_TYPES: AssetType[] = ['Model', 'Texture', 'Audio', 'Material']
+
+// ─── T32: tags, favorites, smart folders ────────────────────────────────
+
+import { invoke } from '@tauri-apps/api/core'
+
+/** Tag-with-count returned by `list_all_asset_tags`. */
+export interface AssetTagInfo {
+  name: string
+  uses: number
+}
+
+/** A saved smart folder: a name plus a serialised filter. */
+export interface SmartFolder {
+  id: number
+  name: string
+  filter: AssetSmartFolderFilter
+}
+
+/** T32: discriminated shape matching Rust's `SmartFolderFilter`. */
+export interface AssetSmartFolderFilter {
+  asset_type?: string
+  tags?: string[]
+  favorite_only?: boolean
+}
+
+/** T32: attach a tag to an asset. Idempotent — empty tags are no-ops. */
+export async function addAssetTag(assetId: number, tag: string): Promise<void> {
+  await invoke('add_asset_tag', { assetId, tag })
+}
+
+/** T32: detach a tag from an asset. */
+export async function removeAssetTag(assetId: number, tag: string): Promise<void> {
+  await invoke('remove_asset_tag', { assetId, tag })
+}
+
+/** T32: every distinct tag with use-count, ordered most-used first. */
+export async function listAllAssetTags(): Promise<AssetTagInfo[]> {
+  const raw = await invoke<[string, number][]>('list_all_asset_tags')
+  return raw.map(([name, uses]) => ({ name, uses }))
+}
+
+/** T32: flip the favorite flag on an asset; returns the new value. */
+export async function toggleAssetFavorite(assetId: number): Promise<boolean> {
+  return invoke<boolean>('toggle_asset_favorite', { assetId })
+}
+
+/** T32: save (create or update) a smart folder. Returns its row id. */
+export async function saveSmartFolder(
+  name: string,
+  filter: AssetSmartFolderFilter
+): Promise<number> {
+  return invoke<number>('save_smart_folder', { name, filter })
+}
+
+/** T32: evaluate a smart-folder filter and return matching asset records. */
+export async function evaluateSmartFolder(
+  filter: AssetSmartFolderFilter
+): Promise<AssetSearchResult[]> {
+  return invoke<AssetSearchResult[]>('evaluate_smart_folder', { filter })
+}
+
+/**
+ * T32: in-memory equivalent of a smart-folder evaluation — useful
+ * for the asset browser preview without round-tripping through the
+ * Rust side on every keystroke. The Rust path remains the source
+ * of truth for cross-tab consistency.
+ */
+export function matchesFilter(
+  asset: { asset_type?: string; name?: string; path?: string; is_favorite?: boolean },
+  filter: AssetSmartFolderFilter,
+  knownTags: ReadonlySet<string>
+): boolean {
+  if (filter.asset_type && asset.asset_type !== filter.asset_type) {
+    return false
+  }
+  if (filter.favorite_only) {
+    // The frontend mirror of `favorite_only` requires the parent
+    // caller to include `is_favorite` in the asset shape; if the
+    // field is missing we treat the asset as not favourited.
+    const fav = (asset as { is_favorite?: boolean }).is_favorite
+    if (!fav) return false
+  }
+  if (filter.tags && filter.tags.length > 0) {
+    for (const tag of filter.tags) {
+      if (!knownTags.has(tag)) return false
+    }
+  }
+  return true
+}

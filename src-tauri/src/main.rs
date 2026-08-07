@@ -766,6 +766,13 @@ fn main() {
             assets::search_assets_database,
             assets::get_asset_database_stats,
             assets::get_asset_collections,
+            // T32: tags, favorites, smart folders
+            assets::add_asset_tag,
+            assets::remove_asset_tag,
+            assets::list_all_asset_tags,
+            assets::toggle_asset_favorite,
+            assets::save_smart_folder,
+            assets::evaluate_smart_folder,
             // Crash reporting
             crash_log::append_frontend_crash_log,
             // Recent-projects support
