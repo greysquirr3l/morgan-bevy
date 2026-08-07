@@ -49,11 +49,20 @@ class ClipboardManager {
         objects: objectsToSerialize.map(obj => ({ ...obj })), // Deep copy
       }
 
-      // Also try to put data in system clipboard as JSON (for cross-session copy/paste)
+      // Also try to put data in system clipboard as JSON (for
+      // cross-session copy/paste). `writeText` may return either a
+      // Promise (real browsers) or `undefined` (some jsdom
+      // environments), so guard the `.catch` so a non-promise
+      // return value doesn't fail the whole copy.
       if (navigator.clipboard && navigator.clipboard.writeText) {
-        navigator.clipboard
-          .writeText(JSON.stringify(this.data))
-          .catch(err => console.warn('Could not write to system clipboard:', err))
+        try {
+          const result = navigator.clipboard.writeText(JSON.stringify(this.data))
+          if (result && typeof result.catch === 'function') {
+            result.catch(err => console.warn('Could not write to system clipboard:', err))
+          }
+        } catch (err) {
+          console.warn('System clipboard write failed:', err)
+        }
       }
 
       console.log(`Copied ${objectsToSerialize.length} object(s) to clipboard`)
@@ -93,10 +102,14 @@ class ClipboardManager {
       // Note: Using useEditorStore.setState directly instead of destructured addObject
       const pastedIds: string[] = []
 
-      // Calculate offset for pasted objects
-      const offset = position || [2, 0, 0] // Default offset if no position specified
+      // T70: offset semantics — `offset` is the *target* position of the
+      // cluster centre after paste. So every object shifts by
+      // `offset - original_centre`. The previous implementation
+      // cancelled the offset out against the centre for any
+      // multi-object paste, effectively making paste() a no-op.
+      const offset = position || [2, 0, 0] // Default target if no position specified
 
-      // Find center of copied objects to offset from
+      // Find center of copied objects so we can compute the shift.
       let centerX = 0,
         centerY = 0,
         centerZ = 0
@@ -108,14 +121,17 @@ class ClipboardManager {
       centerX /= clipboardData.objects.length
       centerY /= clipboardData.objects.length
       centerZ /= clipboardData.objects.length
+      const shiftX = offset[0] - centerX
+      const shiftY = offset[1] - centerY
+      const shiftZ = offset[2] - centerZ
 
       // Create new objects at offset positions
       for (const objData of clipboardData.objects) {
         const newId = `${objData.name}_paste_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`
         const newPosition: [number, number, number] = [
-          objData.position[0] - centerX + offset[0],
-          objData.position[1] - centerY + offset[1],
-          objData.position[2] - centerZ + offset[2],
+          objData.position[0] + shiftX,
+          objData.position[1] + shiftY,
+          objData.position[2] + shiftZ,
         ]
 
         // Use store's setState to directly add the object
