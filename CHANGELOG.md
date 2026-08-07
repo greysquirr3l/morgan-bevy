@@ -7,6 +7,60 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **In-app help & documentation modal (T59)** — `src/components/HelpModal.tsx`
+  exposes four sections (Getting Started, Procedural Generation, Export &
+  Integration, Keyboard Shortcuts) plus a Resources block linking to Bevy,
+  Tauri, and the GitHub repo. Inline table-of-contents for quick jumping,
+  ARIA `dialog`/`doc-tab` roles, Escape-to-close. Wired from the top-bar
+  `Help & Documentation` menu item and the existing `?` keyboard shortcut.
+
+- **Crash reporting and structured logging (T69)** — `src-tauri/src/crash_log.rs`
+  installs `std::panic::set_hook` writing to `{app_data_dir}/logs/crash.log`
+  with rolling 256 KiB cap and exposes `append_frontend_crash_log` so the
+  renderer can append matching entries. `src/utils/crashHandler.ts`
+  installs `window.error` and `unhandledrejection` listeners forwarding
+  payload, source, and stack. 5 Rust tests + 5 frontend tests cover
+  panic-hook idempotency, rolling capacity, payload validation, and
+  unhandled-rejection surfacing.
+
+- **Auto-save with debounced localStorage snapshots (T20)** —
+  `src/hooks/useAutoSave.ts` debounces 5 s and flushes every 60 s, with a
+  freshness indicator and corrupt-snapshot recovery. 6 vitest cases cover
+  debounce, throttle, schema versioning, and recovery.
+
+- **File menu + recent projects (T21)** — `src/components/FileMenu/FileMenu.tsx`
+  wires New / Open / Save / Save As / Recent Projects / Import / Export /
+  Exit through the Tauri dialog plugin and applies loaded `ProjectData` to
+  the editor store. `src/utils/recentProjects.ts` keeps a deduped
+  `MAX_RECENT = 10` list with `pruneMissingRecents()` cleanup.
+  `src-tauri/src/main.rs` adds `path_exists` and `load_project_from_path`
+  Tauri commands for safe project bootstrap. 5 FileMenu tests + 13
+  recent-projects tests cover ordering, dedupe, prune, persistence, and
+  corruption recovery.
+
+- **Bevy 0.19 documentation (T84/T85)** — `docs/dev/BEVY_0.18_TO_0.19_MIGRATION.md`
+  documents the migration steps from 0.18 to 0.19 (notably the new
+  `TextFont { font_size: FontSize::Px(n), ..default() }` shape), and
+  `docs/dev/bevy-compat.md` codifies the contract that generated Rust
+  source is required to compile against Bevy 0.19.
+
+### Changed
+
+- **Tauri dependency alignment** — Cargo resolves `tauri = "2.11.5"`; the
+  npm `@tauri-apps/*` packages have been moved onto the matching 2.11.x
+  line: `api` 2.11.1, `cli` 2.11.4, `plugin-dialog` 2.7.2, `plugin-fs`
+  2.5.1, `plugin-shell` 2.5.2, `plugin-sql` 2.4.0, plus the newly added
+  `plugin-updater` 2.10.1. Eliminates the previous 2.9.0 ↔ 2.11.5 mismatch
+  that surfaced as missing-CLI warnings under `tauri dev`.
+
+### Fixed
+
+- `App.tsx` no-extra-semi lint error in the `toggle-grid` shortcut
+  branch: replaced the leading `;` IIFE pattern with a `void()` expression
+  to keep the lint profile at 0 errors without an eslint-disable comment.
+
 ### Security
 
 - **cargo-deny supply-chain policy** (`src-tauri/deny.toml`, `scripts/cargo-deny.sh`,
@@ -18,8 +72,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   2024-0420, 2024-0436, 2025-0075, 2025-0080, 2025-0081, 2025-0098, 2025-0100.
   CI must run with fresh advisories (`cargo deny fetch && cargo deny check`) —
   local cache can be stale. Track these and re-verify after every tauri bump.
-
-## [0.4.0] - 2025-11-24 - "Testing Infrastructure & Enhanced UI Release"
 
 ## [0.4.0] - 2025-11-24 - "Testing Infrastructure & Enhanced UI Release"
 
