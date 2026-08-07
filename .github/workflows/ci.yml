@@ -21,6 +21,9 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+  workflow_dispatch:
+    # Allow manual runs from the Actions tab. Useful for verifying a
+    # workflow change before pushing to a feature branch.
 
 # Cancel in-progress runs of the same workflow on the same ref.
 concurrency:
@@ -52,17 +55,20 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          # Node 22 LTS — matches the project baseline documented in
+          # AGENTS.md. The `@types/node` is pinned at ^26 which the
+          # project happily compiles against on Node 22+.
+          node-version: "22"
           cache: "npm"
 
       - name: Install dependencies
-        run: npm ci
+        run: npm ci --no-audit --no-fund
 
       - name: Lint
         run: npm run lint
 
       - name: Type-check
-        run: npx tsc --noEmit -p tsconfig.json
+        run: npm run type-check
 
       - name: Test
         run: npm test -- --run
@@ -84,33 +90,29 @@ jobs:
 
       - name: Setup Rust toolchain
         uses: dtolnay/rust-toolchain@stable
-        with:
-          toolchain: stable
 
       - name: Cache cargo registry & target dir
         uses: Swatinem/rust-cache@v2
         with:
           workspaces: src-tauri -> target
 
-      - name: Cache cargo bins (cargo-deny)
-        uses: actions/cache@v4
+      - name: Install cargo-deny (prebuilt)
+        # Prebuilt binary is ~10x faster than `cargo install --locked`
+        # and avoids pulling a second Rust toolchain into the runner.
+        uses: taiki-e/install-action@cargo-deny
         with:
-          path: ~/.cargo/bin
-          key: ${{ runner.os }}-cargo-bins-${{ hashFiles('src-tauri/Cargo.lock') }}
-
-      - name: Install cargo-deny
-        run: cargo install --locked cargo-deny
+          version: "0.16"
 
       - name: cargo check
-        working-directory: src-tauri
-        run: cargo check --all-targets
+        run: cargo check --manifest-path src-tauri/Cargo.toml --all-targets
 
       - name: cargo test
-        working-directory: src-tauri
-        run: cargo test
+        run: cargo test --manifest-path src-tauri/Cargo.toml
 
       - name: cargo clippy (full pedantic profile)
-        working-directory: src-tauri
+        # Matches the local `just lint-rust` recipe exactly. Any flag
+        # drift here will fail locally too; the gate is enforced by
+        # AGENTS.md / T66.
         run: |
           cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- \
             -W clippy::all -W clippy::pedantic -W clippy::nursery -W clippy::cargo -W clippy::perf \
@@ -121,8 +123,15 @@ jobs:
             -D clippy::indexing_slicing -D clippy::cast_ptr_alignment -D clippy::suspicious \
             -D warnings
 
+      - name: cargo build (debug, all targets)
+        # A debug build verifies the Rust source compiles across the
+        # full matrix without the cost of a full release installer
+        # (which is covered by the release workflow).
+        run: cargo build --manifest-path src-tauri/Cargo.toml --all-targets
+
       - name: cargo-deny (fresh advisories)
-        # Per nick.md, always fetch in CI — local cache can be stale.
+        # Per nick.md, always fetch in CI — local cache can be stale
+        # and miss real advisories.
         run: scripts/cargo-deny.sh
 
   # ─── Workflow lint (actionlint) ────────────────────────────────────────────
@@ -140,3 +149,5 @@ jobs:
         uses: docker://rhysd/actionlint:1.7.7
         with:
           args: -color
+        # T67 / T65: bump the tag via Renovate / Dependabot rather
+        # than editing the workflow file.
