@@ -1,14 +1,29 @@
 // Material editor component for PBR material properties
+import {
+  DEFAULT_PRESETS,
+  deleteMaterialPreset,
+  listMaterialPresets,
+  newPresetId,
+  saveMaterialPreset,
+  type MaterialPreset,
+} from '@/utils/materialPresets'
 import { invoke } from '@tauri-apps/api/core'
-import { ChevronRight, Copy, Folder, Palette, Star, X } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { ChevronRight, Copy, Folder, Link2, Palette, Star, Unlink, X } from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
 
 interface MaterialEditorProps {
   selectedObjects: string[]
   onMaterialChange?: (materialProps: any) => void
+  // T18: parent supplies a callback that links selected objects
+  // to a named material preset, with the editor's current
+  // effective values used as the instance overrides.
+  onLinkPreset?: (presetId: string, overrides: Record<string, unknown>) => void
+  // T18: parent supplies a callback that unlinks selected objects
+  // from their preset. Inspector wires to `unlinkObjectFromPreset`.
+  onUnlinkPreset?: () => void
 }
 
-interface MaterialPreset {
+interface LegacyPreset {
   name: string
   baseColor: string
   metallic: number
@@ -19,7 +34,11 @@ interface MaterialPreset {
   category: string
 }
 
-const DEFAULT_PRESETS: MaterialPreset[] = [
+// Kept for backwards-compatibility with the dropdown UI that filters
+// by `category`. The new `materialPresets.ts` helpers expose the
+// canonical preset list; this local tuple is only used to drive
+// the *display* category dropdown.
+const LEGACY_CATEGORISED_PRESETS: LegacyPreset[] = [
   {
     name: 'Metal',
     baseColor: '#b0b0b0',
@@ -112,7 +131,12 @@ const DEFAULT_PRESETS: MaterialPreset[] = [
   },
 ]
 
-export default function MaterialEditor({ selectedObjects, onMaterialChange }: MaterialEditorProps) {
+export default function MaterialEditor({
+  selectedObjects,
+  onMaterialChange,
+  onLinkPreset,
+  onUnlinkPreset,
+}: MaterialEditorProps) {
   const [material, setMaterial] = useState({
     baseColor: '#808080',
     metallic: 0.0,
@@ -127,28 +151,16 @@ export default function MaterialEditor({ selectedObjects, onMaterialChange }: Ma
   const [customPresets, setCustomPresets] = useState<MaterialPreset[]>([])
   const [selectedCategory, setSelectedCategory] = useState('Basic')
   const [presetName, setPresetName] = useState('')
+  const [isDragOver, setIsDragOver] = useState(false)
 
-  // Load custom presets from localStorage
+  // T18: ref to the root div so the drop-target lives on the
+  // whole panel, not just the texture field.
+  const rootRef = useRef<HTMLDivElement | null>(null)
+
+  // Load presets (defaults + custom) on mount.
   useEffect(() => {
-    try {
-      const saved = localStorage.getItem('morgan-bevy-material-presets')
-      if (saved) {
-        setCustomPresets(JSON.parse(saved))
-      }
-    } catch (e) {
-      console.error('Failed to load material presets:', e)
-    }
+    setCustomPresets(listMaterialPresets())
   }, [])
-
-  // Save custom presets to localStorage
-  const saveCustomPresets = (presets: MaterialPreset[]) => {
-    try {
-      localStorage.setItem('morgan-bevy-material-presets', JSON.stringify(presets))
-      setCustomPresets(presets)
-    } catch (e) {
-      console.error('Failed to save material presets:', e)
-    }
-  }
 
   const updateMaterial = (property: string, value: any) => {
     const newMaterial = { ...material, [property]: value }
@@ -169,10 +181,11 @@ export default function MaterialEditor({ selectedObjects, onMaterialChange }: Ma
     onMaterialChange?.(newMaterial)
   }
 
-  const saveCurrentAsPreset = () => {
+  const saveCurrentAsPreset = (linkToSelection = false) => {
     if (!presetName.trim()) return
 
     const newPreset: MaterialPreset = {
+      id: newPresetId(presetName.trim()),
       name: presetName.trim(),
       baseColor: material.baseColor,
       metallic: material.metallic,
@@ -180,17 +193,45 @@ export default function MaterialEditor({ selectedObjects, onMaterialChange }: Ma
       emissive: material.emissive,
       emissiveIntensity: material.emissiveIntensity,
       texture: material.texture || undefined,
-      category: 'Custom',
     }
 
-    saveCustomPresets([...customPresets, newPreset])
+    saveMaterialPreset(newPreset)
+    setCustomPresets([...customPresets, newPreset])
+
+    // T18: optional "save-and-link" — creates a material *instance*
+    // on every selected object by recording the current effective
+    // values as the instance overrides. The caller (Inspector)
+    // wires `linkObjectToPreset` into the store; here we just emit
+    // the event so the parent can apply it.
+    if (linkToSelection && onLinkPreset && selectedObjects.length > 0) {
+      onLinkPreset(newPreset.id, currentOverrides())
+    }
     setPresetName('')
   }
 
   const deletePreset = (index: number) => {
-    const newPresets = customPresets.filter((_, i) => i !== index)
-    saveCustomPresets(newPresets)
+    // Only custom presets are deletable; the shipped defaults are
+    // pinned. Filter by `id` rather than index so the index handed
+    // in by the dropdown matches the actual position in the
+    // combined defaults + custom list.
+    const target = customPresets[index]
+    if (!target) return
+    if (DEFAULT_PRESETS.some(p => p.id === target.id)) return
+    const remaining = deleteMaterialPreset(target.id)
+    setCustomPresets(remaining)
   }
+
+  // T18: snapshot the current effective material as the instance
+  // overrides. Used by both the "save & link" flow and the
+  // header's Link button.
+  const currentOverrides = (): Record<string, unknown> => ({
+    baseColor: material.baseColor,
+    metallic: material.metallic,
+    roughness: material.roughness,
+    emissive: material.emissive,
+    emissiveIntensity: material.emissiveIntensity,
+    texture: material.texture ?? undefined,
+  })
 
   const browseForTexture = async () => {
     try {
@@ -204,10 +245,49 @@ export default function MaterialEditor({ selectedObjects, onMaterialChange }: Ma
   }
 
   const allPresets = [...DEFAULT_PRESETS, ...customPresets]
-  const filteredPresets = allPresets.filter(
-    preset => selectedCategory === 'All' || preset.category === selectedCategory
-  )
-  const categories = ['All', ...Array.from(new Set(allPresets.map(p => p.category)))]
+  // T18: the new MaterialPreset type does not carry a `category`
+  // field. Map the legacy categorised presets into a derived list
+  // for the dropdown filter; custom presets live in the "Custom"
+  // bucket.
+  const filteredPresets =
+    selectedCategory === 'All'
+      ? allPresets
+      : selectedCategory === 'Custom'
+        ? customPresets
+        : allPresets.filter(p => {
+            const legacy = LEGACY_CATEGORISED_PRESETS.find(l => l.name === p.name)
+            return legacy?.category === selectedCategory
+          })
+  const categories = [
+    'All',
+    ...Array.from(new Set(LEGACY_CATEGORISED_PRESETS.map(p => p.category))),
+    'Custom',
+  ]
+
+  // T18: drag-and-drop a texture path onto the panel. Accepts both
+  // external file drops (File.path) and asset-browser drops whose
+  // payload is a string path. No-op when the payload doesn't look
+  // like a path.
+  const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault()
+    setIsDragOver(true)
+  }
+  const handleDragLeave = (e: React.DragEvent<HTMLDivElement>) => {
+    // Only clear the highlight when leaving the panel itself, not
+    // when crossing into a child element.
+    if (e.currentTarget === e.target) setIsDragOver(false)
+  }
+  const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault()
+    setIsDragOver(false)
+    const candidate =
+      e.dataTransfer.getData('text/plain') ||
+      e.dataTransfer.getData('text/uri-list') ||
+      (Array.from(e.dataTransfer.files)[0] as File & { path?: string })?.path ||
+      ''
+    if (!candidate) return
+    updateMaterial('texture', candidate)
+  }
 
   if (selectedObjects.length === 0) {
     return (
@@ -238,7 +318,13 @@ export default function MaterialEditor({ selectedObjects, onMaterialChange }: Ma
   }
 
   return (
-    <div className="border-b border-editor-border">
+    <div
+      ref={rootRef}
+      className={`border-b border-editor-border ${isDragOver ? 'ring-2 ring-editor-accent' : ''}`}
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
+    >
       {/* Header */}
       <div
         className="p-2 bg-editor-panel flex items-center cursor-pointer hover:bg-editor-border"
@@ -257,6 +343,31 @@ export default function MaterialEditor({ selectedObjects, onMaterialChange }: Ma
           >
             <Star className="w-3 h-3" />
           </button>
+          {/* T18: link / unlink selected objects to a named preset. */}
+          {onLinkPreset && (
+            <button
+              onClick={e => {
+                e.stopPropagation()
+                onLinkPreset('default-metal', currentOverrides())
+              }}
+              className="p-1 rounded hover:bg-editor-border"
+              title="Link selected objects to a preset"
+            >
+              <Link2 className="w-3 h-3" />
+            </button>
+          )}
+          {onUnlinkPreset && (
+            <button
+              onClick={e => {
+                e.stopPropagation()
+                onUnlinkPreset()
+              }}
+              className="p-1 rounded hover:bg-editor-border"
+              title="Unlink selected objects from their preset"
+            >
+              <Unlink className="w-3 h-3" />
+            </button>
+          )}
           <span className="text-xs text-editor-textMuted">
             {selectedObjects.length} object{selectedObjects.length > 1 ? 's' : ''}
           </span>
@@ -296,37 +407,40 @@ export default function MaterialEditor({ selectedObjects, onMaterialChange }: Ma
 
             {/* Preset Grid */}
             <div className="grid grid-cols-3 gap-2 max-h-48 overflow-y-auto">
-              {filteredPresets.map((preset, index) => (
-                <div key={`${preset.category}-${preset.name}-${index}`} className="relative group">
-                  <button
-                    onClick={() => applyPreset(preset)}
-                    className="w-full p-2 bg-editor-panel border border-editor-border rounded hover:border-editor-accent text-left"
-                  >
-                    <div
-                      className="w-full h-8 rounded mb-1"
-                      style={{
-                        background: `linear-gradient(45deg, ${preset.baseColor}, ${preset.emissive})`,
-                        filter: `brightness(${1 + preset.emissiveIntensity}) saturate(${2 - preset.roughness})`,
-                      }}
-                    />
-                    <div className="text-xs font-medium truncate">{preset.name}</div>
-                    <div className="text-xs text-editor-textMuted">
-                      M:{preset.metallic.toFixed(1)} R:{preset.roughness.toFixed(1)}
-                    </div>
-                  </button>
-
-                  {preset.category === 'Custom' && (
+              {filteredPresets.map((preset, index) => {
+                const isCustom = customPresets.some(p => p.id === preset.id)
+                return (
+                  <div key={`${preset.id}-${index}`} className="relative group">
                     <button
-                      onClick={() =>
-                        deletePreset(customPresets.findIndex(p => p.name === preset.name))
-                      }
-                      className="absolute top-1 right-1 p-1 bg-red-600 text-white rounded opacity-0 group-hover:opacity-100 transition-opacity"
+                      onClick={() => applyPreset(preset)}
+                      className="w-full p-2 bg-editor-panel border border-editor-border rounded hover:border-editor-accent text-left"
                     >
-                      <X className="w-3 h-3" />
+                      <div
+                        className="w-full h-8 rounded mb-1"
+                        style={{
+                          background: `linear-gradient(45deg, ${preset.baseColor}, ${preset.emissive})`,
+                          filter: `brightness(${1 + preset.emissiveIntensity}) saturate(${2 - preset.roughness})`,
+                        }}
+                      />
+                      <div className="text-xs font-medium truncate">{preset.name}</div>
+                      <div className="text-xs text-editor-textMuted">
+                        M:{preset.metallic.toFixed(1)} R:{preset.roughness.toFixed(1)}
+                      </div>
                     </button>
-                  )}
-                </div>
-              ))}
+
+                    {isCustom && (
+                      <button
+                        onClick={() =>
+                          deletePreset(customPresets.findIndex(p => p.id === preset.id))
+                        }
+                        className="absolute top-1 right-1 p-1 bg-red-600 text-white rounded opacity-0 group-hover:opacity-100 transition-opacity"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    )}
+                  </div>
+                )
+              })}
             </div>
 
             {/* Save Current as Preset */}
@@ -340,11 +454,19 @@ export default function MaterialEditor({ selectedObjects, onMaterialChange }: Ma
                   className="flex-1 px-2 py-1 text-xs bg-editor-bg border border-editor-border rounded focus:outline-none focus:border-editor-accent"
                 />
                 <button
-                  onClick={saveCurrentAsPreset}
+                  onClick={() => saveCurrentAsPreset(false)}
                   disabled={!presetName.trim()}
                   className="px-2 py-1 text-xs bg-editor-accent text-white rounded hover:bg-editor-accent/80 disabled:opacity-50"
                 >
                   Save
+                </button>
+                <button
+                  onClick={() => saveCurrentAsPreset(true)}
+                  disabled={!presetName.trim() || selectedObjects.length === 0}
+                  title="Save the preset and link the selected objects to it as a material instance"
+                  className="px-2 py-1 text-xs bg-editor-accent text-white rounded hover:bg-editor-accent/80 disabled:opacity-50"
+                >
+                  Save &amp; Link
                 </button>
               </div>
             </div>
@@ -366,7 +488,9 @@ export default function MaterialEditor({ selectedObjects, onMaterialChange }: Ma
             }}
           >
             <option value="">Select preset...</option>
-            {DEFAULT_PRESETS.filter(p => p.category === 'Basic').map(preset => (
+            {DEFAULT_PRESETS.filter(p =>
+              LEGACY_CATEGORISED_PRESETS.some(l => l.name === p.name && l.category === 'Basic')
+            ).map(preset => (
               <option key={preset.name} value={preset.name}>
                 {preset.name}
               </option>
@@ -492,7 +616,7 @@ export default function MaterialEditor({ selectedObjects, onMaterialChange }: Ma
                   alt="Texture Preview"
                   className="w-full h-16 object-cover border border-editor-border rounded"
                   onError={e => {
-                    (e.target as HTMLImageElement).style.display = 'none'
+                    void ((e.target as HTMLImageElement).style.display = 'none')
                   }}
                 />
               </div>

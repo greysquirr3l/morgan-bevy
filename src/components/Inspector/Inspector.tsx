@@ -29,6 +29,8 @@ export default function Inspector() {
     updateObjectMaterial,
     updateObjectMesh,
     updateObjectProperties,
+    linkObjectToPreset,
+    unlinkObjectFromPreset,
   } = useEditorStore(
     useShallow(s => ({
       selectedObjects: s.selectedObjects,
@@ -37,6 +39,8 @@ export default function Inspector() {
       updateObjectMaterial: s.updateObjectMaterial,
       updateObjectMesh: s.updateObjectMesh,
       updateObjectProperties: s.updateObjectProperties,
+      linkObjectToPreset: s.linkObjectToPreset,
+      unlinkObjectFromPreset: s.unlinkObjectFromPreset,
     }))
   )
 
@@ -280,10 +284,26 @@ export default function Inspector() {
         <MaterialEditor
           selectedObjects={selectedObjects}
           onMaterialChange={materialProps => {
-            console.log('Material changed:', materialProps)
-            // Apply material to selected objects in the store/scene
+            // T18: apply the change to every selected object so
+            // multi-object material edits propagate atomically.
             selectedObjects.forEach((objectId: string) => {
               updateObjectMaterial(objectId, materialProps)
+            })
+          }}
+          onLinkPreset={(presetId, overrides) => {
+            // T18: bind each selected object to the named preset.
+            // The `materialOverrides` snapshot preserves the
+            // per-object values the user has tweaked in the editor.
+            selectedObjects.forEach(objectId => {
+              linkObjectToPreset(objectId, presetId, overrides)
+            })
+          }}
+          onUnlinkPreset={() => {
+            // T18: unlink each selected object. The resolved
+            // effective material remains in `obj.material` from
+            // before the link, so the visual stays unchanged.
+            selectedObjects.forEach(objectId => {
+              unlinkObjectFromPreset(objectId)
             })
           }}
         />

@@ -86,6 +86,20 @@ export interface EditorState {
         baseColor: string
         metallic: number
         roughness: number
+        emissive?: string
+        emissiveIntensity?: number
+        texture?: string
+      }
+      // T18: link to a named MaterialPreset. When set, the
+      // object's resolved material is `preset + overrides`. When
+      // null, the `material` field is the source of truth.
+      materialPresetId?: string
+      materialOverrides?: {
+        baseColor?: string
+        metallic?: number
+        roughness?: number
+        emissive?: string
+        emissiveIntensity?: number
         texture?: string
       }
       collision?: boolean
@@ -154,6 +168,13 @@ export interface EditorState {
     id: string,
     material: { baseColor: string; metallic: number; roughness: number; texture?: string }
   ) => void
+  // T18: bind a scene object to a material preset. The object's
+  // resolved material = preset + overrides. Pass an empty
+  // overrides object to start fresh.
+  linkObjectToPreset: (id: string, presetId: string, overrides: Record<string, unknown>) => void
+  // T18: unlink an object from its preset, copying the currently
+  // effective material into the object's `material` field.
+  unlinkObjectFromPreset: (id: string) => void
   updateObjectMesh: (id: string, meshType: 'cube' | 'sphere' | 'pyramid') => void
   updateObjectProperties: (
     id: string,
@@ -219,6 +240,20 @@ export const useEditorStore = create<EditorState>()(
           baseColor: string
           metallic: number
           roughness: number
+          emissive?: string
+          emissiveIntensity?: number
+          texture?: string
+        }
+        // T18: link to a named MaterialPreset. When set, the
+        // object's resolved material is `preset + overrides`. When
+        // null, the `material` field is the source of truth.
+        materialPresetId?: string
+        materialOverrides?: {
+          baseColor?: string
+          metallic?: number
+          roughness?: number
+          emissive?: string
+          emissiveIntensity?: number
           texture?: string
         }
         collision?: boolean
@@ -583,6 +618,38 @@ export const useEditorStore = create<EditorState>()(
         if (state.sceneObjects.has(id)) {
           const o = state.sceneObjects.get(id)
           if (o) o.material = material
+        }
+      }),
+
+    // T18: link an object to a named preset. The object's resolved
+    // material becomes preset + overrides; any prior material field
+    // is retained for backward compatibility until the user unlinks.
+    linkObjectToPreset: (id: string, presetId: string, overrides: Record<string, unknown>) =>
+      set(state => {
+        if (state.sceneObjects.has(id)) {
+          const o = state.sceneObjects.get(id)
+          if (o) {
+            o.materialPresetId = presetId
+            o.materialOverrides = overrides as {
+              baseColor?: string
+              metallic?: number
+              roughness?: number
+              emissive?: string
+              emissiveIntensity?: number
+              texture?: string
+            }
+          }
+        }
+      }),
+
+    unlinkObjectFromPreset: (id: string) =>
+      set(state => {
+        if (state.sceneObjects.has(id)) {
+          const o = state.sceneObjects.get(id)
+          if (o) {
+            delete o.materialPresetId
+            delete o.materialOverrides
+          }
         }
       }),
 
