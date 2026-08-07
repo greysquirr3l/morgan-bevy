@@ -227,6 +227,8 @@
 
 - T20: vi.hoisted is required when a `vi.fn` mock is referenced inside a top-level `vi.mock` factory — the mock factory is hoisted above the `let`/`const` bindings, so any closure reference to top-level `vi.fn()` will fail with `Cannot access before initialization`.
 
+- **Coraline MCP is wired and indexed** (verified 2026-08-07). The orchestrator should prefer `coraline_*` queries over text grep on tasks that need structural code understanding — especially T90/T91, where the editor's emitter helpers (`rust_collision_component`, `rust_spawn_component`, `rust_trigger_component` at exporters.rs:575/593/609) need sibling helpers for Door/Collectible/NavMeshHint. `dependents(node_id)` returns the exact call chain (e.g. `export_multi_format → export_rust_code → generate_rust_code`), and `get_file_nodes` returns the complete outline of a file in one call. Caveats: `find_references` requires a `node_id` (use `find_symbol(name_pattern)` first to get one), `status`/`stats`/`impact` are user-disabled in this workspace, and `coraline_callees` is empty for macro-heavy functions like `generate_rust_code` because `writeln!`/`push_str`/`format!` don't show as call-graph nodes — use `dependencies` instead, which surfaces real fn→fn calls.
+
 ## Codebase State
 
 > Subagents update this section after completing each task.
