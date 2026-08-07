@@ -468,6 +468,9 @@ impl BSPGenerator {
             mesh: Some("meshes/cube.mesh".to_string()),
             layer: "Floors".to_string(),
             tags: vec!["floor".to_string(), theme.to_string()],
+            collision_shape: None,
+            spawn_point: None,
+            trigger_volume: None,
             metadata: HashMap::new(),
         }
     }
@@ -497,6 +500,9 @@ impl BSPGenerator {
                 "collision".to_string(),
                 theme.to_string(),
             ],
+            collision_shape: None,
+            spawn_point: None,
+            trigger_volume: None,
             metadata: HashMap::new(),
         }
     }
@@ -522,6 +528,9 @@ impl BSPGenerator {
             mesh: Some("meshes/cube.mesh".to_string()),
             layer: "Floors".to_string(),
             tags: vec!["corridor".to_string(), theme.to_string()],
+            collision_shape: None,
+            spawn_point: None,
+            trigger_volume: None,
             metadata: HashMap::new(),
         }
     }
@@ -551,6 +560,9 @@ impl BSPGenerator {
                 "interactive".to_string(),
                 theme.to_string(),
             ],
+            collision_shape: None,
+            spawn_point: None,
+            trigger_volume: None,
             metadata: {
                 let mut meta = HashMap::new();
                 meta.insert("interactive".to_string(), serde_json::Value::Bool(true));

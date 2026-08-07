@@ -47,6 +47,61 @@ pub struct Transform3D {
     pub scale: [f32; 3],
 }
 
+/// Collision shape attached to a `GameObject`.
+///
+/// The shape lives in the object's local space and is exported
+/// alongside the transform into every Bevy-facing format.
+///
+/// Tagged so the JSON representation looks like
+/// `{"kind": "box", "half_extents": [...]}`.
+// `Eq` is intentionally omitted because the inner f32 fields
+// don't implement `Eq`. `PartialEq` is sufficient for serde
+// round-trip and for tests.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub enum CollisionShape {
+    Box { half_extents: [f32; 3] },
+    Sphere { radius: f32 },
+    Capsule { radius: f32, height: f32 },
+}
+
+/// Where a `GameObject` spawns a runtime entity when the level
+/// loads. The optional `team` / `item_id` fields let spawn points
+/// tag the spawned entity with a faction or item identifier.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub enum SpawnPoint {
+    PlayerStart,
+    EnemySpawn {
+        #[serde(default)]
+        team: String,
+    },
+    ItemSpawn {
+        #[serde(default)]
+        item_id: String,
+    },
+}
+
+/// A trigger volume attached to a `GameObject`. The `event` string
+/// is the user-defined hook (e.g. `"level.complete"`) the runtime
+/// fires when an entity enters the volume.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub enum TriggerVolume {
+    Box {
+        half_extents: [f32; 3],
+        event: String,
+    },
+    Sphere {
+        radius: f32,
+        event: String,
+    },
+    Polygon {
+        points: Vec<[f32; 3]>,
+        event: String,
+    },
+}
+
 /// Represents a 3D object in the editor with transform, material, and metadata.
 ///
 /// `GameObjects` are the fundamental building blocks of levels in Morgan-Bevy.
@@ -66,6 +121,19 @@ pub struct GameObject {
     pub layer: String,
     /// Tags for categorization and scripting hooks
     pub tags: Vec<String>,
+    /// Optional collision shape (T42). When set, the exporter
+    /// emits a `Collider` component in the Bevy source / a
+    /// `collision` field in JSON / RON.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub collision_shape: Option<CollisionShape>,
+    /// Optional spawn point (T42). When set, the exporter emits a
+    /// `SpawnPoint` component carrying the team / item-id metadata.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub spawn_point: Option<SpawnPoint>,
+    /// Optional trigger volume (T42). When set, the exporter emits
+    /// a `TriggerVolume` component with the named event hook.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub trigger_volume: Option<TriggerVolume>,
     /// Additional metadata for custom properties and game logic
     pub metadata: HashMap<String, serde_json::Value>,
 }

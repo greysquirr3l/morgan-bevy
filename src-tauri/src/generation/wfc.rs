@@ -605,6 +605,9 @@ impl WFCGenerator {
                             mesh: Some(tile.mesh_type.clone()),
                             layer: "Generated".to_string(),
                             tags: vec!["wfc".to_string(), tileset.to_string()],
+                            collision_shape: None,
+                            spawn_point: None,
+                            trigger_volume: None,
                             metadata: {
                                 let mut map = HashMap::new();
                                 map.insert(
