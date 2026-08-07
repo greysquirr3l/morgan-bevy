@@ -121,6 +121,21 @@ export interface EditorState {
   currentProjectPath: string | null
   missingAssetRefs: string[]
 
+  // T55: lighting rig. `setLights` writes the entire array in one
+  // call (used by the auto-placement helper); per-light edits go
+  // through `addLight` / `removeLight` / `updateLight`.
+  lights: Array<{
+    id: string
+    kind: 'ambient' | 'directional' | 'point' | 'spot'
+    position: [number, number, number]
+    color: [number, number, number]
+    intensity: number
+    angle?: number
+    castShadow: boolean
+    shadowQuality: 'off' | 'hard' | 'soft' | 'ultra'
+    name?: string
+  }>
+
   // Undo/Redo system
   undoHistory: Command[]
   redoHistory: Command[]
@@ -147,6 +162,46 @@ export interface EditorState {
   // Project file (T20)
   setCurrentProjectPath: (path: string | null) => void
   setMissingAssetRefs: (ids: string[]) => void
+
+  // Lighting (T55)
+  setLights: (
+    lights: Array<{
+      id: string
+      kind: 'ambient' | 'directional' | 'point' | 'spot'
+      position: [number, number, number]
+      color: [number, number, number]
+      intensity: number
+      angle?: number
+      castShadow: boolean
+      shadowQuality: 'off' | 'hard' | 'soft' | 'ultra'
+      name?: string
+    }>,
+  ) => void
+  addLight: (light: {
+    id: string
+    kind: 'ambient' | 'directional' | 'point' | 'spot'
+    position: [number, number, number]
+    color: [number, number, number]
+    intensity: number
+    angle?: number
+    castShadow: boolean
+    shadowQuality: 'off' | 'hard' | 'soft' | 'ultra'
+    name?: string
+  }) => void
+  removeLight: (id: string) => void
+  updateLight: (
+    id: string,
+    patch: Partial<{
+      kind: 'ambient' | 'directional' | 'point' | 'spot'
+      position: [number, number, number]
+      color: [number, number, number]
+      intensity: number
+      angle: number
+      castShadow: boolean
+      shadowQuality: 'off' | 'hard' | 'soft' | 'ultra'
+      name: string
+    }>,
+  ) => void
 
   // Object management
   addObject: (type: 'cube' | 'sphere' | 'pyramid', position?: [number, number, number]) => string
@@ -275,6 +330,22 @@ export const useEditorStore = create<EditorState>()(
     // asset database and populate this list with the missing IDs.
     // Consumers can render a banner / badge off this state.
     missingAssetRefs: [] as string[],
+
+    // T55: lighting. Stored as a `LightSource[]` so the auto-
+    // placement helper can write the entire rig in one
+    // `setLights` call. Per-light edits still go through the
+    // store; the array shape keeps the schema simple.
+    lights: [] as Array<{
+      id: string
+      kind: 'ambient' | 'directional' | 'point' | 'spot'
+      position: [number, number, number]
+      color: [number, number, number]
+      intensity: number
+      angle?: number
+      castShadow: boolean
+      shadowQuality: 'off' | 'hard' | 'soft' | 'ultra'
+      name?: string
+    }>,
 
     // Undo/Redo system
     undoHistory: [] as Command[],
@@ -413,6 +484,31 @@ export const useEditorStore = create<EditorState>()(
     setMissingAssetRefs: (ids: string[]) =>
       set(state => {
         state.missingAssetRefs = ids
+      }),
+
+    // T55: lighting actions. `setLights` is the bulk-write path
+    // used by `autoLightPlacement`; `addLight` / `removeLight` /
+    // `updateLight` cover per-light user edits from the toolbar.
+    setLights: lights =>
+      set(state => {
+        state.lights = lights
+      }),
+
+    addLight: light =>
+      set(state => {
+        state.lights.push(light)
+      }),
+
+    removeLight: id =>
+      set(state => {
+        state.lights = state.lights.filter(l => l.id !== id)
+      }),
+
+    updateLight: (id, patch) =>
+      set(state => {
+        const idx = state.lights.findIndex(l => l.id === id)
+        if (idx === -1) return
+        state.lights[idx] = { ...state.lights[idx], ...patch }
       }),
 
     // Object management
