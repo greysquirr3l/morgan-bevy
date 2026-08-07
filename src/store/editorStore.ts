@@ -16,7 +16,7 @@ class StoreDebugLogger {
 
     // Also save to localStorage for persistence
     try {
-      const existing = JSON.parse(localStorage.getItem('morgan-bevy-store-debug') || '[]')
+      const existing = JSON.parse(localStorage.getItem('morgan-bevy.store-debug') || '[]')
       existing.push({
         timestamp,
         message: logEntry,
@@ -24,7 +24,7 @@ class StoreDebugLogger {
       })
       // Keep only last 50 entries
       if (existing.length > 50) existing.shift()
-      localStorage.setItem('morgan-bevy-store-debug', JSON.stringify(existing))
+      localStorage.setItem('morgan-bevy.store-debug', JSON.stringify(existing))
     } catch (e) {
       console.error('Failed to save store debug logs:', e)
     }
@@ -429,12 +429,12 @@ export const useEditorStore = create<EditorState>()(
             stack: new Error().stack,
           }
           const existing = JSON.parse(
-            localStorage.getItem('morgan-bevy-setViewportMode-calls') || '[]'
+            localStorage.getItem('morgan-bevy.setViewportMode-calls') || '[]'
           )
           existing.push(debugEntry)
           // Keep only last 20 calls
           if (existing.length > 20) existing.shift()
-          localStorage.setItem('morgan-bevy-setViewportMode-calls', JSON.stringify(existing))
+          localStorage.setItem('morgan-bevy.setViewportMode-calls', JSON.stringify(existing))
         } catch (e) {
           console.error('Failed to save setViewportMode debug info:', e)
         }
@@ -929,7 +929,7 @@ export const useEditorStore = create<EditorState>()(
         timestamp: new Date().toISOString(),
       }
       try {
-        localStorage.setItem('morgan-bevy-autosave', JSON.stringify(saveData))
+        localStorage.setItem('morgan-bevy.autosave', JSON.stringify(saveData))
       } catch (error) {
         console.error('Failed to auto-save to localStorage:', error)
       }
@@ -950,7 +950,7 @@ export const useEditorStore = create<EditorState>()(
 
     loadFromLocalStorage: () => {
       try {
-        const saved = localStorage.getItem('morgan-bevy-autosave')
+        const saved = localStorage.getItem('morgan-bevy.autosave')
         if (saved) {
           const saveData = JSON.parse(saved)
 
@@ -988,7 +988,7 @@ export const useEditorStore = create<EditorState>()(
 
     clearLocalStorage: () => {
       try {
-        localStorage.removeItem('morgan-bevy-autosave')
+        localStorage.removeItem('morgan-bevy.autosave')
         console.log('Cleared auto-save data from localStorage')
       } catch (error) {
         console.error('Failed to clear localStorage:', error)

@@ -69,7 +69,7 @@ class DebugLogger {
   saveLogs() {
     try {
       localStorage.setItem(
-        'morgan-bevy-debug-logs',
+        'morgan-bevy.debug-logs',
         JSON.stringify({
           timestamp: new Date().toISOString(),
           logs: this.logs,
@@ -98,7 +98,7 @@ class DebugLogger {
 
   clearLogs() {
     this.logs = []
-    localStorage.removeItem('morgan-bevy-debug-logs')
+    localStorage.removeItem('morgan-bevy.debug-logs')
   }
 }
 
@@ -614,7 +614,7 @@ function AppContent() {
   useEffect(() => {
     // Check for auto-saved data on startup
     try {
-      const saved = localStorage.getItem('morgan-bevy-autosave')
+      const saved = localStorage.getItem('morgan-bevy.autosave')
       if (saved) {
         const saveData = JSON.parse(saved)
         const saveDate = new Date(saveData.timestamp)

@@ -316,7 +316,7 @@ export class SaveCommand implements Command {
     }
 
     // Save to localStorage
-    localStorage.setItem('morgan-bevy-scene', JSON.stringify(this.savedData))
+    localStorage.setItem('morgan-bevy.scene', JSON.stringify(this.savedData))
 
     // Also create downloadable backup
     const blob = new Blob([JSON.stringify(this.savedData, null, 2)], { type: 'application/json' })
