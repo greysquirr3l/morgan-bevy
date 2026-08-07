@@ -3,7 +3,7 @@
 > Hybrid Rust + React 3D level editor for the Bevy game engine with
 > procedural generation (BSP, WFC) and professional manual editing tools.
 
-**Core Philosophy**: *"Generate smart, edit fast, export perfect."*
+**Core Philosophy**: _"Generate smart, edit fast, export perfect."_
 
 [![Rust](https://img.shields.io/badge/rust-%23000000.svg?style=for-the-badge&logo=rust&logoColor=white)](https://www.rust-lang.org/)
 [![TypeScript](https://img.shields.io/badge/typescript-%23007ACC.svg?style=for-the-badge&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
@@ -149,18 +149,18 @@ see [`docs/dev/bevy-compat.md`](docs/dev/bevy-compat.md).
 
 ## 🛠️ Technology Stack
 
-| Layer | Technology | Purpose |
-|-------|------------|---------|
-| **Desktop App** | [Tauri](https://tauri.app/) 2.11.5 | Cross-platform native shell (Rust + system webview) |
-| **Frontend** | [React](https://reactjs.org/) 18 + [TypeScript](https://www.typescriptlang.org/) 5.9 | Strict-mode UI; zod-validated Tauri IPC |
-| **3D Rendering** | [Three.js](https://threejs.org/) 0.168 + [React Three Fiber](https://github.com/pmndrs/react-three-fiber) | WebGL viewport with LOD / frustum culling / instancing |
-| **State Management** | [Zustand](https://zustand-demo.pmnd.rs/) 5.0.8 + [Immer](https://immerjs.github.io/immer/) | Per-frame data stays in `useRef`, never the store |
-| **Database** | [SQLite](https://www.sqlite.org/) + [rusqlite](https://github.com/rusqlite/rusqlite) | Asset database with schema-versioned migrations |
-| **Generation** | Rust (`bsp`, `wfc` modules) | Deterministic; no `Instant::now()` in domain logic |
-| **Export Targets** | JSON, RON, Rust source, GLTF, binary FBX 7.7 | Each emits a manifest alongside the data |
-| **Styling** | [Tailwind CSS](https://tailwindcss.com/) 3 + CSS variables for theme tokens | Dark / Light |
-| **Build System** | [Vite](https://vitejs.dev/) 5 + [Cargo](https://doc.rust-lang.org/cargo/) | Hot-reload dev server; release build via `tauri build` |
-| **Quality Gates** | Vitest · ESLint · Cargo Clippy (pedantic + nursery) · cargo-deny | All six preflight checks run in CI |
+| Layer                | Technology                                                                                                | Purpose                                                |
+| -------------------- | --------------------------------------------------------------------------------------------------------- | ------------------------------------------------------ |
+| **Desktop App**      | [Tauri](https://tauri.app/) 2.11.5                                                                        | Cross-platform native shell (Rust + system webview)    |
+| **Frontend**         | [React](https://reactjs.org/) 18 + [TypeScript](https://www.typescriptlang.org/) 5.9                      | Strict-mode UI; zod-validated Tauri IPC                |
+| **3D Rendering**     | [Three.js](https://threejs.org/) 0.168 + [React Three Fiber](https://github.com/pmndrs/react-three-fiber) | WebGL viewport with LOD / frustum culling / instancing |
+| **State Management** | [Zustand](https://zustand-demo.pmnd.rs/) 5.0.8 + [Immer](https://immerjs.github.io/immer/)                | Per-frame data stays in `useRef`, never the store      |
+| **Database**         | [SQLite](https://www.sqlite.org/) + [rusqlite](https://github.com/rusqlite/rusqlite)                      | Asset database with schema-versioned migrations        |
+| **Generation**       | Rust (`bsp`, `wfc` modules)                                                                               | Deterministic; no `Instant::now()` in domain logic     |
+| **Export Targets**   | JSON, RON, Rust source, GLTF, binary FBX 7.7                                                              | Each emits a manifest alongside the data               |
+| **Styling**          | [Tailwind CSS](https://tailwindcss.com/) 3 + CSS variables for theme tokens                               | Dark / Light                                           |
+| **Build System**     | [Vite](https://vitejs.dev/) 5 + [Cargo](https://doc.rust-lang.org/cargo/)                                 | Hot-reload dev server; release build via `tauri build` |
+| **Quality Gates**    | Vitest · ESLint · Cargo Clippy (pedantic + nursery) · cargo-deny                                          | All six preflight checks run in CI                     |
 
 The Bevy 0.19 export contract is the only stability promise we make;
 see [`docs/dev/bevy-compat.md`](docs/dev/bevy-compat.md).
@@ -212,18 +212,18 @@ npm run tauri build
 
 ## 📋 Development Roadmap
 
-| Phase | Timeline | Status | Features |
-|-------|----------|--------|----------|
-| **Phase 1** | ✅ Complete | **Foundation** | 3D Editor, Transform Gizmos, Basic Asset Management |
-| **Phase 2** | ✅ Complete | **UI & Workflow** | Resizable Panels, Camera Controls, Professional UI |
-| **Phase 3** | ✅ Complete | **Asset Database** | SQLite Database, Advanced Asset Browser, Search & Collections |
-| **Phase 4** | ✅ Complete | **Advanced Editing** | Box Selection, Undo/Redo, Enhanced UI |
-| **Phase 5** | ✅ Complete | **Procedural Generation** | BSP, WFC, Theme System, Seed Management |
-| **Phase 6** | ✅ Complete | **Export & Integration** | JSON / RON / Rust / GLTF / FBX + Bevy 0.19 contract |
-| **Phase 7** | ✅ Complete | **Performance** | LOD, frustum culling, instancing, 60 FPS @ 10K+ objects |
-| **Phase 8** | 🔄 In Progress | **Advanced Tools** | Snap points, surface snapping, lighting, paint |
-| **Phase 9** | 🔄 In Progress | **Polish** | Examples, docs, in-app help, marketing |
-| **Phase 10** | 🔄 In Progress | **Distribution** | cargo-deny (✅), CI matrix, release pipeline, auto-updater |
+| Phase        | Timeline       | Status                    | Features                                                      |
+| ------------ | -------------- | ------------------------- | ------------------------------------------------------------- |
+| **Phase 1**  | ✅ Complete    | **Foundation**            | 3D Editor, Transform Gizmos, Basic Asset Management           |
+| **Phase 2**  | ✅ Complete    | **UI & Workflow**         | Resizable Panels, Camera Controls, Professional UI            |
+| **Phase 3**  | ✅ Complete    | **Asset Database**        | SQLite Database, Advanced Asset Browser, Search & Collections |
+| **Phase 4**  | ✅ Complete    | **Advanced Editing**      | Box Selection, Undo/Redo, Enhanced UI                         |
+| **Phase 5**  | ✅ Complete    | **Procedural Generation** | BSP, WFC, Theme System, Seed Management                       |
+| **Phase 6**  | ✅ Complete    | **Export & Integration**  | JSON / RON / Rust / GLTF / FBX + Bevy 0.19 contract           |
+| **Phase 7**  | ✅ Complete    | **Performance**           | LOD, frustum culling, instancing, 60 FPS @ 10K+ objects       |
+| **Phase 8**  | 🔄 In Progress | **Advanced Tools**        | Snap points, surface snapping, lighting, paint                |
+| **Phase 9**  | 🔄 In Progress | **Polish**                | Examples, docs, in-app help, marketing                        |
+| **Phase 10** | 🔄 In Progress | **Distribution**          | cargo-deny (✅), CI matrix, release pipeline, auto-updater    |
 
 See [`PROGRESS.md`](PROGRESS.md) for the per-task status table.
 

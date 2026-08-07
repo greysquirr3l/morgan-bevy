@@ -61,7 +61,7 @@ cd morgan-bevy && npm install && npm run tauri:dev
 - You're already on Unreal / Unity — those editors are richer and
   better integrated with their engines.
 - You need real-time multiplayer editing — out of scope today.
-- You want a Blender replacement — Morgan-Bevy is a *level*
+- You want a Blender replacement — Morgan-Bevy is a _level_
   editor, not a general 3D modeller.
 
 ## Links

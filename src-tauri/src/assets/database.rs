@@ -777,10 +777,9 @@ impl AssetDatabase {
             for tag in &filter.tags {
                 binds.push(Box::new(tag.clone()));
             }
-            binds.push(Box::new(
-                i64::try_from(filter.tags.len())
-                    .map_err(|e| rusqlite::Error::ToSqlConversionFailure(Box::new(e)))?,
-            ));
+            binds.push(Box::new(i64::try_from(filter.tags.len()).map_err(|e| {
+                rusqlite::Error::ToSqlConversionFailure(Box::new(e))
+            })?));
         }
         sql.push_str(" ORDER BY a.updated_at DESC");
 

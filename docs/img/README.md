@@ -5,16 +5,16 @@ Screenshots" section link into this directory. Files listed below
 are the ones we intend to ship — drop them in at 1080p / 1440p and
 let the docs reference them.
 
-| Filename | Source |
-|---|---|
-| `screenshot-viewport-3d.png` | Orbit camera, one cube selected |
-| `screenshot-viewport-fly.png` | Fly camera, grid visible |
-| `screenshot-viewport-ortho.png` | Ortho top-down, two cubes |
-| `screenshot-generation-panel.png` | BSP seed `7C3F` output |
-| `screenshot-export-panel.png` | Rust-source export modal |
-| `screenshot-asset-browser.png` | FTS search "stone wall" |
-| `screenshot-performance-panel.png` | 10K-object stress test |
-| `demo-60s.gif` | 60-second screen recording (gifski) |
+| Filename                           | Source                              |
+| ---------------------------------- | ----------------------------------- |
+| `screenshot-viewport-3d.png`       | Orbit camera, one cube selected     |
+| `screenshot-viewport-fly.png`      | Fly camera, grid visible            |
+| `screenshot-viewport-ortho.png`    | Ortho top-down, two cubes           |
+| `screenshot-generation-panel.png`  | BSP seed `7C3F` output              |
+| `screenshot-export-panel.png`      | Rust-source export modal            |
+| `screenshot-asset-browser.png`     | FTS search "stone wall"             |
+| `screenshot-performance-panel.png` | 10K-object stress test              |
+| `demo-60s.gif`                     | 60-second screen recording (gifski) |
 
 ## Regenerating locally
 
