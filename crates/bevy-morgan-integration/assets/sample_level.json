@@ -1,0 +1,103 @@
+{
+  "id": "level-sample-1",
+  "name": "Sample Office",
+  "objects": [
+    {
+      "id": "obj-floor",
+      "name": "Floor",
+      "transform": {
+        "position": [0.0, 0.0, 0.0],
+        "rotation": [0.0, 0.0, 0.0, 1.0],
+        "scale": [10.0, 0.1, 10.0]
+      },
+      "mesh": "floor.gltf",
+      "material": "default.mat",
+      "layer": "default",
+      "tags": ["static", "nav-mesh"],
+      "collision_shape": {
+        "kind": "box",
+        "half_extents": [10.0, 0.1, 10.0]
+      },
+      "spawn_point": null,
+      "trigger_volume": null
+    },
+    {
+      "id": "obj-spawn",
+      "name": "Player Spawn",
+      "transform": {
+        "position": [0.0, 1.0, 0.0],
+        "rotation": [0.0, 0.0, 0.0, 1.0],
+        "scale": [1.0, 1.0, 1.0]
+      },
+      "mesh": null,
+      "material": null,
+      "layer": "default",
+      "tags": [],
+      "collision_shape": null,
+      "spawn_point": { "kind": "player_start" },
+      "trigger_volume": null
+    },
+    {
+      "id": "obj-door",
+      "name": "Office Door",
+      "transform": {
+        "position": [3.0, 1.0, 0.0],
+        "rotation": [0.0, 0.0, 0.0, 1.0],
+        "scale": [1.0, 2.0, 0.1]
+      },
+      "mesh": "door.gltf",
+      "material": null,
+      "layer": "default",
+      "tags": ["door", "interactable"],
+      "collision_shape": {
+        "kind": "box",
+        "half_extents": [0.5, 1.0, 0.05]
+      },
+      "spawn_point": null,
+      "trigger_volume": null
+    },
+    {
+      "id": "obj-coin",
+      "name": "Gold Coin",
+      "transform": {
+        "position": [-2.0, 0.5, 2.0],
+        "rotation": [0.0, 0.0, 0.0, 1.0],
+        "scale": [0.2, 0.2, 0.2]
+      },
+      "mesh": "coin.gltf",
+      "material": null,
+      "layer": "default",
+      "tags": ["collectible"],
+      "collision_shape": null,
+      "spawn_point": null,
+      "trigger_volume": null
+    },
+    {
+      "id": "obj-exit",
+      "name": "Exit",
+      "transform": {
+        "position": [5.0, 1.0, 5.0],
+        "rotation": [0.0, 0.0, 0.0, 1.0],
+        "scale": [1.0, 1.0, 1.0]
+      },
+      "mesh": null,
+      "material": null,
+      "layer": "default",
+      "tags": [],
+      "collision_shape": null,
+      "spawn_point": null,
+      "trigger_volume": {
+        "kind": "box",
+        "half_extents": [1.0, 1.0, 1.0],
+        "event": "level.complete"
+      }
+    }
+  ],
+  "layers": ["default"],
+  "generation_seed": null,
+  "bounds": {
+    "min": [-10.0, 0.0, -10.0],
+    "max": [10.0, 0.0, 10.0]
+  },
+  "editor_version": "0.4.0"
+}

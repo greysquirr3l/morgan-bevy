@@ -1,0 +1,39 @@
+[package]
+name = "bevy-morgan-integration"
+version = "0.4.0"
+description = "Bevy 0.19 runtime helpers for levels exported by Morgan-Bevy (companion crate to the editor)"
+authors = ["Nick Campbell <s0ma@protonmail.com>"]
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/greysquirr3l/morgan-bevy"
+edition = "2021"
+keywords = ["bevy", "level-editor", "morgan-bevy", "game-development"]
+categories = ["game-development", "graphics"]
+readme = "README.md"
+
+[dependencies]
+# Lightweight Bevy slices — only `app` + `ecs` are pulled in so this
+# crate does not force a full Bevy engine dependency on downstream
+# projects that want to consume the marker components / plugin but
+# already pin a specific Bevy version.
+bevy_app = "0.19"
+bevy_ecs = "0.19"
+# `bevy_transform` is required to attach a `Transform` component to
+# spawned entities. It's a lightweight slice — no rendering deps.
+bevy_transform = "0.19"
+# `bevy_math` 0.19 re-exports `glam = "0.32"`. We pin glam 0.32 here
+# to match Bevy's internal version and avoid two coexisting glam
+# copies in the consumer's binary.
+glam = { version = "0.32", features = ["serde"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+log = "0.4"
+
+[dev-dependencies]
+serde_json = "1"
+
+[lints.clippy]
+pedantic = { level = "warn", priority = -1 }
+nursery = { level = "warn", priority = -1 }
+
+[lints.rust]
+unsafe_code = "forbid"

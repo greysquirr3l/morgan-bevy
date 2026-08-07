@@ -25,13 +25,15 @@ dist-ssr
 
 # Rust
 /src-tauri/target/
+/src-tauri/Cargo.lock
+/target/
+/Cargo.lock
 **/*.rs.bk
 
 # TypeScript
 *.tsbuildinfo
 
-# Tauri
-/src-tauri/Cargo.lock
+# Tauri (no extra rules — src-tauri Cargo.lock is already ignored above)
 
 # Assets - Third-party content
 Assets/TopDownEngine/
