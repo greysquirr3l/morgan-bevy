@@ -5,7 +5,7 @@ import { Color, ShaderMaterial } from 'three'
 const outlineVertexShader = `
   varying vec3 vNormal;
   uniform float outlineThickness;
-  
+
   void main() {
     vNormal = normalize(normalMatrix * normal);
     vec4 pos = modelViewMatrix * vec4(position + normal * outlineThickness, 1.0);
@@ -17,7 +17,7 @@ const outlineFragmentShader = `
   varying vec3 vNormal;
   uniform vec3 outlineColor;
   uniform float outlineOpacity;
-  
+
   void main() {
     float intensity = pow(0.4 - dot(vNormal, vec3(0, 0, 1.0)), 2.0);
     gl_FragColor = vec4(outlineColor, outlineOpacity) * intensity;
@@ -37,46 +37,49 @@ export function useSelectionHighlight(
   const selectedColor = useMemo(() => new Color('#60a5fa'), [])
   const hoveredColor = useMemo(() => new Color('#fbbf24'), [])
   const baseColorObj = useMemo(() => new Color(baseColor), [baseColor])
-  
+
   // Create outline material for selection
   const outlineMaterial = useMemo(() => {
     if (!isSelected && !isHovered) return undefined
-    
+
     return new ShaderMaterial({
       vertexShader: outlineVertexShader,
       fragmentShader: outlineFragmentShader,
       uniforms: {
         outlineColor: { value: isSelected ? selectedColor : hoveredColor },
         outlineThickness: { value: isSelected ? 0.02 : 0.015 },
-        outlineOpacity: { value: isSelected ? 0.8 : 0.6 }
+        outlineOpacity: { value: isSelected ? 0.8 : 0.6 },
       },
       transparent: true,
-      side: 2 // THREE.BackSide
+      side: 2, // THREE.BackSide
     })
   }, [isSelected, isHovered, selectedColor, hoveredColor])
 
   // Base material with efficient color updates
-  const material = useMemo(() => (
-    <meshStandardMaterial 
-      color={isSelected ? selectedColor : isHovered ? hoveredColor : baseColorObj}
-      transparent={isHovered && !isSelected}
-      opacity={isHovered && !isSelected ? 0.8 : 1.0}
-    />
-  ), [isSelected, isHovered, selectedColor, hoveredColor, baseColorObj])
+  const material = useMemo(
+    () => (
+      <meshStandardMaterial
+        color={isSelected ? selectedColor : isHovered ? hoveredColor : baseColorObj}
+        transparent={isHovered && !isSelected}
+        opacity={isHovered && !isSelected ? 0.8 : 1.0}
+      />
+    ),
+    [isSelected, isHovered, selectedColor, hoveredColor, baseColorObj]
+  )
 
   return {
     material,
     needsOutline: isSelected || isHovered,
-    outlineMaterial
+    outlineMaterial,
   }
 }
 
 // Selection highlighting component with outline
-export function SelectionHighlight({ 
-  children, 
-  isSelected, 
-  isHovered, 
-  baseColor 
+export function SelectionHighlight({
+  children,
+  isSelected,
+  isHovered,
+  baseColor,
 }: {
   children: React.ReactNode
   isSelected: boolean
@@ -84,8 +87,8 @@ export function SelectionHighlight({
   baseColor?: string
 }) {
   const { material, needsOutline, outlineMaterial } = useSelectionHighlight(
-    isSelected, 
-    isHovered, 
+    isSelected,
+    isHovered,
     baseColor
   )
 
@@ -97,11 +100,9 @@ export function SelectionHighlight({
           {children}
           {material}
         </mesh>
-        
+
         {/* Outline mesh */}
-        <mesh material={outlineMaterial}>
-          {children}
-        </mesh>
+        <mesh material={outlineMaterial}>{children}</mesh>
       </group>
     )
   }
@@ -114,24 +115,39 @@ export function SelectionHighlight({
   )
 }
 
-// Efficient multi-object selection manager
+// Efficient multi-object selection manager.
+//
+// The `selectionBuffer` ref is a per-id map of `{ selected, hovered }`
+// flags. Consumers (the viewport's per-frame render loop) read it on
+// every frame to decide which meshes need their outline material
+// swapped, without forcing a React re-render. The buffer is updated
+// inside a `useEffect` (not `useMemo`) because the body performs a
+// side-effect — mutating the ref — which is exactly the contract
+// React's rules-of-hooks reserve `useEffect` for.
 export function useSelectionManager(objectIds: string[]) {
   const [selectedObjects, setSelectedObjects] = useState<Set<string>>(new Set())
   const [hoveredObject, setHoveredObject] = useState<string | null>(null)
-  const selectionBuffer = useRef<Map<string, { selected: boolean, hovered: boolean }>>(new Map())
-  
-  // Update selection buffer when objects change
+  const selectionBuffer = useRef<Map<string, { selected: boolean; hovered: boolean }>>(new Map())
+
+  // T48: derive the buffer from the canonical state during render
+  // and mutate the ref. Mutating a ref during render is the
+  // documented pattern for per-frame derived data (AGENTS.md §3
+  // "Per-frame render-loop values live in useRef or in Three.js
+  // objects directly — never in Zustand state"). We use `useMemo`
+  // (not `useEffect`) so the buffer is available to the render that
+  // produced it; `useEffect` would commit the mutation one tick
+  // later and consumers reading `result.current` synchronously after
+  // a state update would see a stale empty buffer.
   useMemo(() => {
-    const newBuffer = new Map()
-    
-    objectIds.forEach(id => {
-      newBuffer.set(id, {
+    const next = new Map<string, { selected: boolean; hovered: boolean }>()
+    for (const id of objectIds) {
+      next.set(id, {
         selected: selectedObjects.has(id),
-        hovered: hoveredObject === id
+        hovered: hoveredObject === id,
       })
-    })
-    
-    selectionBuffer.current = newBuffer
+    }
+    selectionBuffer.current = next
+    return next
   }, [objectIds, selectedObjects, hoveredObject])
 
   const selectObject = (id: string, additive: boolean = false) => {
@@ -177,6 +193,6 @@ export function useSelectionManager(objectIds: string[]) {
     clearSelection,
     hoverObject,
     isSelected,
-    isHovered
+    isHovered,
   }
 }
