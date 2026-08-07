@@ -15,9 +15,10 @@
 use log::{error, info};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use tauri::State;
+use tauri::{Manager, State};
 
 mod assets;
+mod crash_log;
 mod export;
 mod generation;
 mod spatial;
@@ -551,6 +552,24 @@ fn main() {
     env_logger::init();
     info!("Starting Morgan-Bevy Level Editor");
 
+    // Crash logging: install the panic hook first so any subsequent
+    // panic (including the Tauri builder's own failures) is captured to
+    // the rolling crash log. The log file path is resolved at runtime
+    // from the Tauri app data dir; until the app is built the hook
+    // simply falls back to the default panic printer.
+    crash_log::install_panic_hook();
+    if let Ok(app_data_dir) = std::env::var("MORGAN_BEVY_DATA_DIR") {
+        let path = std::path::PathBuf::from(app_data_dir)
+            .join("logs")
+            .join(crash_log::CRASH_LOG_FILENAME);
+        crash_log::ensure_log_dir(&path);
+        crash_log::set_crash_log_path(path);
+    } else {
+        // Defer setting the path until the Tauri app handle is available.
+        // The hook will still print to stderr for now; once `setup`
+        // runs we resolve the real path.
+    }
+
     tauri::Builder::default()
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_dialog::init())
@@ -595,10 +614,28 @@ fn main() {
             assets::scan_assets_database,
             assets::search_assets_database,
             assets::get_asset_database_stats,
-            assets::get_asset_collections
+            assets::get_asset_collections,
+            // Crash reporting
+            crash_log::append_frontend_crash_log
         ])
         .setup(|app| {
             info!("Tauri application setup complete");
+
+            // Resolve the crash log path from the Tauri app data dir if
+            // the env override wasn't set. This makes the panic hook
+            // capture crashes for the lifetime of the process.
+            if crash_log::crash_log_path().is_none() {
+                let candidate = app
+                    .path()
+                    .app_data_dir()
+                    .ok()
+                    .map(|p| p.join("logs").join(crash_log::CRASH_LOG_FILENAME));
+                if let Some(path) = candidate {
+                    crash_log::ensure_log_dir(&path);
+                    crash_log::set_crash_log_path(path.clone());
+                    info!("Crash log configured at {}", path.display());
+                }
+            }
 
             // Initialize asset database in the background
             let handle = app.handle().clone();
