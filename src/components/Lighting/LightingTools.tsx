@@ -12,8 +12,6 @@
  * initial version is enough to drive the export pipeline and the
  * theme auto-lighting contract documented in T55.
  */
-import { ChevronRight, Lightbulb, Plus, Trash2 } from 'lucide-react'
-import { useState } from 'react'
 import { useEditorStore } from '@/store/editorStore'
 import {
   autoLightPlacement,
@@ -22,6 +20,8 @@ import {
 } from '@/utils/autoLightPlacement'
 import { defaultLight, type LightKind, type ShadowQuality } from '@/utils/lighting'
 import { getTheme, THEME_LIST, type ThemeId } from '@/utils/lightThemes'
+import { ChevronRight, Lightbulb, Plus, Trash2 } from 'lucide-react'
+import { useState } from 'react'
 
 export default function LightingTools() {
   const lights = useEditorStore(s => s.lights)
@@ -59,11 +59,7 @@ export default function LightingTools() {
         className="p-2 bg-editor-panel flex items-center cursor-pointer hover:bg-editor-border"
         onClick={() => setIsExpanded(!isExpanded)}
       >
-        {isExpanded ? (
-          <span className="text-xs">▼</span>
-        ) : (
-          <ChevronRight className="w-3 h-3" />
-        )}
+        {isExpanded ? <span className="text-xs">▼</span> : <ChevronRight className="w-3 h-3" />}
         <Lightbulb className="w-3 h-3 ml-2 text-yellow-400" />
         <span className="ml-2 text-sm font-medium">Lighting</span>
         <span className="ml-auto text-xs text-editor-textMuted">
@@ -75,9 +71,7 @@ export default function LightingTools() {
         <div className="p-3 space-y-3 bg-editor-bg">
           {/* Theme + auto-placement */}
           <div className="space-y-2">
-            <label className="block text-xs text-editor-textMuted">
-              Theme
-            </label>
+            <label className="block text-xs text-editor-textMuted">Theme</label>
             <div className="flex items-center gap-2">
               <select
                 className="flex-1 px-2 py-1 text-xs bg-editor-panel border border-editor-border rounded focus:outline-none focus:border-editor-accent"
@@ -99,9 +93,8 @@ export default function LightingTools() {
               </button>
             </div>
             <div className="text-xs text-editor-textMuted">
-              Auto-lighting will place ~{gridPreviewCount} point lights
-              across the floor in a {bounds.max[0] - bounds.min[0]}×
-              {bounds.max[2] - bounds.min[2]} unit grid.
+              Auto-lighting will place ~{gridPreviewCount} point lights across the floor in a{' '}
+              {bounds.max[0] - bounds.min[0]}×{bounds.max[2] - bounds.min[2]} unit grid.
             </div>
           </div>
 
@@ -204,11 +197,11 @@ export default function LightingTools() {
 
 function deriveBounds(
   sceneObjects: Map<
-string,
+    string,
     {
       position: [number, number, number]
     }
->,
+  >
 ): SceneBounds | null {
   if (sceneObjects.size === 0) return null
   let minX = Infinity

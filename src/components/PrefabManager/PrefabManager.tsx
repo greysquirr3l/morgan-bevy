@@ -1,16 +1,16 @@
-import { useState, useEffect } from 'react'
-import { Package, Trash2, Download, ChevronRight, Unlink } from 'lucide-react'
 import { useEditorStore } from '@/store/editorStore'
 import { CreateObjectCommand } from '@/utils/commands'
 import {
+  applyBreakPrefab,
   buildPrefabFromSelection,
   deletePrefabById as deletePrefabFromStorage,
   instantiatePrefabObjects,
   loadPrefabs,
   savePrefab as persistPrefab,
-  applyBreakPrefab,
   type Prefab,
 } from '@/utils/prefabs'
+import { ChevronRight, Download, Package, Trash2, Unlink } from 'lucide-react'
+import { useEffect, useState } from 'react'
 
 export default function PrefabManager() {
   const [isExpanded, setIsExpanded] = useState(false)
@@ -30,7 +30,7 @@ export default function PrefabManager() {
       selectedObjects,
       sceneObjects,
       prefabName,
-      prefabDescription || undefined,
+      prefabDescription || undefined
     )
     if (!built) return
     const next = persistPrefab(built)
@@ -79,11 +79,11 @@ export default function PrefabManager() {
       metadata: {
         version: '1.0.0',
         type: 'morgan-bevy-prefab',
-        exportedAt: new Date().toISOString()
+        exportedAt: new Date().toISOString(),
       },
-      prefab
+      prefab,
     }
-    
+
     const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
@@ -137,7 +137,7 @@ export default function PrefabManager() {
             <Unlink className="w-3 h-3" />
           </button>
           <button
-            onClick={(e) => {
+            onClick={e => {
               e.stopPropagation()
               if (selectedObjects.length > 0) {
                 setShowSaveDialog(true)
@@ -163,7 +163,7 @@ export default function PrefabManager() {
               type="text"
               placeholder="Prefab name..."
               value={prefabName}
-              onChange={(e) => setPrefabName(e.target.value)}
+              onChange={e => setPrefabName(e.target.value)}
               className="w-full px-2 py-1 text-xs bg-editor-panel border border-editor-border rounded focus:outline-none focus:border-editor-accent"
               autoFocus
             />
@@ -171,7 +171,7 @@ export default function PrefabManager() {
               type="text"
               placeholder="Description (optional)..."
               value={prefabDescription}
-              onChange={(e) => setPrefabDescription(e.target.value)}
+              onChange={e => setPrefabDescription(e.target.value)}
               className="w-full px-2 py-1 text-xs bg-editor-panel border border-editor-border rounded focus:outline-none focus:border-editor-accent"
             />
             <div className="flex space-x-2">
@@ -200,11 +200,12 @@ export default function PrefabManager() {
       <div className="max-h-40 overflow-y-auto custom-scrollbar">
         {prefabs.length === 0 ? (
           <div className="p-3 text-xs text-editor-textMuted text-center">
-            No prefabs saved.<br/>
+            No prefabs saved.
+            <br />
             Select objects and click ＋ to create a prefab.
           </div>
         ) : (
-          prefabs.map((prefab) => (
+          prefabs.map(prefab => (
             <div
               key={prefab.id}
               className="p-2 hover:bg-editor-border border-b border-editor-border/50 last:border-b-0"
@@ -215,14 +216,16 @@ export default function PrefabManager() {
                   <div className="flex-1 min-w-0">
                     <div className="font-medium text-xs truncate">{prefab.name}</div>
                     {prefab.description && (
-                      <div className="text-xs text-editor-textMuted truncate">{prefab.description}</div>
+                      <div className="text-xs text-editor-textMuted truncate">
+                        {prefab.description}
+                      </div>
                     )}
                     <div className="text-xs text-editor-textMuted">
                       {prefab.objects.length} object{prefab.objects.length !== 1 ? 's' : ''}
                     </div>
                   </div>
                 </div>
-                
+
                 <div className="flex space-x-1">
                   <button
                     onClick={() => instantiatePrefab(prefab)}

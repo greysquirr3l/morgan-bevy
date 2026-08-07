@@ -77,7 +77,7 @@ describe('directionalContribution', () => {
   it('matches the spec example', () => {
     const light: [number, number, number] = [1, 1, 0]
     expect(directionalContribution(light, [1, 1, 0])).toBeGreaterThan(
-      directionalContribution(light, [0, 1, -1]),
+      directionalContribution(light, [0, 1, -1])
     )
   })
 
@@ -198,7 +198,7 @@ describe('autoLightPlacement', () => {
       getTheme('office'),
       'round',
       // Force non-integer positions
-      1 / 3,
+      1 / 3
     )
     const r = roundedLights(rig)
     for (const light of r) {

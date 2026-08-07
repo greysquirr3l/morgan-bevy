@@ -180,7 +180,7 @@ export interface EditorState {
       castShadow: boolean
       shadowQuality: 'off' | 'hard' | 'soft' | 'ultra'
       name?: string
-    }>,
+    }>
   ) => void
   addLight: (light: {
     id: string
@@ -205,7 +205,7 @@ export interface EditorState {
       castShadow: boolean
       shadowQuality: 'off' | 'hard' | 'soft' | 'ultra'
       name: string
-    }>,
+    }>
   ) => void
 
   // Object management

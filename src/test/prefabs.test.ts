@@ -74,7 +74,7 @@ describe('prefab localStorage', () => {
         samplePrefab(),
         { id: 'broken', name: 'no-objects' /* missing required fields */ },
         'not-an-object',
-      ]),
+      ])
     )
     const list = loadPrefabs()
     expect(list).toHaveLength(1)
@@ -147,7 +147,7 @@ describe('buildPrefabFromSelection', () => {
     const prefab = buildPrefabFromSelection(
       ['a', 'b'],
       useEditorStore.getState().sceneObjects,
-      'Wall-Piece',
+      'Wall-Piece'
     )!
     expect(prefab.objects).toHaveLength(2)
     for (const obj of prefab.objects) {
@@ -158,11 +158,7 @@ describe('buildPrefabFromSelection', () => {
   })
 
   it('sets name + ISO timestamp on the prefab', () => {
-    const prefab = buildPrefabFromSelection(
-      ['a'],
-      useEditorStore.getState().sceneObjects,
-      'X',
-    )!
+    const prefab = buildPrefabFromSelection(['a'], useEditorStore.getState().sceneObjects, 'X')!
     expect(prefab.name).toBe('X')
     expect(() => new Date(prefab.createdAt).toISOString()).not.toThrow()
   })

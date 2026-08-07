@@ -9,8 +9,8 @@
  *  - getVisualIndicator returns null when no constraint is active.
  *  - subscribers receive state updates and unsubscribers stop receiving.
  */
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import * as THREE from 'three'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 // The constraints module imports the editor store lazily, so the
 // `handleKeyInput` path needs a real-or-mocked store. We mock the
@@ -22,10 +22,7 @@ vi.mock('@/store/editorStore', () => ({
   },
 }))
 
-import {
-  transformConstraints,
-  type AxisConstraint,
-} from '../utils/transformConstraints'
+import { transformConstraints, type AxisConstraint } from '../utils/transformConstraints'
 
 describe('transformConstraints.applyConstraint', () => {
   beforeEach(() => transformConstraints.clearConstraint())
@@ -42,9 +39,7 @@ describe('transformConstraints.applyConstraint', () => {
   for (const [constraint, input, expected] of cases) {
     it(`zero-out pattern for ${constraint}`, () => {
       transformConstraints.setConstraint(constraint)
-      const out = transformConstraints.applyConstraint(
-        new THREE.Vector3(...input),
-      )
+      const out = transformConstraints.applyConstraint(new THREE.Vector3(...input))
       expect([out.x, out.y, out.z]).toEqual(expected)
     })
   }
@@ -65,10 +60,7 @@ describe('transformConstraints.applyConstraint', () => {
 
   it('accepts an explicit override constraint', () => {
     transformConstraints.setConstraint('x')
-    const out = transformConstraints.applyConstraint(
-      new THREE.Vector3(1, 2, 3),
-      'z',
-    )
+    const out = transformConstraints.applyConstraint(new THREE.Vector3(1, 2, 3), 'z')
     // Override 'z' should win over the active 'x'.
     expect([out.x, out.y, out.z]).toEqual([0, 0, 3])
   })

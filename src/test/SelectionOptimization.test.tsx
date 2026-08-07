@@ -10,7 +10,7 @@
  *  - clearSelection empties both the set and the buffer.
  *  - hoverObject updates the buffer without touching the selection.
  */
-import { act, renderHook, waitFor } from '@testing-library/react'
+import { act, renderHook } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 import { useSelectionManager } from '../performance/SelectionOptimization'
 
