@@ -1,19 +1,41 @@
 // Test setup file for Vitest
 /* eslint-disable no-var */
 import '@testing-library/jest-dom'
-import { vi } from 'vitest'
+import { beforeEach, vi } from 'vitest'
 
 // Extend global interface for TypeScript
 declare global {
   var mockTauri: any
 }
 
-// Mock localStorage
-const localStorageMock = {
-  getItem: vi.fn(() => null),
-  setItem: vi.fn(),
-  removeItem: vi.fn(),
-  clear: vi.fn(),
+// Mock localStorage with a Map-backed implementation. The default
+// jsdom global is disabled (see `vitest.config.ts`); this mock gives
+// the recent-projects list, SaveCommand, and any other consumer of
+// `window.localStorage` a working in-memory store.
+const localStorageMap = new Map<string, string>()
+
+beforeEach(() => {
+  localStorageMap.clear()
+})
+const localStorageMock: Storage = {
+  get length() {
+    return localStorageMap.size
+  },
+  clear() {
+    localStorageMap.clear()
+  },
+  getItem(key) {
+    return localStorageMap.get(key) ?? null
+  },
+  key(index) {
+    return Array.from(localStorageMap.keys())[index] ?? null
+  },
+  removeItem(key) {
+    localStorageMap.delete(key)
+  },
+  setItem(key, value) {
+    localStorageMap.set(key, value)
+  },
 }
 Object.defineProperty(window, 'localStorage', {
   value: localStorageMock,

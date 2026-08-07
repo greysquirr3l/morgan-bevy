@@ -1,8 +1,17 @@
-import { useState } from 'react'
-import { Save, FolderOpen, FileText, Download } from 'lucide-react'
 import { useEditorStore } from '@/store/editorStore'
-import { SaveCommand, LoadCommand } from '@/utils/commands'
+import { ProjectDataSchema, type ProjectData } from '@/types/schemas'
+import { LoadCommand, SaveCommand } from '@/utils/commands'
+import {
+  addRecentProject,
+  clearRecentProjects,
+  formatRecentTimestamp,
+  getRecentProjects,
+  pruneMissingRecents,
+  type RecentProject,
+} from '@/utils/recentProjects'
 import { invoke } from '@tauri-apps/api/core'
+import { Clock, Download, FileText, FolderOpen, Save, X } from 'lucide-react'
+import { useEffect, useState } from 'react'
 
 interface FileMenuProps {
   isOpen: boolean
@@ -15,6 +24,35 @@ export default function FileMenu({ isOpen, onClose, position, onManualSave }: Fi
   const { executeCommand, sceneObjects, layers } = useEditorStore()
   const [isExporting, setIsExporting] = useState(false)
   const [showExportModal, setShowExportModal] = useState(false)
+  const [recentProjects, setRecentProjects] = useState<RecentProject[]>([])
+  const [, setLastSavedPath] = useState<string | null>(null)
+
+  // Apply a parsed `ProjectData` to the editor store. Mirrors the
+  // historical `LoadCommand` shape but works with the zod-validated
+  // schema payload rather than an untyped JSON blob.
+  const applyProjectDataToStore = (projectData: ProjectData) => {
+    // The historical `LoadCommand` takes an untyped `sceneData`. The
+    // typed schema payload is forwarded as-is — the internal
+    // `LoadCommand` is permissive about extra fields.
+    const command = new LoadCommand(projectData.scene as never)
+    executeCommand(command)
+  }
+
+  // Load the recent-projects list on mount and prune missing entries.
+  useEffect(() => {
+    let cancelled = false
+    void (async () => {
+      const initial = getRecentProjects()
+      if (cancelled) return
+      setRecentProjects(initial)
+      const pruned = await pruneMissingRecents(initial)
+      if (cancelled) return
+      setRecentProjects(pruned)
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   if (!isOpen) return null
 
@@ -23,14 +61,14 @@ export default function FileMenu({ isOpen, onClose, position, onManualSave }: Fi
       const confirmClear = window.confirm('Are you sure? This will clear the current scene.')
       if (!confirmClear) return
     }
-    
+
     // Clear scene and reset to default
     useEditorStore.setState({
       sceneObjects: new Map(),
       selectedObjects: [],
       undoHistory: [],
       redoHistory: [],
-      activeLayer: 'default'
+      activeLayer: 'default',
     })
     onClose()
   }
@@ -46,11 +84,11 @@ export default function FileMenu({ isOpen, onClose, position, onManualSave }: Fi
     const input = document.createElement('input')
     input.type = 'file'
     input.accept = '.json,.morgan'
-    input.onchange = (event) => {
+    input.onchange = event => {
       const file = (event.target as HTMLInputElement).files?.[0]
       if (file) {
         const reader = new FileReader()
-        reader.onload = (e) => {
+        reader.onload = e => {
           try {
             const content = e.target?.result as string
             const data = JSON.parse(content)
@@ -70,7 +108,7 @@ export default function FileMenu({ isOpen, onClose, position, onManualSave }: Fi
 
   const handleExport = async () => {
     setIsExporting(true)
-    
+
     try {
       // Create comprehensive export data
       const exportData = {
@@ -79,15 +117,15 @@ export default function FileMenu({ isOpen, onClose, position, onManualSave }: Fi
           editor: 'Morgan-Bevy',
           exportedAt: new Date().toISOString(),
           objectCount: Array.from(sceneObjects.keys()).length,
-          layerCount: layers.length
+          layerCount: layers.length,
         },
         scene: {
           objects: sceneObjects,
           layers: layers,
           settings: {
             gridSize: useEditorStore.getState().gridSize,
-            snapToGrid: useEditorStore.getState().snapToGrid
-          }
+            snapToGrid: useEditorStore.getState().snapToGrid,
+          },
         },
         // Bevy-compatible format
         bevy: {
@@ -97,16 +135,16 @@ export default function FileMenu({ isOpen, onClose, position, onManualSave }: Fi
               Transform: {
                 translation: obj.position,
                 rotation: obj.rotation,
-                scale: obj.scale
+                scale: obj.scale,
               },
               Visibility: {
-                is_visible: obj.visible
+                is_visible: obj.visible,
               },
-              MeshType: obj.meshType || 'cube'
+              MeshType: obj.meshType || 'cube',
             },
-            layer: layers.find(l => l.id === obj.layerId)?.name || 'Default'
-          }))
-        }
+            layer: layers.find(l => l.id === obj.layerId)?.name || 'Default',
+          })),
+        },
       }
 
       // Create and download file
@@ -117,31 +155,49 @@ export default function FileMenu({ isOpen, onClose, position, onManualSave }: Fi
       a.download = `morgan-scene-${Date.now()}.json`
       a.click()
       URL.revokeObjectURL(url)
-      
     } catch (error) {
       alert('Error exporting scene')
       console.error('Export error:', error)
     } finally {
       setIsExporting(false)
     }
-    
+
     onClose()
   }
 
   const saveProject = async () => {
     try {
-      const projectData = {
-        version: '1.0.0',
-        timestamp: new Date().toISOString(),
+      // Build a ProjectData from the current editor state. The scene is
+      // the live Zustand state — serialise it as a plain object so the
+      // JSON payload matches what the Rust side expects.
+      const state = useEditorStore.getState()
+      const projectData: ProjectData = ProjectDataSchema.parse({
+        schemaVersion: 1,
         scene: {
-          objects: sceneObjects,
-          camera: { position: [10, 10, 10], target: [0, 0, 0] },
-          lighting: { ambient: 0.4, directional: 0.6 }
-        }
-      }
-      
-      await invoke('save_project', { projectData })
-      console.log('Project saved successfully')
+          objects: Array.from(state.sceneObjects.entries()),
+          layers: state.layers,
+          activeLayer: state.activeLayer,
+          selectedObjects: state.selectedObjects,
+          settings: {
+            gridSize: state.gridSize,
+            snapToGrid: state.snapToGrid,
+            transformMode: state.transformMode,
+            coordinateSpace: state.coordinateSpace,
+          },
+        },
+        metadata: {
+          name: 'Morgan-Bevy Project',
+          savedAt: new Date().toISOString(),
+          objectCount: state.sceneObjects.size,
+          layerCount: state.layers.length,
+        },
+      })
+
+      const path = await invoke<string>('save_project', { projectData })
+      // Derive a project name from the path and add to recents.
+      const name = path.split(/[\\/]/).pop() ?? 'project.mbp'
+      setRecentProjects(addRecentProject(path, name))
+      setLastSavedPath(path)
       onClose()
     } catch (error) {
       console.error('Save failed:', error)
@@ -151,14 +207,53 @@ export default function FileMenu({ isOpen, onClose, position, onManualSave }: Fi
 
   const openProject = async () => {
     try {
-      const projectData = await invoke('load_project')
-      console.log('Project loaded successfully:', projectData)
-      // TODO: Apply loaded project data to store
+      const raw = await invoke<unknown>('load_project')
+      const projectData = ProjectDataSchema.parse(raw)
+      applyProjectDataToStore(projectData)
+      // The Rust side returns the parsed JSON, not the path — but the
+      // save_project command returned the path. For "Open" we don't
+      // currently get the path back, so we add a synthetic recent
+      // entry derived from the project metadata name (the user can
+      // re-save to lock the path into recents).
+      const fallbackName =
+        (projectData.metadata as { name?: string } | undefined)?.name ??
+        `${(projectData.metadata as { name?: string } | undefined)?.name ?? 'project'}.mbp`
+      setRecentProjects(
+        addRecentProject(
+          (projectData.metadata as { name?: string } | undefined)?.name ?? 'in-memory',
+          fallbackName
+        )
+      )
       onClose()
     } catch (error) {
       console.error('Load failed:', error)
       alert(`Load failed: ${error}`)
     }
+  }
+
+  const openRecentProject = async (entry: RecentProject) => {
+    try {
+      const raw = await invoke<unknown>('load_project_from_path', {
+        path: entry.path,
+      })
+      const projectData = ProjectDataSchema.parse(raw)
+      applyProjectDataToStore(projectData)
+      setRecentProjects(addRecentProject(entry.path, entry.name))
+      onClose()
+    } catch (error) {
+      // If the file is missing, prune it from the list and let the
+      // user retry.
+      console.error('Failed to open recent project', entry.path, error)
+      setRecentProjects(
+        (await pruneMissingRecents(getRecentProjects())).filter(e => e.path !== entry.path)
+      )
+      alert(`Failed to open ${entry.name}: ${error}`)
+    }
+  }
+
+  const clearRecents = () => {
+    clearRecentProjects()
+    setRecentProjects([])
   }
 
   const exportLevel = () => {
@@ -177,12 +272,12 @@ export default function FileMenu({ isOpen, onClose, position, onManualSave }: Fi
           transform: {
             position: obj.position,
             rotation: obj.rotation,
-            scale: obj.scale
+            scale: obj.scale,
           },
           material: obj.material || {
             baseColor: '#ffffff',
             metallic: 0.0,
-            roughness: 0.5
+            roughness: 0.5,
           },
           mesh: obj.meshType || 'cube',
           layer: obj.layerId,
@@ -191,23 +286,23 @@ export default function FileMenu({ isOpen, onClose, position, onManualSave }: Fi
             visible: obj.visible,
             locked: obj.locked,
             collision: obj.collision,
-            walkable: obj.walkable
-          }
+            walkable: obj.walkable,
+          },
         })),
         layers: ['default', 'walls', 'floors', 'doors'],
         bounds: {
           min: [-50, -50, -50],
-          max: [50, 50, 50]
-        }
+          max: [50, 50, 50],
+        },
       }
-      
+
       // Export via Tauri command
       await invoke('export_level_simple', {
         levelData,
         format,
-        outputPath: null // Let user choose
+        outputPath: null, // Let user choose
       })
-      
+
       setShowExportModal(false)
       onClose()
       console.log(`Exported level as ${format.toUpperCase()}`)
@@ -220,19 +315,16 @@ export default function FileMenu({ isOpen, onClose, position, onManualSave }: Fi
   return (
     <>
       {/* Backdrop to close menu */}
-      <div 
-        className="fixed inset-0 z-40" 
-        onClick={onClose}
-      />
-      
+      <div className="fixed inset-0 z-40" onClick={onClose} />
+
       {/* File Menu */}
-      <div 
+      <div
         className="fixed bg-editor-panel border border-editor-border rounded-md shadow-lg py-1 z-50 min-w-48"
-        style={{ 
-          left: position.x, 
+        style={{
+          left: position.x,
           top: position.y,
           maxHeight: '400px',
-          overflowY: 'auto'
+          overflowY: 'auto',
         }}
       >
         {/* New Scene */}
@@ -244,10 +336,10 @@ export default function FileMenu({ isOpen, onClose, position, onManualSave }: Fi
           <span>New Scene</span>
           <span className="ml-auto text-xs text-editor-textMuted">Ctrl+N</span>
         </button>
-        
+
         {/* Separator */}
         <div className="border-t border-editor-border my-1" />
-        
+
         {/* Load Scene */}
         <button
           className="w-full px-3 py-2 text-left text-sm hover:bg-editor-border flex items-center space-x-2"
@@ -257,7 +349,7 @@ export default function FileMenu({ isOpen, onClose, position, onManualSave }: Fi
           <span>Open Scene...</span>
           <span className="ml-auto text-xs text-editor-textMuted">Ctrl+O</span>
         </button>
-        
+
         {/* Save Scene */}
         <button
           className="w-full px-3 py-2 text-left text-sm hover:bg-editor-border flex items-center space-x-2"
@@ -267,7 +359,7 @@ export default function FileMenu({ isOpen, onClose, position, onManualSave }: Fi
           <span>Save Scene</span>
           <span className="ml-auto text-xs text-editor-textMuted">Ctrl+S</span>
         </button>
-        
+
         {/* Auto-Save to Local Storage */}
         {onManualSave && (
           <button
@@ -279,10 +371,10 @@ export default function FileMenu({ isOpen, onClose, position, onManualSave }: Fi
             <span className="ml-auto text-xs text-editor-textMuted">Auto-restore</span>
           </button>
         )}
-        
+
         {/* Separator */}
         <div className="border-t border-editor-border my-1" />
-        
+
         {/* Project Operations */}
         <button
           className="w-full px-3 py-2 text-left text-sm hover:bg-editor-border flex items-center space-x-2"
@@ -292,7 +384,7 @@ export default function FileMenu({ isOpen, onClose, position, onManualSave }: Fi
           <span>Save Project</span>
           <span className="ml-auto text-xs text-editor-textMuted">Ctrl+Shift+S</span>
         </button>
-        
+
         <button
           className="w-full px-3 py-2 text-left text-sm hover:bg-editor-border flex items-center space-x-2"
           onClick={openProject}
@@ -301,10 +393,48 @@ export default function FileMenu({ isOpen, onClose, position, onManualSave }: Fi
           <span>Open Project...</span>
           <span className="ml-auto text-xs text-editor-textMuted">Ctrl+Shift+O</span>
         </button>
-        
+
+        {/* Recent Projects */}
+        {recentProjects.length > 0 && (
+          <>
+            <div className="border-t border-editor-border my-1" />
+            <div className="px-3 pt-1 pb-1 text-[10px] uppercase tracking-wider text-editor-textMuted flex items-center justify-between">
+              <span className="flex items-center space-x-1">
+                <Clock className="w-3 h-3" />
+                <span>Recent</span>
+              </span>
+              <button
+                type="button"
+                className="text-editor-textMuted hover:text-editor-text"
+                onClick={clearRecents}
+                aria-label="Clear recent projects"
+              >
+                <X className="w-3 h-3" />
+              </button>
+            </div>
+            {recentProjects.map(entry => (
+              <button
+                key={entry.path}
+                type="button"
+                className="w-full px-3 py-1.5 text-left text-sm hover:bg-editor-border flex items-center space-x-2"
+                onClick={() => openRecentProject(entry)}
+                title={entry.path}
+              >
+                <FileText className="w-3.5 h-3.5 flex-shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <div className="truncate">{entry.name}</div>
+                  <div className="text-[10px] text-editor-textMuted truncate">
+                    {formatRecentTimestamp(entry.openedAt)}
+                  </div>
+                </div>
+              </button>
+            ))}
+          </>
+        )}
+
         {/* Separator */}
         <div className="border-t border-editor-border my-1" />
-        
+
         {/* Export Scene */}
         <button
           className="w-full px-3 py-2 text-left text-sm hover:bg-editor-border flex items-center space-x-2"
@@ -315,7 +445,7 @@ export default function FileMenu({ isOpen, onClose, position, onManualSave }: Fi
           <span>{isExporting ? 'Exporting...' : 'Export Scene...'}</span>
           <span className="ml-auto text-xs text-editor-textMuted">Ctrl+E</span>
         </button>
-        
+
         {/* Export Level */}
         <button
           className="w-full px-3 py-2 text-left text-sm hover:bg-editor-border flex items-center space-x-2"
@@ -325,7 +455,7 @@ export default function FileMenu({ isOpen, onClose, position, onManualSave }: Fi
           <span>Export Level...</span>
           <span className="ml-auto text-xs text-editor-textMuted">Ctrl+Shift+E</span>
         </button>
-        
+
         {/* Scene Info */}
         <div className="border-t border-editor-border my-1" />
         <div className="px-3 py-2 text-xs text-editor-textMuted">
@@ -333,13 +463,13 @@ export default function FileMenu({ isOpen, onClose, position, onManualSave }: Fi
           <div>Layers: {layers.length}</div>
         </div>
       </div>
-      
+
       {/* Export Level Modal */}
       {showExportModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-editor-panel border border-editor-border rounded-lg p-6 w-96">
             <h2 className="text-lg font-semibold mb-4">Export Level</h2>
-            
+
             <div className="space-y-3 mb-6">
               <button
                 className="w-full flex items-center justify-between p-3 bg-editor-bg hover:bg-editor-hover rounded text-left"
@@ -347,11 +477,13 @@ export default function FileMenu({ isOpen, onClose, position, onManualSave }: Fi
               >
                 <div>
                   <div className="font-medium">JSON Export</div>
-                  <div className="text-sm text-editor-textMuted">Universal format for web and tools</div>
+                  <div className="text-sm text-editor-textMuted">
+                    Universal format for web and tools
+                  </div>
                 </div>
                 <Download className="w-5 h-5" />
               </button>
-              
+
               <button
                 className="w-full flex items-center justify-between p-3 bg-editor-bg hover:bg-editor-hover rounded text-left"
                 onClick={() => handleLevelExport('ron')}
@@ -362,7 +494,7 @@ export default function FileMenu({ isOpen, onClose, position, onManualSave }: Fi
                 </div>
                 <Download className="w-5 h-5" />
               </button>
-              
+
               <button
                 className="w-full flex items-center justify-between p-3 bg-editor-bg hover:bg-editor-hover rounded text-left"
                 onClick={() => handleLevelExport('rust')}
@@ -374,7 +506,7 @@ export default function FileMenu({ isOpen, onClose, position, onManualSave }: Fi
                 <Download className="w-5 h-5" />
               </button>
             </div>
-            
+
             <div className="flex space-x-2">
               <button
                 className="flex-1 px-4 py-2 bg-editor-bg hover:bg-editor-hover rounded"

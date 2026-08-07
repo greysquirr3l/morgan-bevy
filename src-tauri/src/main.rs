@@ -509,6 +509,28 @@ async fn load_project() -> Result<ProjectData, String> {
     Ok(project_data)
 }
 
+/// Load a project from a known path (used by the recent-projects list).
+/// The frontend persists recent paths in localStorage and re-loads them
+/// without re-prompting via the file dialog.
+#[tauri::command]
+async fn load_project_from_path(path: String) -> Result<ProjectData, String> {
+    info!("Loading project from path: {path}");
+
+    let p = std::path::Path::new(&path);
+    if !p.exists() {
+        return Err(format!("File not found: {path}"));
+    }
+
+    let json_data =
+        std::fs::read_to_string(p).map_err(|e| format!("Failed to read project file: {e}"))?;
+
+    let project_data: ProjectData = serde_json::from_str(&json_data)
+        .map_err(|e| format!("Failed to parse project file: {e}"))?;
+
+    info!("Successfully loaded project from: {}", p.display());
+    Ok(project_data)
+}
+
 #[tauri::command]
 async fn browse_for_texture() -> Result<Vec<String>, String> {
     info!("Browsing for texture files");
@@ -538,6 +560,15 @@ async fn browse_for_texture() -> Result<Vec<String>, String> {
             Ok(path_strings)
         },
     )
+}
+
+/// Best-effort path-existence check used by the recent-projects list to
+/// prune entries whose backing file no longer exists. Returns false
+/// for any I/O error (other errors propagate as Err to the caller so
+/// the caller can decide).
+#[tauri::command]
+fn path_exists(path: &str) -> bool {
+    std::path::Path::new(path).exists()
 }
 
 #[expect(
@@ -597,6 +628,7 @@ fn main() {
             // Project Management
             save_project,
             load_project,
+            load_project_from_path,
             // File Operations
             browse_for_texture,
             // Spatial Queries
@@ -616,7 +648,9 @@ fn main() {
             assets::get_asset_database_stats,
             assets::get_asset_collections,
             // Crash reporting
-            crash_log::append_frontend_crash_log
+            crash_log::append_frontend_crash_log,
+            // Recent-projects support
+            path_exists
         ])
         .setup(|app| {
             info!("Tauri application setup complete");
