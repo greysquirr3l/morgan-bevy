@@ -99,9 +99,12 @@ jobs:
       - name: Install cargo-deny (prebuilt)
         # Prebuilt binary is ~10x faster than `cargo install --locked`
         # and avoids pulling a second Rust toolchain into the runner.
-        uses: taiki-e/install-action@cargo-deny
+        # taiki-e/install-action uses `tool:` (not `version:`) — the
+        # latest release is fetched automatically. Pinned to a
+        # major tag so Renovate can bump it.
+        uses: taiki-e/install-action@v1
         with:
-          version: '0.16'
+          tool: cargo-deny
 
       - name: cargo check
         run: cargo check --manifest-path src-tauri/Cargo.toml --all-targets

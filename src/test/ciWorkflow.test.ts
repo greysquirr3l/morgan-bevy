@@ -108,7 +108,11 @@ describe('ci.yml shape', () => {
   it('uses Swatinem rust-cache and prebuilt cargo-deny', () => {
     const uses = collectUses(wf)
     expect(uses.some(u => u.startsWith('Swatinem/rust-cache@'))).toBe(true)
-    expect(uses.some(u => u.startsWith('taiki-e/install-action@cargo-deny'))).toBe(true)
+    // taiki-e/install-action uses `tool: cargo-deny` (not `version:`);
+    // the action itself accepts a major-tag pin so Renovate can bump it.
+    expect(
+      uses.some(u => u.startsWith('taiki-e/install-action@') && !u.endsWith('@cargo-deny'))
+    ).toBe(true)
   })
 
   it('runs the workflow-lint job on ubuntu-latest only', () => {
