@@ -334,6 +334,7 @@ function useViewportSync() {
     }
 
     prevViewportModeRef.current = viewportMode
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [viewportMode]) // Only depend on viewportMode to prevent infinite loops
 
   return { syncGridToScene, sync3DToGrid }
