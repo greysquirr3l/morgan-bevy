@@ -101,7 +101,8 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          # Node 22 LTS — matches CI and AGENTS.md.
+          node-version: '22'
           cache: 'npm'
 
       - name: Cache cargo
