@@ -1,8 +1,8 @@
-import { useRef, useEffect, useState, useCallback } from 'react'
-import { OrthographicCamera, PerspectiveCamera, Vector3 } from 'three'
+import { useEditorStore } from '@/store/editorStore'
 import { CameraControls } from '@react-three/drei'
 import { useFrame, useThree } from '@react-three/fiber'
-import { useEditorStore } from '@/store/editorStore'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { OrthographicCamera, PerspectiveCamera, Vector3 } from 'three'
 
 export type CameraMode = 'orbit' | 'fly' | 'orthographic'
 
@@ -18,7 +18,7 @@ export default function CameraSystem({ mode, onModeChange }: CameraSystemProps) 
   const [keys, setKeys] = useState<Set<string>>(new Set())
   const [mouseMovement, setMouseMovement] = useState({ x: 0, y: 0 })
   const [isMouseLocked, setIsMouseLocked] = useState(false)
-  
+
   // Camera position and rotation for fly mode
   const flyPosition = useRef(new Vector3(10, 10, 10))
   const flyRotation = useRef({ pitch: 0, yaw: 0 })
@@ -41,42 +41,56 @@ export default function CameraSystem({ mode, onModeChange }: CameraSystemProps) 
     } else {
       // Ensure we have a perspective camera for orbit and fly modes
       if (!(camera instanceof PerspectiveCamera)) {
-        const perspCamera = new PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000)
+        const perspCamera = new PerspectiveCamera(
+          75,
+          window.innerWidth / window.innerHeight,
+          0.1,
+          1000
+        )
         perspCamera.position.set(10, 10, 10)
       }
     }
   }, [mode, camera])
 
   // Keyboard event handlers for fly mode
-  const handleKeyDown = useCallback((event: KeyboardEvent) => {
-    if (mode !== 'fly') return
-    setKeys(prev => new Set(prev).add(event.code))
-    
-    // Prevent default for WASD keys to avoid browser scroll
-    if (['KeyW', 'KeyA', 'KeyS', 'KeyD', 'Space', 'ShiftLeft'].includes(event.code)) {
-      event.preventDefault()
-    }
-  }, [mode])
+  const handleKeyDown = useCallback(
+    (event: KeyboardEvent) => {
+      if (mode !== 'fly') return
+      setKeys(prev => new Set(prev).add(event.code))
 
-  const handleKeyUp = useCallback((event: KeyboardEvent) => {
-    if (mode !== 'fly') return
-    setKeys(prev => {
-      const newKeys = new Set(prev)
-      newKeys.delete(event.code)
-      return newKeys
-    })
-  }, [mode])
+      // Prevent default for WASD keys to avoid browser scroll
+      if (['KeyW', 'KeyA', 'KeyS', 'KeyD', 'Space', 'ShiftLeft'].includes(event.code)) {
+        event.preventDefault()
+      }
+    },
+    [mode]
+  )
+
+  const handleKeyUp = useCallback(
+    (event: KeyboardEvent) => {
+      if (mode !== 'fly') return
+      setKeys(prev => {
+        const newKeys = new Set(prev)
+        newKeys.delete(event.code)
+        return newKeys
+      })
+    },
+    [mode]
+  )
 
   // Mouse movement for fly mode
-  const handleMouseMove = useCallback((event: MouseEvent) => {
-    if (mode !== 'fly' || !isMouseLocked) return
-    
-    const sensitivity = 0.002
-    setMouseMovement({
-      x: event.movementX * sensitivity,
-      y: event.movementY * sensitivity,
-    })
-  }, [mode, isMouseLocked])
+  const handleMouseMove = useCallback(
+    (event: MouseEvent) => {
+      if (mode !== 'fly' || !isMouseLocked) return
+
+      const sensitivity = 0.002
+      setMouseMovement({
+        x: event.movementX * sensitivity,
+        y: event.movementY * sensitivity,
+      })
+    },
+    [mode, isMouseLocked]
+  )
 
   // Pointer lock for fly mode
   const handleCanvasClick = useCallback(() => {
@@ -103,7 +117,7 @@ export default function CameraSystem({ mode, onModeChange }: CameraSystemProps) 
       gl.domElement.removeEventListener('click', handleCanvasClick)
       document.removeEventListener('pointerlockchange', handlePointerLockChange)
     }
-  }, [handleKeyDown, handleKeyUp, handleCanvasClick, handlePointerLockChange])
+  }, [handleKeyDown, handleKeyUp, handleCanvasClick, handlePointerLockChange, gl.domElement])
 
   // Mouse movement listener for fly mode
   useEffect(() => {
@@ -121,7 +135,10 @@ export default function CameraSystem({ mode, onModeChange }: CameraSystemProps) 
     if (isMouseLocked) {
       flyRotation.current.yaw -= mouseMovement.x
       flyRotation.current.pitch -= mouseMovement.y
-      flyRotation.current.pitch = Math.max(-Math.PI/2, Math.min(Math.PI/2, flyRotation.current.pitch))
+      flyRotation.current.pitch = Math.max(
+        -Math.PI / 2,
+        Math.min(Math.PI / 2, flyRotation.current.pitch)
+      )
       setMouseMovement({ x: 0, y: 0 })
     }
 
@@ -188,14 +205,9 @@ export default function CameraSystem({ mode, onModeChange }: CameraSystemProps) 
   return (
     <>
       {mode === 'orbit' && (
-        <CameraControls
-          ref={controlsRef}
-          makeDefault
-          minDistance={1}
-          maxDistance={100}
-        />
+        <CameraControls ref={controlsRef} makeDefault minDistance={1} maxDistance={100} />
       )}
-      
+
       {mode === 'fly' && isMouseLocked && (
         <div className="fixed top-4 left-1/2 transform -translate-x-1/2 bg-black/80 text-white px-4 py-2 rounded text-sm z-50">
           <div className="text-center">
@@ -203,9 +215,7 @@ export default function CameraSystem({ mode, onModeChange }: CameraSystemProps) 
             <div className="text-xs mt-1">
               WASD: Move • Mouse: Look • Space/C: Up/Down • Shift: Fast • ESC: Exit
             </div>
-            <div className="text-xs text-gray-300 mt-1">
-              Speed: {flySpeed.toFixed(1)} units/sec
-            </div>
+            <div className="text-xs text-gray-300 mt-1">Speed: {flySpeed.toFixed(1)} units/sec</div>
           </div>
         </div>
       )}
@@ -214,9 +224,7 @@ export default function CameraSystem({ mode, onModeChange }: CameraSystemProps) 
         <div className="fixed top-4 left-1/2 transform -translate-x-1/2 bg-black/80 text-white px-4 py-2 rounded text-sm z-50">
           <div className="text-center">
             <div className="font-semibold">Orthographic Top-Down View</div>
-            <div className="text-xs mt-1">
-              Mouse: Pan • Scroll: Zoom • 1: Orbit • 2: Fly
-            </div>
+            <div className="text-xs mt-1">Mouse: Pan • Scroll: Zoom • 1: Orbit • 2: Fly</div>
           </div>
         </div>
       )}
@@ -227,14 +235,18 @@ export default function CameraSystem({ mode, onModeChange }: CameraSystemProps) 
 // Hook for camera controls
 export function useCameraControls() {
   const [cameraMode, setCameraMode] = useState<CameraMode>('orbit')
-  
+
   const frameSelected = useCallback(() => {
     const { selectedObjects, sceneObjects } = useEditorStore.getState()
     if (selectedObjects.length === 0) return
 
     // Calculate bounding box of selected objects
-    let minX = Infinity, minY = Infinity, minZ = Infinity
-    let maxX = -Infinity, maxY = -Infinity, maxZ = -Infinity
+    let minX = Infinity,
+      minY = Infinity,
+      minZ = Infinity
+    let maxX = -Infinity,
+      maxY = -Infinity,
+      maxZ = -Infinity
 
     selectedObjects.forEach(id => {
       const obj = sceneObjects.get(id)
@@ -258,13 +270,15 @@ export function useCameraControls() {
 
     // Set camera position based on mode
     // Implementation would depend on specific camera mode
-    console.log(`Framing selection at (${centerX}, ${centerY}, ${centerZ}) with distance ${distance}`)
+    console.log(
+      `Framing selection at (${centerX}, ${centerY}, ${centerZ}) with distance ${distance}`
+    )
   }, [])
 
   const frameAll = useCallback(() => {
     const { sceneObjects } = useEditorStore.getState()
     const objectIds = Object.keys(sceneObjects)
-    
+
     if (objectIds.length === 0) return
 
     // Similar logic to frameSelected but for all objects

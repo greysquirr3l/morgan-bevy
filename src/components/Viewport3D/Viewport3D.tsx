@@ -1,18 +1,17 @@
-import { Canvas } from '@react-three/fiber'
-import { Grid, Stats } from '@react-three/drei'
-import Scene from './Scene'
-import OptimizedScene, { PerformanceOverlay } from './OptimizedScene'
-import BoxSelection, { BoxSelectionOverlay } from './BoxSelection'
-import TransformGizmos from '../TransformGizmos'
-import TransformConstraintIndicator from '../TransformConstraintIndicator'
-import CameraSystem from './CameraSystem'
-import { useEditorStore } from '@/store/editorStore'
-import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts'
 import { useBoxSelection } from '@/hooks/useBoxSelection'
 import { useCameraControls } from '@/hooks/useCameraControls'
-import { usePerformanceManager, PerformanceObject } from '@/performance'
-import { useCallback, useState, forwardRef, useImperativeHandle, useMemo } from 'react'
-import React from 'react'
+import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts'
+import { PerformanceObject, usePerformanceManager } from '@/performance'
+import { useEditorStore } from '@/store/editorStore'
+import { Grid, Stats } from '@react-three/drei'
+import { Canvas } from '@react-three/fiber'
+import React, { forwardRef, useCallback, useImperativeHandle, useMemo, useState } from 'react'
+import TransformConstraintIndicator from '../TransformConstraintIndicator'
+import TransformGizmos from '../TransformGizmos'
+import BoxSelection, { BoxSelectionOverlay } from './BoxSelection'
+import CameraSystem from './CameraSystem'
+import OptimizedScene, { PerformanceOverlay } from './OptimizedScene'
+import Scene from './Scene'
 // Camera controls interface
 export interface CameraControlsRef {
   resetView: () => void
@@ -21,10 +20,10 @@ export interface CameraControlsRef {
 }
 
 // Performance context component that handles R3F hooks within Canvas
-function PerformanceContext({ 
-  performanceObjects, 
-  setMetrics, 
-  setQualityInfo
+function PerformanceContext({
+  performanceObjects,
+  setMetrics,
+  setQualityInfo,
 }: {
   performanceObjects: PerformanceObject[]
   setMetrics: (metrics: any) => void
@@ -34,45 +33,49 @@ function PerformanceContext({
     performanceObjects,
     5000 // max render budget
   )
-  
+
   // Update parent component with metrics
   React.useEffect(() => {
     setMetrics(metrics)
   }, [metrics, setMetrics])
-  
+
   // Simple quality management without useFrame for now
   React.useEffect(() => {
     setQualityInfo({
       qualityMultiplier: metrics.frameRate > 30 ? 1.0 : 0.6,
       lodDistance: metrics.frameRate > 30 ? 50 : 30,
-      instanceThreshold: 10
+      instanceThreshold: 10,
     })
   }, [metrics.frameRate, setQualityInfo])
-  
+
   return null
 }
 
 // Camera controls component that provides the controls within Canvas context
-function CameraControls({ cameraControlsRef }: { cameraControlsRef: React.ForwardedRef<CameraControlsRef> }) {
+function CameraControls({
+  cameraControlsRef,
+}: {
+  cameraControlsRef: React.ForwardedRef<CameraControlsRef>
+}) {
   const { resetView, focusSelection, frameAll } = useCameraControls()
   const { cameraMode, setCameraMode } = useEditorStore()
-  
-  useImperativeHandle(cameraControlsRef, () => ({
-    resetView,
-    focusSelection,
-    frameAll
-  }), [resetView, focusSelection, frameAll])
 
-  return (
-    <CameraSystem 
-      mode={cameraMode} 
-      onModeChange={setCameraMode}
-    />
+  useImperativeHandle(
+    cameraControlsRef,
+    () => ({
+      resetView,
+      focusSelection,
+      frameAll,
+    }),
+    [resetView, focusSelection, frameAll]
   )
+
+  return <CameraSystem mode={cameraMode} onModeChange={setCameraMode} />
 }
 
-export default forwardRef<CameraControlsRef, object>((_props, ref) => {
-  const { showGrid, showStats, transformMode, addObject, cameraMode, sceneObjects, layers } = useEditorStore()
+export default forwardRef<CameraControlsRef, object>(function Viewport3D(_props, ref) {
+  const { showGrid, showStats, transformMode, addObject, cameraMode, sceneObjects, layers } =
+    useEditorStore()
   const [isDragOver, setIsDragOver] = useState(false)
   const [useOptimizedRendering, setUseOptimizedRendering] = useState(true)
   const { boxState } = useBoxSelection()
@@ -85,38 +88,40 @@ export default forwardRef<CameraControlsRef, object>((_props, ref) => {
     culledObjects: 0,
     instancedObjects: 0,
     frameRate: 60,
-    memoryUsage: 0
+    memoryUsage: 0,
   })
-  
+
   const [qualityInfo, setQualityInfo] = useState({
     qualityMultiplier: 1.0,
     lodDistance: 50,
-    instanceThreshold: 10
+    instanceThreshold: 10,
   })
-  
+
   // Convert scene objects to performance objects for metrics
   const performanceObjects: PerformanceObject[] = useMemo(() => {
-    return Object.values(sceneObjects).map((obj: any) => {
-      if (obj.type !== 'mesh' || !obj.meshType) return null
-      
-      let importance = 0.5
-      if (obj.id.includes('selected')) importance = 1.0
-      if (obj.layerId === 'walls') importance = 0.8
-      if (obj.layerId === 'floors') importance = 0.6
-      if (obj.metadata?.fromGrid) importance = 0.4
-      
-      return {
-        id: obj.id,
-        meshType: obj.meshType,
-        position: obj.position,
-        rotation: obj.rotation,
-        scale: obj.scale,
-        color: obj.material?.baseColor || '#9ca3af',
-        visible: obj.visible && (layers.find(l => l.id === obj.layerId)?.visible ?? true),
-        importance,
-        boundingRadius: Math.max(...obj.scale) * 0.5
-      }
-    }).filter(Boolean) as PerformanceObject[]
+    return Object.values(sceneObjects)
+      .map((obj: any) => {
+        if (obj.type !== 'mesh' || !obj.meshType) return null
+
+        let importance = 0.5
+        if (obj.id.includes('selected')) importance = 1.0
+        if (obj.layerId === 'walls') importance = 0.8
+        if (obj.layerId === 'floors') importance = 0.6
+        if (obj.metadata?.fromGrid) importance = 0.4
+
+        return {
+          id: obj.id,
+          meshType: obj.meshType,
+          position: obj.position,
+          rotation: obj.rotation,
+          scale: obj.scale,
+          color: obj.material?.baseColor || '#9ca3af',
+          visible: obj.visible && (layers.find(l => l.id === obj.layerId)?.visible ?? true),
+          importance,
+          boundingRadius: Math.max(...obj.scale) * 0.5,
+        }
+      })
+      .filter(Boolean) as PerformanceObject[]
   }, [sceneObjects, layers])
 
   // Handle drag and drop from assets panel
@@ -131,52 +136,56 @@ export default forwardRef<CameraControlsRef, object>((_props, ref) => {
     setIsDragOver(false)
   }, [])
 
-  const handleDrop = useCallback((event: React.DragEvent) => {
-    event.preventDefault()
-    setIsDragOver(false)
-    
-    try {
-      const assetData = JSON.parse(event.dataTransfer.getData('application/json'))
-      
-      // Only handle asset drops (not other types of drag data)
-      if (!assetData.isAsset) {
-        return
-      }
-      
-      // Calculate drop position (simplified - would normally use raycasting)
-      const rect = event.currentTarget.getBoundingClientRect()
-      const x = ((event.clientX - rect.left) / rect.width) * 20 - 10
-      const z = ((event.clientY - rect.top) / rect.height) * 20 - 10
-      
-      // Determine object type based on asset type and name
-      let objectType: 'cube' | 'sphere' | 'pyramid' = 'cube' // default fallback
-      if (assetData.type === 'model') {
-        // Map common model names to basic shapes for demo
-        const fileName = assetData.name.toLowerCase()
-        if (fileName.includes('sphere')) {
-          objectType = 'sphere'
-        } else if (fileName.includes('cube') || fileName.includes('box')) {
-          objectType = 'cube'
-        } else if (fileName.includes('pyramid') || fileName.includes('cone')) {
-          objectType = 'pyramid'
-        } else {
-          objectType = 'cube' // default for unknown models
+  const handleDrop = useCallback(
+    (event: React.DragEvent) => {
+      event.preventDefault()
+      setIsDragOver(false)
+
+      try {
+        const assetData = JSON.parse(event.dataTransfer.getData('application/json'))
+
+        // Only handle asset drops (not other types of drag data)
+        if (!assetData.isAsset) {
+          return
         }
+
+        // Calculate drop position (simplified - would normally use raycasting)
+        const rect = event.currentTarget.getBoundingClientRect()
+        const x = ((event.clientX - rect.left) / rect.width) * 20 - 10
+        const z = ((event.clientY - rect.top) / rect.height) * 20 - 10
+
+        // Determine object type based on asset type and name
+        let objectType: 'cube' | 'sphere' | 'pyramid' = 'cube' // default fallback
+        if (assetData.type === 'model') {
+          // Map common model names to basic shapes for demo
+          const fileName = assetData.name.toLowerCase()
+          if (fileName.includes('sphere')) {
+            objectType = 'sphere'
+          } else if (fileName.includes('cube') || fileName.includes('box')) {
+            objectType = 'cube'
+          } else if (fileName.includes('pyramid') || fileName.includes('cone')) {
+            objectType = 'pyramid'
+          } else {
+            objectType = 'cube' // default for unknown models
+          }
+        }
+
+        // Create the 3D object in the scene
+        const objectId = addObject(objectType, [x, 0, z])
+
+        console.log(
+          `Dropped asset "${assetData.name}" (${assetData.type}) at position [${x.toFixed(2)}, 0, ${z.toFixed(2)}]`
+        )
+        console.log('Created object ID:', objectId, 'Type:', objectType)
+      } catch (error) {
+        console.error('Failed to handle asset drop:', error)
       }
-      
-      // Create the 3D object in the scene
-      const objectId = addObject(objectType, [x, 0, z])
-      
-      console.log(`Dropped asset "${assetData.name}" (${assetData.type}) at position [${x.toFixed(2)}, 0, ${z.toFixed(2)}]`)
-      console.log('Created object ID:', objectId, 'Type:', objectType)
-      
-    } catch (error) {
-      console.error('Failed to handle asset drop:', error)
-    }
-  }, [addObject])
+    },
+    [addObject]
+  )
 
   return (
-    <div 
+    <div
       className={`viewport-3d w-full h-full bg-gray-900 relative ${
         isDragOver ? 'ring-2 ring-blue-400 ring-inset' : ''
       }`}
@@ -194,7 +203,7 @@ export default forwardRef<CameraControlsRef, object>((_props, ref) => {
       )}
 
       {/* Box Selection Overlay */}
-      <BoxSelectionOverlay 
+      <BoxSelectionOverlay
         isSelecting={boxState.isSelecting}
         startPoint={boxState.startPoint}
         currentPoint={boxState.currentPoint}
@@ -204,16 +213,16 @@ export default forwardRef<CameraControlsRef, object>((_props, ref) => {
       <TransformConstraintIndicator />
 
       <Canvas
-        camera={{ 
-          position: [10, 10, 10], 
+        camera={{
+          position: [10, 10, 10],
           fov: 60,
           near: 0.1,
-          far: 1000
+          far: 1000,
         }}
-        gl={{ 
+        gl={{
           antialias: true,
           alpha: false,
-          preserveDrawingBuffer: true
+          preserveDrawingBuffer: true,
         }}
         shadows
         onCreated={({ gl }) => {
@@ -221,12 +230,12 @@ export default forwardRef<CameraControlsRef, object>((_props, ref) => {
         }}
       >
         {/* Performance context to handle R3F hooks */}
-        <PerformanceContext 
+        <PerformanceContext
           performanceObjects={performanceObjects}
           setMetrics={setMetrics}
           setQualityInfo={setQualityInfo}
         />
-        
+
         {/* Lighting */}
         <ambientLight intensity={0.4} />
         <directionalLight
@@ -264,11 +273,7 @@ export default forwardRef<CameraControlsRef, object>((_props, ref) => {
         )}
 
         {/* Scene Content */}
-        {useOptimizedRendering ? (
-          <OptimizedScene />
-        ) : (
-          <Scene />
-        )}
+        {useOptimizedRendering ? <OptimizedScene /> : <Scene />}
 
         {/* Transform Gizmos - needs to be inside Canvas for R3F hooks */}
         <TransformGizmos />
@@ -290,10 +295,10 @@ export default forwardRef<CameraControlsRef, object>((_props, ref) => {
 
       {/* Performance Controls */}
       <div className="absolute top-2 right-2 flex space-x-2">
-        <button 
+        <button
           className={`px-2 py-1 text-xs rounded ${
-            useOptimizedRendering 
-              ? 'bg-green-600 text-white' 
+            useOptimizedRendering
+              ? 'bg-green-600 text-white'
               : 'bg-black bg-opacity-50 text-white hover:bg-opacity-75'
           }`}
           onClick={() => setUseOptimizedRendering(!useOptimizedRendering)}
@@ -305,30 +310,30 @@ export default forwardRef<CameraControlsRef, object>((_props, ref) => {
 
       {/* Camera Mode Controls */}
       <div className="absolute bottom-2 left-2 flex space-x-2">
-        <button 
+        <button
           className={`px-2 py-1 text-xs rounded ${
-            cameraMode === 'orbit' 
-              ? 'bg-editor-accent text-white' 
+            cameraMode === 'orbit'
+              ? 'bg-editor-accent text-white'
               : 'bg-black bg-opacity-50 text-white hover:bg-opacity-75'
           }`}
           onClick={() => useEditorStore.getState().setCameraMode('orbit')}
         >
           Orbit
         </button>
-        <button 
+        <button
           className={`px-2 py-1 text-xs rounded ${
-            cameraMode === 'fly' 
-              ? 'bg-editor-accent text-white' 
+            cameraMode === 'fly'
+              ? 'bg-editor-accent text-white'
               : 'bg-black bg-opacity-50 text-white hover:bg-opacity-75'
           }`}
           onClick={() => useEditorStore.getState().setCameraMode('fly')}
         >
           Fly
         </button>
-        <button 
+        <button
           className={`px-2 py-1 text-xs rounded ${
-            cameraMode === 'orthographic' 
-              ? 'bg-editor-accent text-white' 
+            cameraMode === 'orthographic'
+              ? 'bg-editor-accent text-white'
               : 'bg-black bg-opacity-50 text-white hover:bg-opacity-75'
           }`}
           onClick={() => useEditorStore.getState().setCameraMode('orthographic')}
@@ -343,12 +348,7 @@ export default forwardRef<CameraControlsRef, object>((_props, ref) => {
       </div>
 
       {/* Performance Overlay */}
-      {useOptimizedRendering && (
-        <PerformanceOverlay 
-          metrics={metrics} 
-          qualityInfo={qualityInfo} 
-        />
-      )}
+      {useOptimizedRendering && <PerformanceOverlay metrics={metrics} qualityInfo={qualityInfo} />}
     </div>
   )
 })

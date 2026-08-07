@@ -1,6 +1,6 @@
-import React, { useRef, useEffect, useState, useCallback } from 'react'
-import { invoke } from '@tauri-apps/api/core'
 import { useEditorStore } from '@/store/editorStore'
+import { invoke } from '@tauri-apps/api/core'
+import React, { useCallback, useEffect, useRef, useState } from 'react'
 
 interface GridViewProps {
   className?: string
@@ -33,7 +33,7 @@ export interface GridViewRef {
   exportGrid: () => string
   importGrid: (gridString: string) => void
   clearGrid: () => void
-  getGridData: () => string[][]  // Add method to get current grid data
+  getGridData: () => string[][] // Add method to get current grid data
 }
 
 const GridView = React.forwardRef<GridViewRef, GridViewProps>(({ className = '' }, ref) => {
@@ -90,13 +90,13 @@ const GridView = React.forwardRef<GridViewRef, GridViewProps>(({ className = '' 
   const initializeGrid = useCallback(() => {
     // Try to load from localStorage first (for view switches), then store data, then create empty
     const { gridData: storeGridData, loadFromLocalStorage } = useEditorStore.getState()
-    
+
     // Try loading from localStorage in case we're switching from 3D view
     const wasLoaded = loadFromLocalStorage()
-    
-    let newGrid: string[][];
+
+    let newGrid: string[][]
     const currentStoreData = useEditorStore.getState().gridData
-    
+
     // Check if we have meaningful data to restore
     if (wasLoaded && currentStoreData && currentStoreData.length > 0) {
       const nonEmptyCount = currentStoreData.flat().filter(t => t && t !== 'empty').length
@@ -107,14 +107,18 @@ const GridView = React.forwardRef<GridViewRef, GridViewProps>(({ className = '' 
           .fill(null)
           .map(() => Array(gridSize.width).fill('empty'))
       }
-    } else if (storeGridData && storeGridData.length > 0 && storeGridData.some(row => row.some(cell => cell && cell !== 'empty'))) {
+    } else if (
+      storeGridData &&
+      storeGridData.length > 0 &&
+      storeGridData.some(row => row.some(cell => cell && cell !== 'empty'))
+    ) {
       newGrid = storeGridData.map(row => [...row]) // Deep copy
     } else {
       newGrid = Array(gridSize.height)
         .fill(null)
         .map(() => Array(gridSize.width).fill('empty'))
     }
-    
+
     setGridData(newGrid)
   }, [gridSize.width, gridSize.height])
 
@@ -148,35 +152,35 @@ const GridView = React.forwardRef<GridViewRef, GridViewProps>(({ className = '' 
             mesh: null,
             collision: false,
             walkable: true,
-            tags: []
+            tags: [],
           },
           wall: {
             tile_type: 'wall',
-            name: 'Wall', 
+            name: 'Wall',
             description: 'Basic wall tile',
             visual: { icon: '#', color: '#444444', background_color: null },
             mesh: null,
             collision: true,
             walkable: false,
-            tags: []
+            tags: [],
           },
           door: {
             tile_type: 'door',
             name: 'Door',
-            description: 'Basic door tile', 
+            description: 'Basic door tile',
             visual: { icon: 'D', color: '#8B4513', background_color: null },
             mesh: null,
             collision: false,
             walkable: true,
-            tags: []
-          }
-        }
+            tags: [],
+          },
+        },
       }
       console.log('Created fallback theme:', fallbackTheme)
       setAvailableThemes([fallbackTheme])
       console.log('Setting fallback theme as selected')
       setSelectedTheme(fallbackTheme)
-      
+
       // Force a re-render by logging the theme state
       setTimeout(() => {
         console.log('After fallback - selectedTheme:', selectedTheme)
@@ -191,13 +195,16 @@ const GridView = React.forwardRef<GridViewRef, GridViewProps>(({ className = '' 
     const rect = canvas.getBoundingClientRect()
     const x = Math.floor((event.clientX - rect.left) / cellSize)
     const y = Math.floor((event.clientY - rect.top) / cellSize)
-    return { x: Math.max(0, Math.min(x, gridSize.width - 1)), y: Math.max(0, Math.min(y, gridSize.height - 1)) }
+    return {
+      x: Math.max(0, Math.min(x, gridSize.width - 1)),
+      y: Math.max(0, Math.min(y, gridSize.height - 1)),
+    }
   }
 
   // Paint tile at position (2D grid only - sync happens on view switch)
   const paintTile = (x: number, y: number, tileType: string) => {
     if (x < 0 || x >= gridSize.width || y < 0 || y >= gridSize.height) return
-    
+
     setGridData(prev => {
       const newGrid = [...prev]
       // Ensure the row exists
@@ -213,27 +220,28 @@ const GridView = React.forwardRef<GridViewRef, GridViewProps>(({ className = '' 
   // Fill connected area with same tile type
   const floodFill = (startX: number, startY: number, targetTile: string, replaceTile: string) => {
     if (targetTile === replaceTile) return
-    
+
     const stack = [{ x: startX, y: startY }]
     const visited = new Set<string>()
-    
+
     setGridData(prev => {
       const newGrid = prev.map(row => [...row])
-      
+
       while (stack.length > 0) {
         const { x, y } = stack.pop()!
         const key = `${x},${y}`
-        
-        if (visited.has(key) || x < 0 || x >= gridSize.width || y < 0 || y >= gridSize.height) continue
+
+        if (visited.has(key) || x < 0 || x >= gridSize.width || y < 0 || y >= gridSize.height)
+          continue
         if (newGrid[y][x] !== targetTile) continue
-        
+
         visited.add(key)
         newGrid[y][x] = replaceTile
-        
+
         // Add adjacent cells
         stack.push({ x: x + 1, y }, { x: x - 1, y }, { x, y: y + 1 }, { x, y: y - 1 })
       }
-      
+
       return newGrid
     })
   }
@@ -249,7 +257,7 @@ const GridView = React.forwardRef<GridViewRef, GridViewProps>(({ className = '' 
 
     if (editMode === 'paint') {
       setIsDrawing(true)
-      
+
       // Check if clicking on an existing tile (not empty) - remove it
       const currentTile = gridData[pos.y]?.[pos.x]
       if (currentTile && currentTile !== 'empty') {
@@ -280,7 +288,7 @@ const GridView = React.forwardRef<GridViewRef, GridViewProps>(({ className = '' 
       // Only paint if we've moved to a different position
       if (!lastPaintedPos || pos.x !== lastPaintedPos.x || pos.y !== lastPaintedPos.y) {
         setLastPaintedPos(pos)
-        
+
         // Use consistent drag mode throughout the drag operation
         if (dragMode === 'erase') {
           paintTile(pos.x, pos.y, 'empty')
@@ -301,74 +309,77 @@ const GridView = React.forwardRef<GridViewRef, GridViewProps>(({ className = '' 
   }
 
   // Keyboard handlers for copy/paste
-  const handleKeyDown = useCallback((event: KeyboardEvent) => {
-    if (!selection) return
+  const handleKeyDown = useCallback(
+    (event: KeyboardEvent) => {
+      if (!selection) return
 
-    if (event.ctrlKey || event.metaKey) {
-      if (event.key === 'c') {
-        // Copy selection
+      if (event.ctrlKey || event.metaKey) {
+        if (event.key === 'c') {
+          // Copy selection
+          const { start, end } = selection
+          const minX = Math.min(start.x, end.x)
+          const maxX = Math.max(start.x, end.x)
+          const minY = Math.min(start.y, end.y)
+          const maxY = Math.max(start.y, end.y)
+
+          const copied = []
+          for (let y = minY; y <= maxY; y++) {
+            const row = []
+            for (let x = minX; x <= maxX; x++) {
+              row.push(gridData[y]?.[x] || 'empty')
+            }
+            copied.push(row)
+          }
+          setCopiedData(copied)
+          event.preventDefault()
+        } else if (event.key === 'v' && copiedData) {
+          // Paste at selection start
+          const { start } = selection
+          setGridData(prev => {
+            const newGrid = prev.map(row => [...row])
+
+            copiedData.forEach((row, dy) => {
+              row.forEach((tile, dx) => {
+                const x = start.x + dx
+                const y = start.y + dy
+                if (x >= 0 && x < gridSize.width && y >= 0 && y < gridSize.height) {
+                  newGrid[y][x] = tile
+                }
+              })
+            })
+
+            return newGrid
+          })
+          event.preventDefault()
+        }
+      }
+
+      if (event.key === 'Delete' || event.key === 'Backspace') {
+        // Delete selection
         const { start, end } = selection
         const minX = Math.min(start.x, end.x)
         const maxX = Math.max(start.x, end.x)
         const minY = Math.min(start.y, end.y)
         const maxY = Math.max(start.y, end.y)
-        
-        const copied = []
-        for (let y = minY; y <= maxY; y++) {
-          const row = []
-          for (let x = minX; x <= maxX; x++) {
-            row.push(gridData[y]?.[x] || 'empty')
-          }
-          copied.push(row)
-        }
-        setCopiedData(copied)
-        event.preventDefault()
-      } else if (event.key === 'v' && copiedData) {
-        // Paste at selection start
-        const { start } = selection
+
         setGridData(prev => {
           const newGrid = prev.map(row => [...row])
-          
-          copiedData.forEach((row, dy) => {
-            row.forEach((tile, dx) => {
-              const x = start.x + dx
-              const y = start.y + dy
-              if (x >= 0 && x < gridSize.width && y >= 0 && y < gridSize.height) {
-                newGrid[y][x] = tile
+
+          for (let y = minY; y <= maxY; y++) {
+            for (let x = minX; x <= maxX; x++) {
+              if (newGrid[y]) {
+                newGrid[y][x] = 'empty'
               }
-            })
-          })
-          
+            }
+          }
+
           return newGrid
         })
         event.preventDefault()
       }
-    }
-
-    if (event.key === 'Delete' || event.key === 'Backspace') {
-      // Delete selection
-      const { start, end } = selection
-      const minX = Math.min(start.x, end.x)
-      const maxX = Math.max(start.x, end.x)
-      const minY = Math.min(start.y, end.y)
-      const maxY = Math.max(start.y, end.y)
-      
-      setGridData(prev => {
-        const newGrid = prev.map(row => [...row])
-        
-        for (let y = minY; y <= maxY; y++) {
-          for (let x = minX; x <= maxX; x++) {
-            if (newGrid[y]) {
-              newGrid[y][x] = 'empty'
-            }
-          }
-        }
-        
-        return newGrid
-      })
-      event.preventDefault()
-    }
-  }, [selection, gridData, copiedData, gridSize])
+    },
+    [selection, gridData, copiedData, gridSize]
+  )
 
   useEffect(() => {
     document.addEventListener('keydown', handleKeyDown)
@@ -380,10 +391,15 @@ const GridView = React.forwardRef<GridViewRef, GridViewProps>(({ className = '' 
     console.log('=== RENDER GRID CALLED ===')
     console.log('renderGrid - selectedTheme:', selectedTheme)
     console.log('renderGrid - availableThemes length:', availableThemes.length)
-    
+
     const canvas = canvasRef.current
     if (!canvas || !selectedTheme) {
-      console.log('renderGrid - Early return: canvas exists?', !!canvas, 'selectedTheme exists?', !!selectedTheme)
+      console.log(
+        'renderGrid - Early return: canvas exists?',
+        !!canvas,
+        'selectedTheme exists?',
+        !!selectedTheme
+      )
       return
     }
 
@@ -402,14 +418,14 @@ const GridView = React.forwardRef<GridViewRef, GridViewProps>(({ className = '' 
       for (let x = 0; x < gridSize.width; x++) {
         const tileType = gridData[y]?.[x] || 'empty'
         const tileDef = selectedTheme.tiles[tileType]
-        
+
         if (tileDef && tileType !== 'empty') {
           // Background color
           if (tileDef.visual.background_color) {
             ctx.fillStyle = tileDef.visual.background_color
             ctx.fillRect(x * cellSize, y * cellSize, cellSize, cellSize)
           }
-          
+
           // Draw tile icon
           ctx.fillStyle = tileDef.visual.color
           ctx.font = `${Math.floor(cellSize * 0.8)}px monospace`
@@ -428,14 +444,14 @@ const GridView = React.forwardRef<GridViewRef, GridViewProps>(({ className = '' 
     if (showGrid) {
       ctx.strokeStyle = '#404040'
       ctx.lineWidth = 1
-      
+
       for (let x = 0; x <= gridSize.width; x++) {
         ctx.beginPath()
         ctx.moveTo(x * cellSize, 0)
         ctx.lineTo(x * cellSize, canvas.height)
         ctx.stroke()
       }
-      
+
       for (let y = 0; y <= gridSize.height; y++) {
         ctx.beginPath()
         ctx.moveTo(0, y * cellSize)
@@ -451,14 +467,14 @@ const GridView = React.forwardRef<GridViewRef, GridViewProps>(({ className = '' 
       const maxX = (Math.max(start.x, end.x) + 1) * cellSize
       const minY = Math.min(start.y, end.y) * cellSize
       const maxY = (Math.max(start.y, end.y) + 1) * cellSize
-      
+
       ctx.strokeStyle = '#00ff00'
       ctx.lineWidth = 2
       ctx.setLineDash([5, 5])
       ctx.strokeRect(minX, minY, maxX - minX, maxY - minY)
       ctx.setLineDash([])
     }
-  }, [gridData, selectedTheme, gridSize, cellSize, showGrid, selection])
+  }, [gridData, selectedTheme, gridSize, cellSize, showGrid, selection, availableThemes.length])
 
   useEffect(() => {
     renderGrid()
@@ -468,16 +484,16 @@ const GridView = React.forwardRef<GridViewRef, GridViewProps>(({ className = '' 
   React.useImperativeHandle(ref, () => ({
     exportGrid: () => {
       if (!selectedTheme) return ''
-      return gridData.map(row => 
-        row.map(tileType => selectedTheme.tiles[tileType]?.visual.icon || ' ').join('')
-      ).join('\n')
+      return gridData
+        .map(row => row.map(tileType => selectedTheme.tiles[tileType]?.visual.icon || ' ').join(''))
+        .join('\n')
     },
     importGrid: async (gridString: string) => {
       if (!selectedTheme) return
       try {
         const tileMap: string[][] = await invoke('parse_grid_to_tiles', {
           themeId: selectedTheme.id,
-          gridString
+          gridString,
         })
         setGridData(tileMap)
       } catch (error) {
@@ -488,7 +504,7 @@ const GridView = React.forwardRef<GridViewRef, GridViewProps>(({ className = '' 
       console.log('=== CLEAR GRID CALLED ===')
       console.log('Before clear - selectedTheme:', selectedTheme)
       console.log('Before clear - availableThemes:', availableThemes)
-      
+
       // Create a completely fresh empty grid
       const newGrid = Array(gridSize.height)
         .fill(null)
@@ -497,12 +513,12 @@ const GridView = React.forwardRef<GridViewRef, GridViewProps>(({ className = '' 
       setSelection(null)
       // Also clear the store
       setStoreGridData(newGrid)
-      
+
       console.log('After clear - selectedTheme:', selectedTheme)
       console.log('After clear - availableThemes:', availableThemes)
       console.log('=== CLEAR GRID COMPLETE ===')
     },
-    getGridData: () => gridData  // Expose current grid data
+    getGridData: () => gridData, // Expose current grid data
   }))
 
   const getTileList = () => {
@@ -519,7 +535,7 @@ const GridView = React.forwardRef<GridViewRef, GridViewProps>(({ className = '' 
           <label className="text-editor-textMuted">Theme:</label>
           <select
             value={selectedTheme?.id || ''}
-            onChange={(e) => {
+            onChange={e => {
               const theme = availableThemes.find(t => t.id === e.target.value)
               setSelectedTheme(theme || null)
             }}
@@ -559,7 +575,7 @@ const GridView = React.forwardRef<GridViewRef, GridViewProps>(({ className = '' 
             min="12"
             max="32"
             value={cellSize}
-            onChange={(e) => setCellSize(Number(e.target.value))}
+            onChange={e => setCellSize(Number(e.target.value))}
             className="w-16"
           />
           <span className="text-editor-textMuted w-8">{cellSize}</span>
@@ -583,7 +599,7 @@ const GridView = React.forwardRef<GridViewRef, GridViewProps>(({ className = '' 
           <input
             type="number"
             value={gridSize.width}
-            onChange={(e) => setGridSize(prev => ({ ...prev, width: Number(e.target.value) }))}
+            onChange={e => setGridSize(prev => ({ ...prev, width: Number(e.target.value) }))}
             className="bg-editor-bg text-editor-text border border-editor-border rounded px-2 py-1 w-16 text-xs"
             min="10"
             max="100"
@@ -592,7 +608,7 @@ const GridView = React.forwardRef<GridViewRef, GridViewProps>(({ className = '' 
           <input
             type="number"
             value={gridSize.height}
-            onChange={(e) => setGridSize(prev => ({ ...prev, height: Number(e.target.value) }))}
+            onChange={e => setGridSize(prev => ({ ...prev, height: Number(e.target.value) }))}
             className="bg-editor-bg text-editor-text border border-editor-border rounded px-2 py-1 w-16 text-xs"
             min="10"
             max="100"
@@ -604,10 +620,14 @@ const GridView = React.forwardRef<GridViewRef, GridViewProps>(({ className = '' 
       <div className="flex flex-1 overflow-hidden">
         {/* Tile Palette */}
         <div className="w-48 bg-editor-panel border-r border-editor-border p-2 overflow-y-auto">
-          <div className="text-sm font-semibold text-editor-accent mb-2 border-b border-editor-border/30 pb-1">Tile Palette</div>
+          <div className="text-sm font-semibold text-editor-accent mb-2 border-b border-editor-border/30 pb-1">
+            Tile Palette
+          </div>
           <div className="space-y-1">
             {!selectedTheme ? (
-              <div className="text-xs text-editor-textMuted">Loading themes... (selectedTheme is null)</div>
+              <div className="text-xs text-editor-textMuted">
+                Loading themes... (selectedTheme is null)
+              </div>
             ) : getTileList().length === 0 ? (
               <div className="text-xs text-editor-textMuted">No tiles available</div>
             ) : (
@@ -615,24 +635,27 @@ const GridView = React.forwardRef<GridViewRef, GridViewProps>(({ className = '' 
                 const tile = tileDef as TileDefinition
                 console.log('Rendering tile button:', tileKey, tile)
                 return (
-                <button
-                  key={tileKey}
-                  onClick={() => setSelectedTile(tileKey)}
-                  className={`w-full text-left px-2 py-1 rounded text-xs flex items-center space-x-2 ${
-                    selectedTile === tileKey
-                      ? 'bg-editor-accent text-white'
-                      : 'bg-editor-bg text-editor-text hover:bg-gray-600'
-                  }`}
-                  title={tile.description}
-                >
-                  <span 
-                    className="w-4 h-4 flex items-center justify-center font-mono text-xs"
-                    style={{ color: tile.visual.color, backgroundColor: tile.visual.background_color || 'transparent' }}
+                  <button
+                    key={tileKey}
+                    onClick={() => setSelectedTile(tileKey)}
+                    className={`w-full text-left px-2 py-1 rounded text-xs flex items-center space-x-2 ${
+                      selectedTile === tileKey
+                        ? 'bg-editor-accent text-white'
+                        : 'bg-editor-bg text-editor-text hover:bg-gray-600'
+                    }`}
+                    title={tile.description}
                   >
-                    {tile.visual.icon}
-                  </span>
-                  <span className="truncate">{tile.name}</span>
-                </button>
+                    <span
+                      className="w-4 h-4 flex items-center justify-center font-mono text-xs"
+                      style={{
+                        color: tile.visual.color,
+                        backgroundColor: tile.visual.background_color || 'transparent',
+                      }}
+                    >
+                      {tile.visual.icon}
+                    </span>
+                    <span className="truncate">{tile.name}</span>
+                  </button>
                 )
               })
             )}
@@ -650,11 +673,14 @@ const GridView = React.forwardRef<GridViewRef, GridViewProps>(({ className = '' 
             className="border border-editor-border cursor-crosshair"
             style={{ imageRendering: 'pixelated' }}
           />
-          
+
           {/* Instructions Overlay */}
           {selection && (
             <div className="absolute top-2 left-2 bg-editor-panel/90 border border-editor-border rounded p-2 text-xs text-editor-text">
-              <div>Selection: {Math.abs(selection.end.x - selection.start.x) + 1}×{Math.abs(selection.end.y - selection.start.y) + 1}</div>
+              <div>
+                Selection: {Math.abs(selection.end.x - selection.start.x) + 1}×
+                {Math.abs(selection.end.y - selection.start.y) + 1}
+              </div>
               <div>Ctrl+C: Copy | Ctrl+V: Paste | Del: Clear</div>
             </div>
           )}

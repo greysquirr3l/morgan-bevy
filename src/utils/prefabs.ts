@@ -104,7 +104,7 @@ export function buildPrefabFromSelection(
   selectedIds: string[],
   sceneObjects: EditorState['sceneObjects'],
   name: string,
-  description?: string,
+  description?: string
 ): Prefab | null {
   const objects: PrefabObject[] = []
   for (const id of selectedIds) {
@@ -145,7 +145,7 @@ export function buildPrefabFromSelection(
  */
 export function instantiatePrefabObjects(
   prefab: Prefab,
-  originOffset: [number, number, number] = [2, 0, 0],
+  originOffset: [number, number, number] = [2, 0, 0]
 ): PrefabObject[] {
   return prefab.objects.map(obj => ({
     ...obj,
@@ -168,7 +168,7 @@ export function instantiatePrefabObjects(
  * responsible for writing the result back into the scene.
  */
 export function breakPrefabOnObjects<T extends { prefabInstanceId?: string }>(
-  objects: Array<{ id: string; obj: T }>,
+  objects: Array<{ id: string; obj: T }>
 ): string[] {
   const broken: string[] = []
   for (const { id, obj } of objects) {
@@ -186,13 +186,14 @@ export function breakPrefabOnObjects<T extends { prefabInstanceId?: string }>(
  */
 export function applyBreakPrefab<T extends { prefabInstanceId?: string }>(
   scene: Map<string, T>,
-  ids: string[],
+  ids: string[]
 ): Map<string, T> {
   const next = new Map(scene)
   for (const id of ids) {
     const obj = next.get(id)
     if (!obj) continue
-    const { prefabInstanceId: _drop, ...rest } = obj
+    const { prefabInstanceId, ...rest } = obj
+    void prefabInstanceId
     next.set(id, rest as T)
   }
   return next

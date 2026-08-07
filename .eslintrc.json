@@ -1,13 +1,11 @@
 {
   "root": true,
-  "env": { 
-    "browser": true, 
+  "env": {
+    "browser": true,
     "es2020": true,
     "node": true
   },
-  "extends": [
-    "eslint:recommended"
-  ],
+  "extends": ["eslint:recommended"],
   "ignorePatterns": ["dist", ".eslintrc.cjs", "src-tauri/**", "node_modules/**", "**/*.d.ts"],
   "parser": "@typescript-eslint/parser",
   "parserOptions": {
@@ -21,23 +19,68 @@
   "rules": {
     "react-refresh/only-export-components": [
       "warn",
-      { "allowConstantExport": true }
+      {
+        "allowConstantExport": true,
+        // Allow hooks (named `use*`), React HOCs (`forwardRef`, `memo`),
+        // and the project's helper components / types that share a
+        // file with a primary React component. This list is the
+        // exhaustively enumerated allow-list for the current
+        // codebase — add to it when introducing new hooks / shared
+        // helpers in a `.tsx` file. Keep this list as small as
+        // possible; split components into sibling files whenever
+        // practical.
+        "allowExportNames": [
+          "forwardRef",
+          "memo",
+          // Hooks
+          "useKeyboardShortcutsModal",
+          "useCameraContext",
+          "useCameraControls",
+          "useInstancedRendering",
+          "useLOD",
+          "useSelectionHighlight",
+          "useSelectionManager",
+          // Helper components (also PascalCase — non-component exports
+          // because they wrap `forwardRef` or are bundled for reuse).
+          "LODSphereGeometry",
+          "LODBoxGeometry",
+          "LODConeGeometry",
+          "InstancedCubes",
+          "InstancedSpheres",
+          "InstancedCones",
+          "InstancedObjectManager",
+          "SelectionHighlight",
+          "PerformanceOverlay",
+          "PerformanceContext",
+          "CameraControls",
+          // Types / interfaces / contexts
+          "CameraContext",
+          "CameraControlsRef",
+          "CameraMode",
+          "GridViewRef",
+          "LODLevel",
+          "DEFAULT_LOD_LEVELS",
+          "InstancedObjectData",
+          "PerformanceObject",
+          "RenderingStrategy"
+        ]
+      }
     ],
-    
+
     // General code quality - relaxed for development workflow
     "no-console": "off",
-    "no-debugger": "error", 
+    "no-debugger": "error",
     "no-undef": "off",
     "no-unused-vars": "off",
     "@typescript-eslint/no-unused-vars": ["warn", { "argsIgnorePattern": "^_" }],
     "@typescript-eslint/no-explicit-any": "off",
     "@typescript-eslint/prefer-const": "off",
     "@typescript-eslint/no-non-null-assertion": "off",
-    
+
     // React hooks - essential for correctness
     "react-hooks/rules-of-hooks": "error",
     "react-hooks/exhaustive-deps": "warn",
-    
+
     // 3D Editor specific rules - relaxed for math-heavy code
     "no-magic-numbers": "off",
     "prefer-const": "off",

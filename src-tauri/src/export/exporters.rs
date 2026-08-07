@@ -27,6 +27,108 @@ pub struct ExportedFile {
     pub success: bool,
 }
 
+/// Bitset of which marker types the level uses.
+///
+/// Mirrors `bevy_morgan_integration::systems::MarkerSet` — the
+/// generator builds this once from `level_data.objects` before
+/// emitting, and uses it to gate the systems + plugin + companion
+/// types that get written into the generated file.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct MarkerSet {
+    pub door: bool,
+    pub collectible: bool,
+    pub spawn_point: bool,
+    pub trigger_volume: bool,
+    pub nav_mesh_hint: bool,
+}
+
+impl MarkerSet {
+    /// Construct an empty `MarkerSet`.
+    #[must_use]
+    pub const fn new() -> Self {
+        Self {
+            door: false,
+            collectible: false,
+            spawn_point: false,
+            trigger_volume: false,
+            nav_mesh_hint: false,
+        }
+    }
+
+    /// `true` when no markers are set.
+    #[must_use]
+    pub const fn is_empty(&self) -> bool {
+        !self.door
+            && !self.collectible
+            && !self.spawn_point
+            && !self.trigger_volume
+            && !self.nav_mesh_hint
+    }
+}
+
+/// How the generated Bevy source references the per-marker systems.
+///
+/// The editor records the chosen mode in the generated header so
+/// re-exports preserve it; `parse_systems_mode_from_header` reads
+/// the comment back out.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SystemsMode {
+    /// Reference the companion crate's `systems` module. Bug fixes
+    /// flow through automatically on `cargo update`.
+    CompanionReference,
+    /// Embed the system bodies verbatim. Hermetic build; the
+    /// generated file has no runtime dep on
+    /// `bevy_morgan_integration::systems`. Reserved for T90 v2;
+    /// the editor currently emits `CompanionReference`.
+    Inline,
+}
+
+impl Default for SystemsMode {
+    fn default() -> Self {
+        Self::CompanionReference
+    }
+}
+
+/// Compute the `MarkerSet` for a level by inspecting every object's
+/// `tags`. A tag of `"door"` flips `door = true`, `"collectible"`
+/// flips `collectible`, etc. Case-insensitive.
+#[must_use]
+pub fn marker_tags_present(level_data: &LevelData) -> MarkerSet {
+    let mut s = MarkerSet::new();
+    for obj in &level_data.objects {
+        for tag in &obj.tags {
+            match tag.to_lowercase().as_str() {
+                "door" => s.door = true,
+                "collectible" => s.collectible = true,
+                "spawn" | "spawn-point" | "spawnpoint" => s.spawn_point = true,
+                "trigger" | "trigger-volume" | "triggervolume" => s.trigger_volume = true,
+                "nav-mesh" | "navmesh" => s.nav_mesh_hint = true,
+                _ => {}
+            }
+        }
+    }
+    s
+}
+
+/// Read the `// Systems mode: ...` header line out of a previously
+/// exported Bevy source file. Returns `None` if the file was
+/// generated before T90 (legacy export) or the marker isn't found.
+#[must_use]
+pub fn parse_systems_mode_from_header(generated: &str) -> Option<SystemsMode> {
+    for line in generated.lines() {
+        let line = line.trim_start_matches('/').trim();
+        if let Some(rest) = line.strip_prefix("Systems mode:") {
+            let mode = rest.trim();
+            return match mode {
+                "CompanionReference" => Some(SystemsMode::CompanionReference),
+                "Inline" => Some(SystemsMode::Inline),
+                _ => None,
+            };
+        }
+    }
+    None
+}
+
 pub struct LevelExporter;
 
 impl LevelExporter {
@@ -140,6 +242,27 @@ impl LevelExporter {
 
     fn export_rust_code(level_data: &LevelData, file_path: &PathBuf) -> Result<()> {
         let rust_code = Self::generate_rust_code(level_data)?;
+        fs::write(file_path, rust_code)?;
+        Ok(())
+    }
+
+    /// T90: re-export a level's Rust source while preserving the
+    /// previously chosen `SystemsMode` from the on-disk header.
+    /// Reads the existing file (if any), extracts the mode, and
+    /// regenerates with the same mode. Legacy exports (no mode
+    /// marker) default to `CompanionReference`.
+    #[allow(dead_code)]
+    pub fn re_export_rust_code(level_data: &LevelData, file_path: &PathBuf) -> Result<()> {
+        let previous_mode = fs::read_to_string(file_path)
+            .ok()
+            .and_then(|src| parse_systems_mode_from_header(&src));
+        let rust_code = match previous_mode {
+            Some(SystemsMode::CompanionReference) | None => Self::generate_rust_code(level_data)?,
+            // Inline mode is reserved for T90 v2; until then, fall
+            // back to CompanionReference so the consumer's
+            // `bevy-morgan-integration` runtime is always present.
+            Some(SystemsMode::Inline) => Self::generate_rust_code(level_data)?,
+        };
         fs::write(file_path, rust_code)?;
         Ok(())
     }
@@ -348,6 +471,15 @@ impl LevelExporter {
     fn generate_rust_code(level_data: &LevelData) -> Result<String> {
         let mut code = String::new();
 
+        // T90: compute the marker set once and decide whether to emit
+        // the per-marker systems plugin. The marker set is derived
+        // from the level's object tags — see `marker_tags_present`.
+        let marker_set = marker_tags_present(level_data);
+        // T90 v1: only CompanionReference is supported in the
+        // emission path. Inline mode is reserved for the editor's
+        // export dialog and will be wired up in T90 v2.
+        let systems_mode = SystemsMode::CompanionReference;
+
         // File header — targets Bevy 0.19 component shape (per
         // docs/dev/BEVY_0.18_TO_0.19_MIGRATION.md). PbrBundle and SceneBundle
         // are pre-0.15 and won't compile; we use Mesh3d + MeshMaterial3d +
@@ -365,15 +497,44 @@ impl LevelExporter {
         let seed = level_data
             .generation_seed
             .map_or_else(|| "none".to_string(), |s| s.to_string());
+        let systems_mode_label = match systems_mode {
+            SystemsMode::CompanionReference => "CompanionReference",
+            SystemsMode::Inline => "Inline",
+        };
         writeln!(
             code,
             "// Generated level code for Bevy 0.19+\n\
              // Auto-generated by Morgan-Bevy Level Editor ({})\n\
-             // Theme: {theme} | Algorithm: {algorithm} | Seed: {seed}\n",
+             // Theme: {theme} | Algorithm: {algorithm} | Seed: {seed}\n\
+             // Systems mode: {systems_mode_label}\n",
             env!("CARGO_PKG_VERSION"),
         )?;
         code.push_str("use bevy::prelude::*;\n");
-        code.push_str("use bevy::asset::Handle;\n\n");
+        code.push_str("use bevy::asset::Handle;\n");
+
+        // T90: when the level uses any per-marker tags, emit a `use
+        // bevy_morgan_integration::systems::*;` block plus the plugin
+        // call site. The marker set gates which companion types and
+        // system registrations are emitted — empty marker sets skip
+        // the import + plugin entirely.
+        if !marker_set.is_empty() {
+            code.push_str("use bevy_morgan_integration::systems::{\n");
+            code.push_str("    MorganLevelSystems, plugin, Player,\n");
+            if marker_set.door || marker_set.collectible {
+                code.push_str("    Open, PickupEvent,\n");
+            }
+            if marker_set.trigger_volume {
+                code.push_str("    TriggerActivated,\n");
+            }
+            if marker_set.spawn_point {
+                code.push_str("    PlayerStart,\n");
+            }
+            if marker_set.nav_mesh_hint {
+                code.push_str("    NavMeshSource,\n");
+            }
+            code.push_str("};\n");
+        }
+        code.push('\n');
 
         // T42: emit `SpawnPoint` / `TriggerVolume` type definitions so the
         // generated file is self-contained (the consuming project does not
@@ -520,6 +681,30 @@ impl LevelExporter {
             level_data.bounds.max[2]
         )?;
         code.push_str("}\n");
+
+        // T90: emit the per-marker systems + plugin registration site
+        // when the marker set is non-empty. The `marker_set` block
+        // above already imported the symbols; here we provide a
+        // free-function `plugin_init` that consumers call from
+        // their App::new() chain. Inline (the systems body) lives
+        // in `bevy_morgan_integration::systems` — CompanionReference
+        // mode is the only v1 emission strategy; Inline mode is
+        // reserved for a future editor dialog.
+        if !marker_set.is_empty() {
+            code.push_str("\n/// Register the per-marker level systems\n");
+            code.push_str("/// with a Bevy `App` builder. Call from your app's\n");
+            code.push_str("/// `main`:\n");
+            code.push_str("///\n");
+            code.push_str("/// ```ignore\n");
+            code.push_str("/// App::new()\n");
+            code.push_str("///     .add_systems(Startup, spawn_level_<fn_name>)\n");
+            code.push_str("///     .add_plugins(plugin())\n");
+            code.push_str("///     .run();\n");
+            code.push_str("/// ```\n");
+            code.push_str(
+                "pub fn plugin_init(app: &mut bevy::app::App) {\n    app.add_plugins(plugin());\n}\n",
+            );
+        }
 
         Ok(code)
     }
@@ -1263,5 +1448,166 @@ mod tests {
         assert!(!serialized.contains("collision_shape"));
         assert!(!serialized.contains("spawn_point"));
         assert!(!serialized.contains("trigger_volume"));
+    }
+
+    // ----- T90: marker set + systems emission tests -----
+
+    /// Build a level with the given tags for the first object, used by
+    /// the per-marker tests below.
+    fn level_with_tags(tags: &[&str]) -> LevelData {
+        let mut lvl = sample_level();
+        if let Some(obj) = lvl.objects.first_mut() {
+            obj.tags = tags.iter().map(|s| (*s).to_string()).collect();
+        }
+        lvl
+    }
+
+    #[test]
+    fn marker_set_is_empty_when_no_tags() {
+        let lvl = level_with_tags(&[]);
+        let s = marker_tags_present(&lvl);
+        assert!(s.is_empty());
+        assert_eq!(s, MarkerSet::new());
+    }
+
+    #[test]
+    fn marker_set_includes_door_when_tagged() {
+        let lvl = level_with_tags(&["door"]);
+        let s = marker_tags_present(&lvl);
+        assert!(s.door);
+        assert!(!s.collectible);
+        assert!(!s.spawn_point);
+        assert!(!s.trigger_volume);
+        assert!(!s.nav_mesh_hint);
+        assert!(!s.is_empty());
+    }
+
+    #[test]
+    fn marker_set_collects_all_marker_tags() {
+        let lvl = level_with_tags(&[
+            "door",
+            "collectible",
+            "spawn-point",
+            "trigger-volume",
+            "nav-mesh",
+        ]);
+        let s = marker_tags_present(&lvl);
+        assert!(s.door);
+        assert!(s.collectible);
+        assert!(s.spawn_point);
+        assert!(s.trigger_volume);
+        assert!(s.nav_mesh_hint);
+    }
+
+    #[test]
+    fn marker_set_ignores_unrelated_tags() {
+        let lvl = level_with_tags(&["static", "decor", "physics"]);
+        let s = marker_tags_present(&lvl);
+        assert!(s.is_empty());
+    }
+
+    #[test]
+    fn marker_set_is_case_insensitive() {
+        let lvl = level_with_tags(&["Door", "COLLECTIBLE"]);
+        let s = marker_tags_present(&lvl);
+        assert!(s.door);
+        assert!(s.collectible);
+    }
+
+    #[test]
+    fn generated_rust_header_records_systems_mode() {
+        let lvl = level_with_tags(&[]);
+        let code = LevelExporter::generate_rust_code(&lvl).unwrap();
+        assert!(code.contains("// Systems mode: CompanionReference"));
+    }
+
+    #[test]
+    fn generated_rust_omits_systems_block_when_no_markers() {
+        let lvl = level_with_tags(&[]);
+        let code = LevelExporter::generate_rust_code(&lvl).unwrap();
+        // No markers -> no use line, no plugin block.
+        assert!(!code.contains("use bevy_morgan_integration::systems::"));
+        assert!(!code.contains("pub fn plugin_init"));
+    }
+
+    #[test]
+    fn generated_rust_includes_systems_block_when_door_tagged() {
+        let lvl = level_with_tags(&["door"]);
+        let code = LevelExporter::generate_rust_code(&lvl).unwrap();
+        assert!(code.contains("use bevy_morgan_integration::systems::"));
+        assert!(code.contains("MorganLevelSystems"));
+        assert!(code.contains("pub fn plugin_init"));
+    }
+
+    #[test]
+    fn generated_rust_includes_pickup_event_when_collectible_tagged() {
+        let lvl = level_with_tags(&["collectible"]);
+        let code = LevelExporter::generate_rust_code(&lvl).unwrap();
+        // The collectible marker pulls in PickupEvent + Open (the
+        // door/collectible pairing shares Open).
+        assert!(code.contains("PickupEvent"));
+        assert!(code.contains("Open"));
+    }
+
+    #[test]
+    fn generated_rust_includes_trigger_activated_when_trigger_tagged() {
+        let lvl = level_with_tags(&["trigger-volume"]);
+        let code = LevelExporter::generate_rust_code(&lvl).unwrap();
+        assert!(code.contains("TriggerActivated"));
+    }
+
+    #[test]
+    fn generated_rust_includes_nav_mesh_source_when_nav_mesh_tagged() {
+        let lvl = level_with_tags(&["nav-mesh"]);
+        let code = LevelExporter::generate_rust_code(&lvl).unwrap();
+        assert!(code.contains("NavMeshSource"));
+    }
+
+    #[test]
+    fn generated_rust_includes_player_start_when_spawn_tagged() {
+        let lvl = level_with_tags(&["spawn-point"]);
+        let code = LevelExporter::generate_rust_code(&lvl).unwrap();
+        assert!(code.contains("PlayerStart"));
+    }
+
+    #[test]
+    fn parse_systems_mode_recognises_companion_reference() {
+        let header = "// Generated level code for Bevy 0.19+\n\
+                      // Systems mode: CompanionReference\n";
+        assert_eq!(
+            parse_systems_mode_from_header(header),
+            Some(SystemsMode::CompanionReference)
+        );
+    }
+
+    #[test]
+    fn parse_systems_mode_recognises_inline() {
+        let header = "// Systems mode: Inline\n";
+        assert_eq!(
+            parse_systems_mode_from_header(header),
+            Some(SystemsMode::Inline)
+        );
+    }
+
+    #[test]
+    fn parse_systems_mode_returns_none_for_legacy_export() {
+        let legacy = "// Generated level code for Bevy 0.18\n";
+        assert_eq!(parse_systems_mode_from_header(legacy), None);
+    }
+
+    #[test]
+    fn parse_systems_mode_returns_none_for_garbage_value() {
+        let header = "// Systems mode: NotAMode\n";
+        assert_eq!(parse_systems_mode_from_header(header), None);
+    }
+
+    #[test]
+    fn parse_systems_mode_round_trips_through_generated_rust() {
+        let lvl = level_with_tags(&["door"]);
+        let code = LevelExporter::generate_rust_code(&lvl).unwrap();
+        assert_eq!(
+            parse_systems_mode_from_header(&code),
+            Some(SystemsMode::CompanionReference)
+        );
     }
 }

@@ -139,7 +139,7 @@ describe('computePointLightGrid', () => {
 
   it('every position lies inside (or on) the floor footprint', () => {
     const grid = computePointLightGrid(bounds, 1 / 25)
-    for (const [x, _y, z] of grid) {
+    for (const [x, , z] of grid) {
       expect(x).toBeGreaterThanOrEqual(bounds.min[0])
       expect(x).toBeLessThanOrEqual(bounds.max[0])
       expect(z).toBeGreaterThanOrEqual(bounds.min[2])

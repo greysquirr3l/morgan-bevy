@@ -62,3 +62,5 @@ TODO.md
 
 # Editor
 .vscode/
+.github/copilot-instructions.md
+.github/hooks/rtk-rewrite.json
