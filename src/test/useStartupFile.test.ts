@@ -20,10 +20,11 @@ vi.mock('@tauri-apps/api/event', () => ({
   listen: (...args: unknown[]) => mockListen(...args),
 }))
 
+import type { Mock } from 'vitest'
 import type { Command } from '../utils/commands'
 
 const { mockExecuteCommand } = vi.hoisted(() => ({
-  mockExecuteCommand: vi.fn<(cmd: Command) => void>(),
+  mockExecuteCommand: vi.fn() as Mock<[Command], void>,
 }))
 vi.mock('@/store/editorStore', () => ({
   useEditorStore: Object.assign(

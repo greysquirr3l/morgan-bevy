@@ -19,6 +19,19 @@ import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts'
 import { useResizablePanels } from '@/hooks/useResizablePanels'
 import { useStartupFile } from '@/hooks/useStartupFile'
 import { useEditorStore, useSceneObjects } from '@/store/editorStore'
+import {
+  assertNeverAction,
+  EDIT_ACTIONS,
+  GENERATE_ACTIONS,
+  HELP_ACTIONS,
+  TOOLS_ACTIONS,
+  VIEW_ACTIONS,
+  type EditAction,
+  type GenerateAction,
+  type HelpAction,
+  type ToolsAction,
+  type ViewAction,
+} from '@/types/menuActions'
 import { PanelLeft, PanelRight } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import HelpModal from './components/HelpModal'
@@ -468,7 +481,7 @@ function AppContent() {
   }
 
   // Menu action handlers
-  const handleEditAction = (action: string) => {
+  const handleEditAction = (action: EditAction) => {
     switch (action) {
       case 'undo':
         undo()
@@ -489,11 +502,13 @@ function AppContent() {
       case 'duplicate':
         duplicateObjects(selectedObjects)
         break
+      default:
+        assertNeverAction(action, EDIT_ACTIONS)
     }
     closeMenus()
   }
 
-  const handleViewAction = (action: string) => {
+  const handleViewAction = (action: ViewAction) => {
     switch (action) {
       case 'show-left-panel':
         if (!panels.leftVisible) toggleLeftPanel()
@@ -523,20 +538,34 @@ function AppContent() {
       case 'switch-2d':
         debouncedSetViewportMode('2d')
         break
+      default:
+        assertNeverAction(action, VIEW_ACTIONS)
     }
     closeMenus()
   }
 
-  const handleGenerateAction = (_action: string) => {
-    // Focus the Generation Panel
-    const generationPanel = document.querySelector('[data-panel="generation"]')
-    if (generationPanel) {
-      generationPanel.scrollIntoView({ behavior: 'smooth' })
+  const handleGenerateAction = (action: GenerateAction) => {
+    // All current Generate actions route through the generation panel
+    // — keep this switch so adding new variants is an exhaustiveness
+    // check.
+    switch (action) {
+      case 'run-bsp':
+      case 'run-wfc':
+      case 'reroll-seed':
+      case 'focus-generation':
+        // Focus the Generation Panel
+        const generationPanel = document.querySelector('[data-panel="generation"]')
+        if (generationPanel) {
+          generationPanel.scrollIntoView({ behavior: 'smooth' })
+        }
+        break
+      default:
+        assertNeverAction(action, GENERATE_ACTIONS)
     }
     closeMenus()
   }
 
-  const handleToolsAction = (action: string) => {
+  const handleToolsAction = (action: ToolsAction) => {
     switch (action) {
       case 'transform-select':
         setTransformMode('select')
@@ -558,11 +587,13 @@ function AppContent() {
         const gridSelect = document.querySelector('select[title="Grid Size"]') as HTMLSelectElement
         gridSelect?.focus()
         break
+      default:
+        assertNeverAction(action, TOOLS_ACTIONS)
     }
     closeMenus()
   }
 
-  const handleHelpAction = (action: string) => {
+  const handleHelpAction = (action: HelpAction) => {
     switch (action) {
       case 'keyboard-shortcuts':
         openKeyboardShortcuts()
@@ -573,6 +604,8 @@ function AppContent() {
       case 'about':
         setHelpOpen(true)
         break
+      default:
+        assertNeverAction(action, HELP_ACTIONS)
     }
     closeMenus()
   }
