@@ -36,6 +36,7 @@ import { PanelLeft, PanelRight } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import HelpModal from './components/HelpModal'
 import Inspector from './components/Inspector/Inspector'
+import UpdateNotification from './components/Update/UpdateNotification'
 
 // Robust debug logging system
 class DebugLogger {
@@ -1329,6 +1330,9 @@ function AppContent() {
 
       {/* Help Modal */}
       <HelpModal isOpen={helpOpen} onClose={() => setHelpOpen(false)} />
+
+      {/* T68: In-app update notification (renders null if no update / plugin unreachable). */}
+      <UpdateNotification />
     </div>
   )
 }

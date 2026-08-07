@@ -34,10 +34,10 @@ env:
   # Disable sccache — fails with permission errors on hosted runners
   # (per nick.md "When sccache fails with permission errors, run with
   # RUSTC_WRAPPER= SCCACHE_DISABLE=1 cargo clippy ...").
-  RUSTC_WRAPPER: ""
-  SCCACHE_DISABLE: "1"
+  RUSTC_WRAPPER: ''
+  SCCACHE_DISABLE: '1'
   CARGO_TERM_COLOR: always
-  RUSTFLAGS: "-D warnings"
+  RUSTFLAGS: '-D warnings'
 
 jobs:
   # ─── Frontend (TypeScript + Vite + Vitest) ──────────────────────────────────
@@ -58,8 +58,8 @@ jobs:
           # Node 22 LTS — matches the project baseline documented in
           # AGENTS.md. The `@types/node` is pinned at ^26 which the
           # project happily compiles against on Node 22+.
-          node-version: "22"
-          cache: "npm"
+          node-version: '22'
+          cache: 'npm'
 
       - name: Install dependencies
         run: npm ci --no-audit --no-fund
@@ -101,7 +101,7 @@ jobs:
         # and avoids pulling a second Rust toolchain into the runner.
         uses: taiki-e/install-action@cargo-deny
         with:
-          version: "0.16"
+          version: '0.16'
 
       - name: cargo check
         run: cargo check --manifest-path src-tauri/Cargo.toml --all-targets
