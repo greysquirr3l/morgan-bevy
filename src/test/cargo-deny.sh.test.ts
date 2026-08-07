@@ -63,6 +63,7 @@ describe('cargo-deny supply-chain policy (T66)', () => {
     })
     const raw = (result.stdout ?? '') + (result.stderr ?? '')
     // Strip ANSI escape codes so the assertion is portable across TTY modes.
+    // eslint-disable-next-line no-control-regex -- ANSI escapes are the only reliable way to parse cargo-deny output
     const output = raw.replace(/\x1b\[[0-9;]*m/g, '')
     expect(result.status, `cargo-deny exited with ${result.status}\n${output}`).toBe(0)
     expect(output).toContain('advisories ok, bans ok, licenses ok, sources ok')

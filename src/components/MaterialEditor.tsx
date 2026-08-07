@@ -492,7 +492,7 @@ export default function MaterialEditor({ selectedObjects, onMaterialChange }: Ma
                   alt="Texture Preview"
                   className="w-full h-16 object-cover border border-editor-border rounded"
                   onError={e => {
-                    ;(e.target as HTMLImageElement).style.display = 'none'
+                    (e.target as HTMLImageElement).style.display = 'none'
                   }}
                 />
               </div>

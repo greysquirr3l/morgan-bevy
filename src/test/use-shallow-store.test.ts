@@ -25,33 +25,33 @@ describe('useShallow store subscription', () => {
   it('returns the same reference across unrelated store mutations', () => {
     // Use a stable object identity for selectedObjects — shallow equality
     // compares by reference for arrays.
-    const stableArr: string[] = [];
-    useEditorStore.setState(s => ({ ...s, selectedObjects: stableArr }));
+    const stableArr: string[] = []
+    useEditorStore.setState(s => ({ ...s, selectedObjects: stableArr }))
 
     const { result } = renderHook(() =>
       useEditorStore(
         useShallow(s => ({
           selectedObjects: s.selectedObjects,
           hoveredObject: s.hoveredObject,
-        })),
-      ),
+        }))
+      )
     )
 
-    const initial = result.current;
-    expect(initial.selectedObjects).toBe(stableArr);
+    const initial = result.current
+    expect(initial.selectedObjects).toBe(stableArr)
 
     // Mutate an unrelated field — selector output stays referentially
     // identical because shallow equality holds.
     act(() => {
-      useEditorStore.setState(s => ({ ...s, transformMode: 'translate' }));
-    });
-    expect(result.current).toBe(initial);
+      useEditorStore.setState(s => ({ ...s, transformMode: 'translate' }))
+    })
+    expect(result.current).toBe(initial)
 
     // Mutate a read field with the same stable reference.
     act(() => {
-      useEditorStore.setState(s => ({ ...s, selectedObjects: stableArr }));
-    });
-    expect(result.current).toBe(initial);
+      useEditorStore.setState(s => ({ ...s, selectedObjects: stableArr }))
+    })
+    expect(result.current).toBe(initial)
   })
 
   it('re-renders when a read field actually changes', () => {

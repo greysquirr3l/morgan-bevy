@@ -229,9 +229,10 @@ export default function AssetBrowser({ hideHeader = false }: AssetBrowserProps) 
       console.error('Asset scan failed:', error)
       setError(error instanceof Error ? error.message : 'Asset scan failed')
     } finally {
-      if (signal?.aborted) return
-      setIsScanning(false)
-      setScanProgress(null)
+      if (!signal?.aborted) {
+        setIsScanning(false)
+        setScanProgress(null)
+      }
     }
   }
 

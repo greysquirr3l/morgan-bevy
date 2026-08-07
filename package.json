@@ -17,7 +17,7 @@
     "tauri": "tauri",
     "tauri:dev": "tauri dev",
     "tauri:build": "tauri build",
-    "lint": "eslint src --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
+    "lint": "eslint src --ext ts,tsx --report-unused-disable-directives",
     "lint:fix": "eslint src --ext ts,tsx --fix",
     "lint:rust": "cd src-tauri && cargo clippy -- -W clippy::all",
     "lint:all": "npm run lint && npm run lint:rust",

@@ -111,7 +111,7 @@ function useViewportSync() {
 
     // Get fresh data from store to avoid stale closure issues
     const { selectedTheme, gridData, removeObject, addObjectDirect } = useEditorStore.getState()
-    const sceneObjects = useSceneObjects()
+    const sceneObjects = useEditorStore.getState().sceneObjects
 
     if (!selectedTheme || !gridData || gridData.length === 0) {
       // debugLogger.log('SYNC_GRID_TO_SCENE', 'Sync aborted - missing data', {
@@ -212,7 +212,7 @@ function useViewportSync() {
     // debugLogger.log('SYNC_3D_TO_GRID', 'Starting 3D to grid sync')
 
     const { setGridData } = useEditorStore.getState()
-    const sceneObjects = useSceneObjects()
+    const sceneObjects = useEditorStore.getState().sceneObjects
     // debugLogger.log('SYNC_3D_TO_GRID', 'Got editor store state', {
     //   sceneObjectsCount: Object.keys(sceneObjects || {}).length
     // })
@@ -493,7 +493,7 @@ function AppContent() {
         break
       case 'toggle-grid':
         // Focus the viewport and toggle grid
-        ;(document.querySelector('.viewport-container') as HTMLElement)?.focus()
+        (document.querySelector('.viewport-container') as HTMLElement)?.focus()
         break
       case 'reset-camera':
         cameraControlsRef.current?.resetView()
