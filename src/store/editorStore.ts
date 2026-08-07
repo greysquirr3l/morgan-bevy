@@ -99,6 +99,14 @@ export interface EditorState {
   showGrid: boolean
   showStats: boolean
 
+  // Project file state (T20). `currentProjectPath` is the on-disk
+  // path of the currently-loaded project file, or `null` if the
+  // scene is unsaved / freshly created. `missingAssetRefs` is the
+  // list of asset IDs the most-recent project file referenced that
+  // the asset database could not resolve; rendered as a banner / badge.
+  currentProjectPath: string | null
+  missingAssetRefs: string[]
+
   // Undo/Redo system
   undoHistory: Command[]
   redoHistory: Command[]
@@ -121,6 +129,10 @@ export interface EditorState {
   setSelectedTheme: (theme: any) => void
   toggleGrid: () => void
   toggleStats: () => void
+
+  // Project file (T20)
+  setCurrentProjectPath: (path: string | null) => void
+  setMissingAssetRefs: (ids: string[]) => void
 
   // Object management
   addObject: (type: 'cube' | 'sphere' | 'pyramid', position?: [number, number, number]) => string
@@ -216,6 +228,18 @@ export const useEditorStore = create<EditorState>()(
     >(),
     showGrid: true,
     showStats: false,
+
+    // Project file state (T20). When `currentProjectPath` is `null`,
+    // the editor considers the scene unsaved (the File menu shows
+    // "Save As" instead of "Save"). When non-null, the File menu can
+    // overwrite the file in place via `save_project` with a path.
+    currentProjectPath: null as string | null,
+
+    // Missing-asset warnings (T20). After `load_project_from_path`
+    // we cross-check the project's `metadata.assetRefs` against the
+    // asset database and populate this list with the missing IDs.
+    // Consumers can render a banner / badge off this state.
+    missingAssetRefs: [] as string[],
 
     // Undo/Redo system
     undoHistory: [] as Command[],
@@ -336,6 +360,24 @@ export const useEditorStore = create<EditorState>()(
     toggleStats: () =>
       set(state => {
         state.showStats = !state.showStats
+      }),
+
+    // Project file (T20): set the in-memory pointer to the project
+    // file on disk. The File menu's "Save" command uses this to
+    // overwrite in place; "Save As" clears it before prompting so
+    // subsequent saves go through the dialog flow.
+    setCurrentProjectPath: (path: string | null) =>
+      set(state => {
+        state.currentProjectPath = path
+        // Saving / loading a project invalidates any previous
+        // missing-asset warning set — they were computed against
+        // the old asset library state.
+        state.missingAssetRefs = []
+      }),
+
+    setMissingAssetRefs: (ids: string[]) =>
+      set(state => {
+        state.missingAssetRefs = ids
       }),
 
     // Object management

@@ -1,6 +1,7 @@
 import { useEditorStore } from '@/store/editorStore'
 import { ProjectDataSchema, type ProjectData } from '@/types/schemas'
 import { LoadCommand, SaveCommand } from '@/utils/commands'
+import { collectAssetRefs, missingRefs, readAssetRefs, withAssetRefs } from '@/utils/projectAssets'
 import {
   addRecentProject,
   clearRecentProjects,
@@ -21,7 +22,7 @@ interface FileMenuProps {
 }
 
 export default function FileMenu({ isOpen, onClose, position, onManualSave }: FileMenuProps) {
-  const { executeCommand, sceneObjects, layers } = useEditorStore()
+  const { executeCommand, sceneObjects, layers, currentProjectPath } = useEditorStore()
   const [isExporting, setIsExporting] = useState(false)
   const [showExportModal, setShowExportModal] = useState(false)
   const [recentProjects, setRecentProjects] = useState<RecentProject[]>([])
@@ -30,12 +31,45 @@ export default function FileMenu({ isOpen, onClose, position, onManualSave }: Fi
   // Apply a parsed `ProjectData` to the editor store. Mirrors the
   // historical `LoadCommand` shape but works with the zod-validated
   // schema payload rather than an untyped JSON blob.
-  const applyProjectDataToStore = (projectData: ProjectData) => {
+  const applyProjectDataToStore = (projectData: ProjectData, sourcePath?: string) => {
     // The historical `LoadCommand` takes an untyped `sceneData`. The
     // typed schema payload is forwarded as-is — the internal
     // `LoadCommand` is permissive about extra fields.
     const command = new LoadCommand(projectData.scene as never)
     executeCommand(command)
+    // Record the source path so subsequent "Save" overwrites in place.
+    useEditorStore.getState().setCurrentProjectPath(sourcePath ?? null)
+
+    // Cross-check the project's asset refs against the live asset
+    // database. We do this best-effort: a failure to query the
+    // database must not block the load itself.
+    const refs = readAssetRefs(projectData)
+    if (refs.length === 0) return
+    void (async () => {
+      try {
+        const knownPaths = await invoke<unknown>('search_assets_database', {
+          query: '',
+        })
+        const knownSet = new Set<string>()
+        if (Array.isArray(knownPaths)) {
+          for (const entry of knownPaths) {
+            if (entry && typeof entry === 'object' && 'path' in entry) {
+              const p = (entry as { path?: unknown }).path
+              if (typeof p === 'string') knownSet.add(p)
+            }
+          }
+        }
+        const missing = missingRefs(knownSet, refs)
+        useEditorStore.getState().setMissingAssetRefs(missing)
+        if (missing.length > 0) {
+          console.warn(`Project loaded with ${missing.length} missing asset(s):`, missing)
+        }
+      } catch (e) {
+        // Non-fatal: asset database may not be initialised in dev /
+        // web builds. The scene loads regardless.
+        console.debug('Asset-ref check skipped:', e)
+      }
+    })()
   }
 
   // Load the recent-projects list on mount and prune missing entries.
@@ -167,37 +201,46 @@ export default function FileMenu({ isOpen, onClose, position, onManualSave }: Fi
 
   const saveProject = async () => {
     try {
-      // Build a ProjectData from the current editor state. The scene is
-      // the live Zustand state — serialise it as a plain object so the
-      // JSON payload matches what the Rust side expects.
       const state = useEditorStore.getState()
-      const projectData: ProjectData = ProjectDataSchema.parse({
-        schemaVersion: 1,
-        scene: {
-          objects: Array.from(state.sceneObjects.entries()),
-          layers: state.layers,
-          activeLayer: state.activeLayer,
-          selectedObjects: state.selectedObjects,
-          settings: {
-            gridSize: state.gridSize,
-            snapToGrid: state.snapToGrid,
-            transformMode: state.transformMode,
-            coordinateSpace: state.coordinateSpace,
+      const projectData: ProjectData = ProjectDataSchema.parse(
+        withAssetRefs(
+          {
+            schemaVersion: 1,
+            scene: {
+              objects: Array.from(state.sceneObjects.entries()),
+              layers: state.layers,
+              activeLayer: state.activeLayer,
+              selectedObjects: state.selectedObjects,
+              settings: {
+                gridSize: state.gridSize,
+                snapToGrid: state.snapToGrid,
+                transformMode: state.transformMode,
+                coordinateSpace: state.coordinateSpace,
+              },
+            },
+            metadata: {
+              name: 'Morgan-Bevy Project',
+              savedAt: new Date().toISOString(),
+              objectCount: state.sceneObjects.size,
+              layerCount: state.layers.length,
+            },
           },
-        },
-        metadata: {
-          name: 'Morgan-Bevy Project',
-          savedAt: new Date().toISOString(),
-          objectCount: state.sceneObjects.size,
-          layerCount: state.layers.length,
-        },
-      })
+          collectAssetRefs(state)
+        )
+      )
 
-      const path = await invoke<string>('save_project', { projectData })
-      // Derive a project name from the path and add to recents.
-      const name = path.split(/[\\/]/).pop() ?? 'project.mbp'
+      // Save As: clear the in-memory path so the Rust side pops the
+      // dialog. If the user already has a project open (Save), we
+      // pass the existing path and the Rust side overwrites it
+      // in-place without prompting.
+      const path = await invoke<string>('save_project', {
+        projectData,
+        path: state.currentProjectPath,
+      })
+      const name = path.split(/[\\/]/).pop() ?? 'project.morgan'
       setRecentProjects(addRecentProject(path, name))
       setLastSavedPath(path)
+      state.setCurrentProjectPath(path)
       onClose()
     } catch (error) {
       console.error('Save failed:', error)
@@ -205,11 +248,19 @@ export default function FileMenu({ isOpen, onClose, position, onManualSave }: Fi
     }
   }
 
+  const saveProjectAs = async () => {
+    // Force the Save-As flow even if a current path is set: clear
+    // the in-memory path, then delegate to `saveProject` so the
+    // Rust side will pop the dialog.
+    useEditorStore.getState().setCurrentProjectPath(null)
+    await saveProject()
+  }
+
   const openProject = async () => {
     try {
       const raw = await invoke<unknown>('load_project')
       const projectData = ProjectDataSchema.parse(raw)
-      applyProjectDataToStore(projectData)
+      applyProjectDataToStore(projectData, undefined)
       // The Rust side returns the parsed JSON, not the path — but the
       // save_project command returned the path. For "Open" we don't
       // currently get the path back, so we add a synthetic recent
@@ -237,7 +288,7 @@ export default function FileMenu({ isOpen, onClose, position, onManualSave }: Fi
         path: entry.path,
       })
       const projectData = ProjectDataSchema.parse(raw)
-      applyProjectDataToStore(projectData)
+      applyProjectDataToStore(projectData, entry.path)
       setRecentProjects(addRecentProject(entry.path, entry.name))
       onClose()
     } catch (error) {
@@ -381,9 +432,19 @@ export default function FileMenu({ isOpen, onClose, position, onManualSave }: Fi
           onClick={saveProject}
         >
           <Save className="w-4 h-4" />
-          <span>Save Project</span>
+          <span>{currentProjectPath ? 'Save Project' : 'Save Project As…'}</span>
           <span className="ml-auto text-xs text-editor-textMuted">Ctrl+Shift+S</span>
         </button>
+
+        {currentProjectPath && (
+          <button
+            className="w-full px-3 py-2 text-left text-sm hover:bg-editor-border flex items-center space-x-2"
+            onClick={saveProjectAs}
+          >
+            <Save className="w-4 h-4" />
+            <span>Save Project As…</span>
+          </button>
+        )}
 
         <button
           className="w-full px-3 py-2 text-left text-sm hover:bg-editor-border flex items-center space-x-2"

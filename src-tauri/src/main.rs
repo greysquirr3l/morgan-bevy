@@ -468,24 +468,32 @@ async fn export_level_simple(
 }
 
 #[tauri::command]
-async fn save_project(project_data: ProjectData) -> Result<String, String> {
-    info!("Saving project");
+async fn save_project(project_data: ProjectData, path: Option<String>) -> Result<String, String> {
+    info!("Saving project (path={path:?})");
 
-    let Some(path) = FileDialog::new()
-        .add_filter("Morgan-Bevy Project", &["mbp"])
-        .set_file_name("project.mbp")
-        .save_file()
-    else {
-        return Err("Save cancelled by user".to_string());
+    // If the frontend already knows the destination (Save vs Save As),
+    // write in-place. Otherwise pop a Save-As dialog.
+    let target = match path {
+        Some(p) if !p.trim().is_empty() => std::path::PathBuf::from(p),
+        _ => {
+            let Some(dialog_path) = FileDialog::new()
+                .add_filter("Morgan-Bevy Project", &["mbp", "morgan"])
+                .set_file_name("project.morgan")
+                .save_file()
+            else {
+                return Err("Save cancelled by user".to_string());
+            };
+            dialog_path
+        }
     };
 
     let json_data = serde_json::to_string_pretty(&project_data)
         .map_err(|e| format!("Failed to serialize project: {e}"))?;
 
-    std::fs::write(&path, json_data).map_err(|e| format!("Failed to write project file: {e}"))?;
+    std::fs::write(&target, json_data).map_err(|e| format!("Failed to write project file: {e}"))?;
 
-    info!("Successfully saved project to: {}", path.display());
-    Ok(path.to_string_lossy().to_string())
+    info!("Successfully saved project to: {}", target.display());
+    Ok(target.to_string_lossy().to_string())
 }
 
 #[tauri::command]
