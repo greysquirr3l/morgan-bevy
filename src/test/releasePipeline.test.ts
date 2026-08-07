@@ -120,11 +120,9 @@ describe('release.yml', () => {
   it('declares code-sign / notarisation secrets so a single change here covers all platforms', () => {
     // The Tauri action reads these via env; declaring them as job-level
     // env means a maintainer who adds a new secret doesn't have to
-    // touch every matrix leg.
-    const runs = collectRuns(release).join('\n')
-    // We can't introspect env blocks via the run-script, but the
-    // tauri-action step has its env declared in the YAML — parse
-    // it directly.
+    // touch every matrix leg. We can't introspect env blocks via the
+    // run-script, but the tauri-action step has its env declared in
+    // the YAML — parse it directly.
     const jobs = release.jobs as Record<
       string,
       {

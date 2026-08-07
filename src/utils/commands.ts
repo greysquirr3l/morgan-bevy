@@ -141,50 +141,11 @@ export class DuplicateCommand implements Command {
   }
 }
 
-// Selection command
-export class SelectionCommand implements Command {
-  private oldSelection: string[]
-  private newSelection: string[]
-  public description: string
-
-  constructor(oldSelection: string[], newSelection: string[]) {
-    this.oldSelection = oldSelection
-    this.newSelection = newSelection
-    this.description = `Select ${newSelection.length} object(s)`
-  }
-
-  execute(): void {
-    const { setSelectedObjects } = useEditorStore.getState()
-    setSelectedObjects(this.newSelection)
-  }
-
-  undo(): void {
-    const { setSelectedObjects } = useEditorStore.getState()
-    setSelectedObjects(this.oldSelection)
-  }
-}
-
-// Composite command for multiple operations
-export class CompositeCommand implements Command {
-  private commands: Command[]
-  public description: string
-
-  constructor(commands: Command[], description: string) {
-    this.commands = commands
-    this.description = description
-  }
-
-  execute(): void {
-    this.commands.forEach(command => command.execute())
-  }
-
-  undo(): void {
-    // Undo in reverse order
-    for (let i = this.commands.length - 1; i >= 0; i--) {
-      this.commands[i].undo()
-    }
-  }
-}
+// T88 audit removed SelectionCommand + CompositeCommand: both were
+// exported but never instantiated anywhere in src/. The selection
+// store already exposes setSelectedObjects for direct (non-undoable)
+// updates, and grouping multi-step operations can use a future
+// CommandSequence abstraction rather than a parallel hierarchy.
 
 // Group objects command
 export class GroupCommand implements Command {

@@ -1,7 +1,7 @@
 // Transform constraints system for axis locking during transforms
+import { useEditorStore } from '@/store/editorStore'
 import React from 'react'
 import * as THREE from 'three'
-import { useEditorStore } from '@/store/editorStore'
 
 export type AxisConstraint = 'none' | 'x' | 'y' | 'z' | 'xy' | 'xz' | 'yz'
 
@@ -14,10 +14,10 @@ class TransformConstraintManager {
   private static instance: TransformConstraintManager
   private state: TransformConstraintState = {
     activeConstraint: 'none',
-    isConstraintActive: false
+    isConstraintActive: false,
   }
   private listeners: Array<(state: TransformConstraintState) => void> = []
-  
+
   static getInstance(): TransformConstraintManager {
     if (!TransformConstraintManager.instance) {
       TransformConstraintManager.instance = new TransformConstraintManager()
@@ -29,7 +29,7 @@ class TransformConstraintManager {
   setConstraint(constraint: AxisConstraint): void {
     this.state = {
       activeConstraint: constraint,
-      isConstraintActive: constraint !== 'none'
+      isConstraintActive: constraint !== 'none',
     }
     this.notifyListeners()
   }
@@ -38,7 +38,7 @@ class TransformConstraintManager {
   clearConstraint(): void {
     this.state = {
       activeConstraint: 'none',
-      isConstraintActive: false
+      isConstraintActive: false,
     }
     this.notifyListeners()
   }
@@ -63,7 +63,7 @@ class TransformConstraintManager {
   // Apply constraint to a vector
   applyConstraint(vector: THREE.Vector3, constraint?: AxisConstraint): THREE.Vector3 {
     const activeConstraint = constraint || this.state.activeConstraint
-    
+
     if (activeConstraint === 'none' || !this.state.isConstraintActive) {
       return vector
     }
@@ -100,7 +100,7 @@ class TransformConstraintManager {
   // Apply constraint to euler rotation
   applyRotationConstraint(euler: THREE.Euler, constraint?: AxisConstraint): THREE.Euler {
     const activeConstraint = constraint || this.state.activeConstraint
-    
+
     if (activeConstraint === 'none' || !this.state.isConstraintActive) {
       return euler
     }
@@ -138,7 +138,7 @@ class TransformConstraintManager {
   // Handle keyboard input for constraints
   handleKeyInput(key: string, isPressed: boolean): boolean {
     const { transformMode } = useEditorStore.getState()
-    
+
     // Only handle constraints during transform operations
     if (transformMode === 'select') {
       return false
@@ -188,21 +188,21 @@ class TransformConstraintManager {
       z: '#4444ff', // Blue
       xy: '#ffff44', // Yellow
       xz: '#ff44ff', // Magenta
-      yz: '#44ffff'  // Cyan
+      yz: '#44ffff', // Cyan
     }
 
     const labels = {
       x: 'X-Axis',
-      y: 'Y-Axis', 
+      y: 'Y-Axis',
       z: 'Z-Axis',
       xy: 'XY-Plane',
       xz: 'XZ-Plane',
-      yz: 'YZ-Plane'
+      yz: 'YZ-Plane',
     }
 
     return {
       text: labels[this.state.activeConstraint as keyof typeof labels] || 'Unknown',
-      color: colors[this.state.activeConstraint as keyof typeof colors] || '#ffffff'
+      color: colors[this.state.activeConstraint as keyof typeof colors] || '#ffffff',
     }
   }
 }
@@ -223,29 +223,6 @@ export function useTransformConstraints() {
     setConstraint: transformConstraints.setConstraint.bind(transformConstraints),
     clearConstraint: transformConstraints.clearConstraint.bind(transformConstraints),
     applyConstraint: transformConstraints.applyConstraint.bind(transformConstraints),
-    getVisualIndicator: transformConstraints.getVisualIndicator.bind(transformConstraints)
-  }
-}
-
-// Add to keyboard shortcuts
-export function addConstraintKeyHandlers(): () => void {
-  const handleKeyDown = (event: KeyboardEvent) => {
-    const key = event.shiftKey ? `shift+${event.key.toLowerCase()}` : event.key.toLowerCase()
-    if (transformConstraints.handleKeyInput(key, true)) {
-      event.preventDefault()
-    }
-  }
-
-  const handleKeyUp = (event: KeyboardEvent) => {
-    const key = event.shiftKey ? `shift+${event.key.toLowerCase()}` : event.key.toLowerCase()
-    transformConstraints.handleKeyInput(key, false)
-  }
-
-  window.addEventListener('keydown', handleKeyDown)
-  window.addEventListener('keyup', handleKeyUp)
-
-  return () => {
-    window.removeEventListener('keydown', handleKeyDown)
-    window.removeEventListener('keyup', handleKeyUp)
+    getVisualIndicator: transformConstraints.getVisualIndicator.bind(transformConstraints),
   }
 }

@@ -281,35 +281,3 @@ export function useAssetDatabase() {
   };
 }
 
-// Hook for individual asset operations
-export function useAsset(assetId: number | null) {
-  const [asset, setAsset] = useState<AssetSearchResult | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (assetId === null) {
-      setAsset(null);
-      return;
-    }
-
-    setLoading(true);
-    setError(null);
-
-    // For now, we'll search by ID in the search results
-    // In a more complete implementation, we might have a dedicated getAssetById command
-    AssetDatabaseService.searchAssets({ query: '', limit: 10000 })
-      .then(results => {
-        const found = results.find(result => result.asset.id === assetId);
-        setAsset(found || null);
-      })
-      .catch(err => {
-        setError(err instanceof Error ? err.message : 'Failed to load asset');
-      })
-      .finally(() => {
-        setLoading(false);
-      });
-  }, [assetId]);
-
-  return { asset, loading, error };
-}

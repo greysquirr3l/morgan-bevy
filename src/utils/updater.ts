@@ -99,34 +99,7 @@ export async function checkForUpdate(channel: UpdateChannel = 'stable'): Promise
   }
 }
 
-/**
- * Download the previously-checked update. Calls `onProgress` as
- * bytes stream in (0..1). Returns the new state on completion.
- *
- * The caller is responsible for retaining the `Update` instance
- * returned from `checkForUpdate`. This wrapper doesn't keep it
- * because the plugin doesn't expose the current version of a
- * "checked but not yet downloaded" update on the store.
- */
-export async function downloadUpdate(
-  update: { downloadAndInstall: (cb?: (e: unknown) => void) => Promise<void> },
-  onProgress: (p: number) => void
-): Promise<void> {
-  try {
-    await update.downloadAndInstall(event => {
-      // The plugin's DownloadEvent has `event: 'started' |
-      // 'progress' | 'finished'` and a contentLength. We only
-      // care about progress for the UI.
-      const e = event as unknown as {
-        event?: string
-        downloadedBytes?: number
-        contentLength?: number
-      }
-      if (e.event === 'progress' && e.contentLength && typeof e.downloadedBytes === 'number') {
-        onProgress(Math.min(1, e.downloadedBytes / e.contentLength))
-      }
-    })
-  } catch (e) {
-    throw e instanceof Error ? e : new Error(String(e))
-  }
-}
+// T88 audit removed downloadUpdate: the only consumer
+// (UpdateNotification.tsx) calls `update.downloadAndInstall(...)`
+// directly with its own progress handling. The wrapper was dead
+// surface.

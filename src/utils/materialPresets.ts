@@ -15,7 +15,6 @@
  * material actually rendered for that object.
  */
 
-import type { EditorState } from '@/store/editorStore'
 
 export interface MaterialPreset {
   id: string
@@ -184,14 +183,10 @@ function isMaterialPreset(value: unknown): value is MaterialPreset {
   )
 }
 
-/**
- * Resolve a material instance to the effective values applied at
- * render time. `overrides` win where present; everything else falls
- * through to the base preset.
- */
+/** Resolve a material instance against its preset. */
 export function effectiveMaterial(
   preset: MaterialPreset | undefined,
-  instance: MaterialInstance | undefined
+  instance: MaterialInstance | undefined,
 ): {
   baseColor: string
   metallic: number
@@ -240,39 +235,4 @@ export function newPresetId(name: string): string {
     .replace(/(^-|-$)/g, '')
   const suffix = Math.random().toString(36).slice(2, 8)
   return `${slug || 'preset'}-${suffix}`
-}
-
-/**
- * Whether the per-object `material` field stored in the scene
- * matches the resolved effective material of the given instance
- * (i.e. the instance is the source of truth). Used by the
- * Inspector to show a "(linked to preset)" badge.
- */
-export function instanceMatches(
-  stored: EditorState['sceneObjects'] extends Map<string, infer V>
-    ? V extends { material?: infer M }
-      ? M
-      : never
-    : never,
-  preset: MaterialPreset | undefined,
-  instance: MaterialInstance | undefined
-): boolean {
-  const effective = effectiveMaterial(preset, instance)
-  if (!stored) return false
-  const s = stored as {
-    baseColor?: string
-    metallic?: number
-    roughness?: number
-    emissive?: string
-    emissiveIntensity?: number
-    texture?: string
-  }
-  return (
-    s.baseColor === effective.baseColor &&
-    s.metallic === effective.metallic &&
-    s.roughness === effective.roughness &&
-    s.emissive === effective.emissive &&
-    s.emissiveIntensity === effective.emissiveIntensity &&
-    (s.texture ?? null) === (effective.texture ?? null)
-  )
 }

@@ -188,10 +188,7 @@ export function copySelectedObjects(): boolean {
   return clipboard.copy(selectedObjects)
 }
 
-export async function pasteFromClipboard(position?: [number, number, number]): Promise<string[]> {
-  return await clipboard.paste(position)
-}
-
-export function hasClipboardData(): boolean {
-  return clipboard.hasData()
-}
+// T88 audit removed pasteFromClipboard + hasClipboardData: callers
+// (useKeyboardShortcuts, FileMenu) already use the singleton's
+// `clipboard.paste(...)` / `clipboard.hasData()` directly. The
+// thin wrappers were dead surface.
