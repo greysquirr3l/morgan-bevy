@@ -58,10 +58,7 @@ describe('auto-tag.yml', () => {
   })
 
   it('only auto-tags when CI is green and on main', () => {
-    const jobs = autoTag.jobs as Record<
-      string,
-      { if?: string; steps?: Array<{ run?: string }> }
-    >
+    const jobs = autoTag.jobs as Record<string, { if?: string; steps?: Array<{ run?: string }> }>
     const job = jobs['auto-tag']
     expect(job?.if).toMatch(/conclusion.*success/)
     expect(job?.if).toMatch(/head_branch.*main/)
@@ -101,9 +98,12 @@ describe('release.yml', () => {
   })
 
   it('build matrix covers linux + macOS (x86_64 + aarch64) + windows', () => {
-    const jobs = release.jobs as Record<string, {
-      strategy?: { matrix?: { include?: Array<{ target: string; os: string }> } }
-    }>
+    const jobs = release.jobs as Record<
+      string,
+      {
+        strategy?: { matrix?: { include?: Array<{ target: string; os: string }> } }
+      }
+    >
     const matrix = jobs.build?.strategy?.matrix?.include ?? []
     const targets = new Set(matrix.map(m => m.target))
     expect(targets.has('x86_64-unknown-linux-gnu')).toBe(true)
@@ -125,24 +125,26 @@ describe('release.yml', () => {
     // We can't introspect env blocks via the run-script, but the
     // tauri-action step has its env declared in the YAML — parse
     // it directly.
-    const jobs = release.jobs as Record<string, {
-      steps?: Array<{ name?: string; env?: Record<string, string> }>
-    }>
-    const buildStep = (jobs.build?.steps ?? []).find(s =>
-      s.name?.includes('Build tauri app'),
-    )
+    const jobs = release.jobs as Record<
+      string,
+      {
+        steps?: Array<{ name?: string; env?: Record<string, string> }>
+      }
+    >
+    const buildStep = (jobs.build?.steps ?? []).find(s => s.name?.includes('Build tauri app'))
     expect(buildStep?.env).toBeDefined()
     expect(buildStep?.env?.APPLE_ID).toBe('${{ secrets.APPLE_ID }}')
     expect(buildStep?.env?.WINDOWS_CERTIFICATE).toBe('${{ secrets.WINDOWS_CERTIFICATE }}')
   })
 
   it('publishes a draft release (no auto-publish of unreviewed binaries)', () => {
-    const jobs = release.jobs as Record<string, {
-      steps?: Array<{ with?: Record<string, unknown> }>
-    }>
-    const buildStep = (jobs.build?.steps ?? []).find(s =>
-      s.with?.tagName !== undefined,
-    )
+    const jobs = release.jobs as Record<
+      string,
+      {
+        steps?: Array<{ with?: Record<string, unknown> }>
+      }
+    >
+    const buildStep = (jobs.build?.steps ?? []).find(s => s.with?.tagName !== undefined)
     expect(buildStep?.with?.releaseDraft).toBe(true)
   })
 
@@ -158,12 +160,13 @@ describe('release.yml', () => {
     // `node-version` is a `with:` block, not a `run:`, so it doesn't
     // appear in collectRuns. Read it directly off the parsed YAML —
     // YAML preserves kebab-case keys verbatim.
-    const jobs = release.jobs as Record<string, {
-      steps?: Array<{ with?: Record<string, unknown> }>
-    }>
-    const node = (jobs.build?.steps ?? []).find(s =>
-      s.with?.['node-version'] !== undefined,
-    )
+    const jobs = release.jobs as Record<
+      string,
+      {
+        steps?: Array<{ with?: Record<string, unknown> }>
+      }
+    >
+    const node = (jobs.build?.steps ?? []).find(s => s.with?.['node-version'] !== undefined)
     expect(node?.with?.['node-version']).toBe('22')
   })
 
