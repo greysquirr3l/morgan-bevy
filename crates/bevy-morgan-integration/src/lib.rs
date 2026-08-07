@@ -216,6 +216,15 @@ pub struct ExportedEntity {
     pub spawn_point: Option<ExportedSpawnPoint>,
     #[serde(default)]
     pub trigger_volume: Option<ExportedTriggerVolume>,
+    // T91: four new markers.
+    #[serde(default)]
+    pub light: Option<Light>,
+    #[serde(default)]
+    pub animation: Option<Animation>,
+    #[serde(default)]
+    pub audio: Option<Audio>,
+    #[serde(default)]
+    pub vfx: Option<Vfx>,
 }
 
 /// Top-level export shape. Matches the editor's `LevelData` JSON.
@@ -270,6 +279,10 @@ mod tests {
                 }),
                 spawn_point: Some(ExportedSpawnPoint::PlayerStart),
                 trigger_volume: None,
+                light: None,
+                animation: None,
+                audio: None,
+                vfx: None,
             }],
             layers: vec!["default".to_string()],
             generation_seed: Some(42),

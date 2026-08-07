@@ -24,6 +24,7 @@ mod generation;
 mod spatial;
 
 use assets::AssetDatabaseState;
+use export::exporters::{AnimationMarker, AudioMarker, LightMarker, VfxMarker};
 use export::{ExportFormat, LevelExporter};
 use generation::bsp::BSPGenerator;
 use generation::wfc::{WFCGenerationParams, WFCGenerator};
@@ -134,6 +135,24 @@ pub struct GameObject {
     /// a `TriggerVolume` component with the named event hook.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub trigger_volume: Option<TriggerVolume>,
+    /// Optional light marker (T91). When set, the exporter emits
+    /// a `Light` component (Point / Spot / Directional) using
+    /// the given parameters.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub light: Option<LightMarker>,
+    /// Optional animation marker (T91). When set, the exporter
+    /// emits an `Animation` component carrying the clip + speed.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub animation: Option<AnimationMarker>,
+    /// Optional audio marker (T91). When set, the exporter emits
+    /// an `Audio` component (Ambient / OneShot) referencing the
+    /// given asset path.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub audio: Option<AudioMarker>,
+    /// Optional VFX marker (T91). When set, the exporter emits
+    /// a `Vfx` component (Particle / Billboard).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub vfx: Option<VfxMarker>,
     /// Additional metadata for custom properties and game logic
     pub metadata: HashMap<String, serde_json::Value>,
 }

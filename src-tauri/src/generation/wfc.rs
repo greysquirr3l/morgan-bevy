@@ -608,6 +608,10 @@ impl WFCGenerator {
                             collision_shape: None,
                             spawn_point: None,
                             trigger_volume: None,
+                            light: None,
+                            animation: None,
+                            audio: None,
+                            vfx: None,
                             metadata: {
                                 let mut map = HashMap::new();
                                 map.insert(

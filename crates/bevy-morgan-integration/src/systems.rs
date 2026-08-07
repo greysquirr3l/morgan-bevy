@@ -426,7 +426,9 @@ pub struct Lights {
 )]
 pub fn light_observer(add: On<Add, Light>, lights: Query<&Light>, mut resources: ResMut<Lights>) {
     if let Ok(light) = lights.get(add.entity) {
-        resources.entries.push((EntityId::from_entity(add.entity), light.clone()));
+        resources
+            .entries
+            .push((EntityId::from_entity(add.entity), light.clone()));
     }
 }
 
@@ -448,7 +450,9 @@ pub fn animation_player_observer(
     mut resources: ResMut<Animations>,
 ) {
     if let Ok(anim) = animations.get(add.entity) {
-        resources.entries.push((EntityId::from_entity(add.entity), anim.clone()));
+        resources
+            .entries
+            .push((EntityId::from_entity(add.entity), anim.clone()));
     }
 }
 
@@ -498,13 +502,11 @@ pub struct VfxEntries {
     clippy::needless_pass_by_value,
     reason = "On<Add, T> is a Bevy system param; it must be by-value"
 )]
-pub fn vfx_observer(
-    add: On<Add, Vfx>,
-    vfxes: Query<&Vfx>,
-    mut resources: ResMut<VfxEntries>,
-) {
+pub fn vfx_observer(add: On<Add, Vfx>, vfxes: Query<&Vfx>, mut resources: ResMut<VfxEntries>) {
     if let Ok(vfx) = vfxes.get(add.entity) {
-        resources.entries.push((EntityId::from_entity(add.entity), vfx.clone()));
+        resources
+            .entries
+            .push((EntityId::from_entity(add.entity), vfx.clone()));
     }
 }
 

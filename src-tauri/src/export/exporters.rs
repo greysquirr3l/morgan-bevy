@@ -33,6 +33,7 @@ pub struct ExportedFile {
 /// generator builds this once from `level_data.objects` before
 /// emitting, and uses it to gate the systems + plugin + companion
 /// types that get written into the generated file.
+#[allow(clippy::struct_excessive_bools, reason = "MarkerSet is a bitset")]
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct MarkerSet {
     pub door: bool,
@@ -40,6 +41,11 @@ pub struct MarkerSet {
     pub spawn_point: bool,
     pub trigger_volume: bool,
     pub nav_mesh_hint: bool,
+    // T91: four new markers.
+    pub light: bool,
+    pub animation: bool,
+    pub audio: bool,
+    pub vfx: bool,
 }
 
 impl MarkerSet {
@@ -52,6 +58,10 @@ impl MarkerSet {
             spawn_point: false,
             trigger_volume: false,
             nav_mesh_hint: false,
+            light: false,
+            animation: false,
+            audio: false,
+            vfx: false,
         }
     }
 
@@ -63,7 +73,81 @@ impl MarkerSet {
             && !self.spawn_point
             && !self.trigger_volume
             && !self.nav_mesh_hint
+            && !self.light
+            && !self.animation
+            && !self.audio
+            && !self.vfx
     }
+}
+
+// ---------------------------------------------------------------------------
+// T91 marker enums — mirror of the companion crate's `markers.rs`.
+// ---------------------------------------------------------------------------
+
+/// Lighting marker (T91). The editor's `GameObject.light` field
+/// carries this when the object is a light source.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub enum LightMarker {
+    Point {
+        color: [f32; 3],
+        intensity: f32,
+        range: f32,
+        shadows: bool,
+    },
+    Spot {
+        color: [f32; 3],
+        intensity: f32,
+        range: f32,
+        inner_angle: f32,
+        outer_angle: f32,
+        shadows: bool,
+    },
+    Directional {
+        color: [f32; 3],
+        intensity: f32,
+        shadows: bool,
+    },
+}
+
+/// Animation marker (T91). `Play` runs the clip in a loop at the
+/// given speed; `PlayOnce` plays the clip a single time.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub enum AnimationMarker {
+    Play {
+        clip: String,
+        repeat: bool,
+        speed: f32,
+    },
+    PlayOnce {
+        clip: String,
+    },
+}
+
+/// Audio marker (T91). `Ambient` is a looping sound; `OneShot`
+/// plays once and the entity despawns on completion.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub enum AudioMarker {
+    Ambient {
+        path: String,
+        volume: f32,
+        looping: bool,
+    },
+    OneShot {
+        path: String,
+        volume: f32,
+    },
+}
+
+/// VFX marker (T91). `Particle` references a particle-effect asset;
+/// `Billboard` references a 2D texture rendered facing the camera.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub enum VfxMarker {
+    Particle { path: String, count: u32 },
+    Billboard { texture: String, size: [f32; 2] },
 }
 
 /// How the generated Bevy source references the per-marker systems.
@@ -103,6 +187,10 @@ pub fn marker_tags_present(level_data: &LevelData) -> MarkerSet {
                 "spawn" | "spawn-point" | "spawnpoint" => s.spawn_point = true,
                 "trigger" | "trigger-volume" | "triggervolume" => s.trigger_volume = true,
                 "nav-mesh" | "navmesh" => s.nav_mesh_hint = true,
+                "light" | "lightsource" => s.light = true,
+                "anim" | "animation" => s.animation = true,
+                "audio" | "sound" => s.audio = true,
+                "vfx" | "particles" | "particle" | "billboard" => s.vfx = true,
                 _ => {}
             }
         }
@@ -659,6 +747,27 @@ impl LevelExporter {
                 code.push_str(Self::rust_trigger_component(trigger).as_str());
             }
 
+            // T91: lighting marker — emits a `Light` component
+            // (Point / Spot / Directional).
+            if let Some(ref light) = obj.light {
+                code.push_str(Self::rust_light_component(light).as_str());
+            }
+
+            // T91: animation marker.
+            if let Some(ref anim) = obj.animation {
+                code.push_str(Self::rust_animation_component(anim).as_str());
+            }
+
+            // T91: audio marker.
+            if let Some(ref audio) = obj.audio {
+                code.push_str(Self::rust_audio_component(audio).as_str());
+            }
+
+            // T91: VFX marker.
+            if let Some(ref vfx) = obj.vfx {
+                code.push_str(Self::rust_vfx_component(vfx).as_str());
+            }
+
             code.push_str("    ));\n\n");
         }
 
@@ -819,6 +928,79 @@ impl LevelExporter {
                     Self::escape_rust_string(event),
                 )
             }
+        }
+    }
+
+    /// T91: emit a `Light` enum literal carrying the variant
+    /// data. The consumer's Bevy project needs `bevy_pbr` for the
+    /// actual `PointLight` / `SpotLight` / `DirectionalLight`
+    /// components; this marker is the editor's typed source.
+    fn rust_light_component(light: &LightMarker) -> String {
+        match light {
+            LightMarker::Point { color, intensity, range, shadows } => format!(
+                "        Light::Point {{ color: [{:.3}, {:.3}, {:.3}], intensity: {:.3}, range: {:.3}, shadows: {} }},\n",
+                color[0], color[1], color[2], intensity, range, shadows,
+            ),
+            LightMarker::Spot {
+                color, intensity, range, inner_angle, outer_angle, shadows,
+            } => format!(
+                "        Light::Spot {{ color: [{:.3}, {:.3}, {:.3}], intensity: {:.3}, range: {:.3}, inner_angle: {:.3}, outer_angle: {:.3}, shadows: {} }},\n",
+                color[0], color[1], color[2], intensity, range, inner_angle, outer_angle, shadows,
+            ),
+            LightMarker::Directional { color, intensity, shadows } => format!(
+                "        Light::Directional {{ color: [{:.3}, {:.3}, {:.3}], intensity: {:.3}, shadows: {} }},\n",
+                color[0], color[1], color[2], intensity, shadows,
+            ),
+        }
+    }
+
+    /// T91: emit an `Animation` enum literal.
+    fn rust_animation_component(anim: &AnimationMarker) -> String {
+        match anim {
+            AnimationMarker::Play { clip, repeat, speed } => format!(
+                "        Animation::Play {{ clip: \"{}\".to_string(), repeat: {}, speed: {:.3} }},\n",
+                Self::escape_rust_string(clip),
+                repeat,
+                speed,
+            ),
+            AnimationMarker::PlayOnce { clip } => format!(
+                "        Animation::PlayOnce {{ clip: \"{}\".to_string() }},\n",
+                Self::escape_rust_string(clip),
+            ),
+        }
+    }
+
+    /// T91: emit an `Audio` enum literal.
+    fn rust_audio_component(audio: &AudioMarker) -> String {
+        match audio {
+            AudioMarker::Ambient { path, volume, looping } => format!(
+                "        Audio::Ambient {{ path: \"{}\".to_string(), volume: {:.3}, looping: {} }},\n",
+                Self::escape_rust_string(path),
+                volume,
+                looping,
+            ),
+            AudioMarker::OneShot { path, volume } => format!(
+                "        Audio::OneShot {{ path: \"{}\".to_string(), volume: {:.3} }},\n",
+                Self::escape_rust_string(path),
+                volume,
+            ),
+        }
+    }
+
+    /// T91: emit a `Vfx` enum literal.
+    fn rust_vfx_component(vfx: &VfxMarker) -> String {
+        match vfx {
+            VfxMarker::Particle { path, count } => format!(
+                "        Vfx::Particle {{ path: \"{}\".to_string(), count: {} }},\n",
+                Self::escape_rust_string(path),
+                count,
+            ),
+            VfxMarker::Billboard { texture, size } => format!(
+                "        Vfx::Billboard {{ texture: \"{}\".to_string(), size: [{:.3}, {:.3}] }},\n",
+                Self::escape_rust_string(texture),
+                size[0],
+                size[1],
+            ),
         }
     }
 
@@ -1063,6 +1245,10 @@ mod tests {
                     spawn_point: None,
                     trigger_volume: None,
                     metadata: HashMap::new(),
+                    light: None,
+                    animation: None,
+                    audio: None,
+                    vfx: None,
                 },
                 GameObject {
                     id: "light_1".to_string(),
@@ -1080,6 +1266,10 @@ mod tests {
                     spawn_point: None,
                     trigger_volume: None,
                     metadata: HashMap::new(),
+                    light: None,
+                    animation: None,
+                    audio: None,
+                    vfx: None,
                 },
             ],
             layers: vec!["walls".to_string(), "lights".to_string()],
@@ -1568,6 +1758,106 @@ mod tests {
         let lvl = level_with_tags(&["spawn-point"]);
         let code = LevelExporter::generate_rust_code(&lvl).unwrap();
         assert!(code.contains("PlayerStart"));
+    }
+
+    // ----- T91: marker enum + emission tests -----
+
+    #[test]
+    fn marker_set_includes_light_when_light_tagged() {
+        let lvl = level_with_tags(&["light"]);
+        let s = marker_tags_present(&lvl);
+        assert!(s.light);
+    }
+
+    #[test]
+    fn marker_set_includes_animation_when_animation_tagged() {
+        let lvl = level_with_tags(&["animation"]);
+        let s = marker_tags_present(&lvl);
+        assert!(s.animation);
+    }
+
+    #[test]
+    fn marker_set_includes_audio_when_audio_tagged() {
+        let lvl = level_with_tags(&["audio"]);
+        let s = marker_tags_present(&lvl);
+        assert!(s.audio);
+    }
+
+    #[test]
+    fn marker_set_includes_vfx_when_vfx_tagged() {
+        let lvl = level_with_tags(&["vfx"]);
+        let s = marker_tags_present(&lvl);
+        assert!(s.vfx);
+    }
+
+    #[test]
+    fn generated_rust_includes_light_variant_when_light_tagged() {
+        let mut lvl = sample_level();
+        if let Some(obj) = lvl.objects.first_mut() {
+            obj.light = Some(LightMarker::Point {
+                color: [1.0, 0.5, 0.0],
+                intensity: 2.0,
+                range: 10.0,
+                shadows: true,
+            });
+        }
+        let code = LevelExporter::generate_rust_code(&lvl).unwrap();
+        assert!(code.contains("Light::Point"));
+        assert!(code.contains("color: [1.000, 0.500, 0.000]"));
+        assert!(code.contains("shadows: true"));
+    }
+
+    #[test]
+    fn generated_rust_includes_animation_variant_when_animation_tagged() {
+        let mut lvl = sample_level();
+        if let Some(obj) = lvl.objects.first_mut() {
+            obj.animation = Some(AnimationMarker::Play {
+                clip: "walk.glb".to_string(),
+                repeat: true,
+                speed: 1.5,
+            });
+        }
+        let code = LevelExporter::generate_rust_code(&lvl).unwrap();
+        assert!(code.contains("Animation::Play"));
+        assert!(code.contains("clip: \"walk.glb\".to_string()"));
+        assert!(code.contains("speed: 1.500"));
+    }
+
+    #[test]
+    fn generated_rust_includes_audio_variant_when_audio_tagged() {
+        let mut lvl = sample_level();
+        if let Some(obj) = lvl.objects.first_mut() {
+            obj.audio = Some(AudioMarker::Ambient {
+                path: "sounds/fountain.ogg".to_string(),
+                volume: 0.8,
+                looping: true,
+            });
+        }
+        let code = LevelExporter::generate_rust_code(&lvl).unwrap();
+        assert!(code.contains("Audio::Ambient"));
+        assert!(code.contains("looping: true"));
+    }
+
+    #[test]
+    fn generated_rust_includes_vfx_variant_when_vfx_tagged() {
+        let mut lvl = sample_level();
+        if let Some(obj) = lvl.objects.first_mut() {
+            obj.vfx = Some(VfxMarker::Billboard {
+                texture: "vfx/smoke.png".to_string(),
+                size: [2.0, 2.0],
+            });
+        }
+        let code = LevelExporter::generate_rust_code(&lvl).unwrap();
+        assert!(code.contains("Vfx::Billboard"));
+        assert!(code.contains("texture: \"vfx/smoke.png\".to_string()"));
+        assert!(code.contains("size: [2.000, 2.000]"));
+    }
+
+    #[test]
+    fn marker_set_is_empty_for_default_level() {
+        let lvl = sample_level();
+        let s = marker_tags_present(&lvl);
+        assert!(s.is_empty());
     }
 
     #[test]

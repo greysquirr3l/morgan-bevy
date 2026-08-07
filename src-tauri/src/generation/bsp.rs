@@ -471,6 +471,10 @@ impl BSPGenerator {
             collision_shape: None,
             spawn_point: None,
             trigger_volume: None,
+            light: None,
+            animation: None,
+            audio: None,
+            vfx: None,
             metadata: HashMap::new(),
         }
     }
@@ -503,6 +507,10 @@ impl BSPGenerator {
             collision_shape: None,
             spawn_point: None,
             trigger_volume: None,
+            light: None,
+            animation: None,
+            audio: None,
+            vfx: None,
             metadata: HashMap::new(),
         }
     }
@@ -531,6 +539,10 @@ impl BSPGenerator {
             collision_shape: None,
             spawn_point: None,
             trigger_volume: None,
+            light: None,
+            animation: None,
+            audio: None,
+            vfx: None,
             metadata: HashMap::new(),
         }
     }
@@ -563,6 +575,10 @@ impl BSPGenerator {
             collision_shape: None,
             spawn_point: None,
             trigger_volume: None,
+            light: None,
+            animation: None,
+            audio: None,
+            vfx: None,
             metadata: {
                 let mut meta = HashMap::new();
                 meta.insert("interactive".to_string(), serde_json::Value::Bool(true));
