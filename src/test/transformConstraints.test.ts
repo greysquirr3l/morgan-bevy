@@ -150,7 +150,10 @@ describe('transformConstraints.getVisualIndicator', () => {
 })
 
 describe('transformConstraints subscription lifecycle', () => {
-  let received: Array<{ active: AxisConstraint; isActive: boolean }>
+  // `received` is shared across both tests in this block. The
+  // first test only cares about the order of `active` values; the
+  // second just counts calls. `unknown[]` keeps both readable.
+  let received: unknown[]
 
   beforeEach(() => {
     received = []
@@ -169,8 +172,9 @@ describe('transformConstraints subscription lifecycle', () => {
     transformConstraints.clearConstraint()
     unsub()
 
-    expect(received.map(r => r.active)).toEqual(['x', 'yz', 'none'])
-    expect(received.map(r => r.isActive)).toEqual([true, true, false])
+    const rec = received as Array<{ active: AxisConstraint; isActive: boolean }>
+    expect(rec.map(r => r.active)).toEqual(['x', 'yz', 'none'])
+    expect(rec.map(r => r.isActive)).toEqual([true, true, false])
   })
 
   it('stops notifying once unsubscribed', () => {

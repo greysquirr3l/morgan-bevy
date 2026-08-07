@@ -1,16 +1,16 @@
 import { useState, useEffect } from 'react'
-import { Package, Trash2, Download, ChevronRight } from 'lucide-react'
+import { Package, Trash2, Download, ChevronRight, Unlink } from 'lucide-react'
 import { useEditorStore } from '@/store/editorStore'
 import { CreateObjectCommand } from '@/utils/commands'
-
-interface Prefab {
-  id: string
-  name: string
-  description?: string
-  objects: any[]
-  thumbnail?: string
-  createdAt: string
-}
+import {
+  buildPrefabFromSelection,
+  deletePrefabById as deletePrefabFromStorage,
+  instantiatePrefabObjects,
+  loadPrefabs,
+  savePrefab as persistPrefab,
+  applyBreakPrefab,
+  type Prefab,
+} from '@/utils/prefabs'
 
 export default function PrefabManager() {
   const [isExpanded, setIsExpanded] = useState(false)
@@ -18,68 +18,60 @@ export default function PrefabManager() {
   const [showSaveDialog, setShowSaveDialog] = useState(false)
   const [prefabName, setPrefabName] = useState('')
   const [prefabDescription, setPrefabDescription] = useState('')
-  
+
   const { selectedObjects, sceneObjects, executeCommand } = useEditorStore()
 
-  const getSelectedObjectsData = () => {
-    return selectedObjects.map(id => sceneObjects.get(id)).filter(Boolean)
-  }
-
+  // T19: replace inline localStorage reads / writes with the
+  // typed helpers from src/utils/prefabs.ts. The helpers tolerate
+  // corrupt JSON and schema drift (cf. the vitest coverage).
   const savePrefab = () => {
-    const selectedObjectsData = getSelectedObjectsData()
-    if (selectedObjectsData.length === 0 || !prefabName.trim()) return
-
-    const newPrefab: Prefab = {
-      id: `prefab_${Date.now()}`,
-      name: prefabName.trim(),
-      description: prefabDescription.trim(),
-      objects: selectedObjectsData.map(obj => ({
-        ...obj,
-        // Remove object-specific IDs to make it reusable
-        id: undefined,
-        parentId: undefined
-      })),
-      createdAt: new Date().toISOString()
-    }
-
-    // Save to localStorage
-    const existingPrefabs = JSON.parse(localStorage.getItem('morgan-bevy-prefabs') || '[]')
-    const updatedPrefabs = [...existingPrefabs, newPrefab]
-    localStorage.setItem('morgan-bevy-prefabs', JSON.stringify(updatedPrefabs))
-    
-    setPrefabs(updatedPrefabs)
+    if (!prefabName.trim()) return
+    const built = buildPrefabFromSelection(
+      selectedObjects,
+      sceneObjects,
+      prefabName,
+      prefabDescription || undefined,
+    )
+    if (!built) return
+    const next = persistPrefab(built)
+    setPrefabs(next)
     setShowSaveDialog(false)
     setPrefabName('')
     setPrefabDescription('')
   }
 
-  const loadPrefabs = () => {
-    const saved = JSON.parse(localStorage.getItem('morgan-bevy-prefabs') || '[]')
-    setPrefabs(saved)
+  const loadStoredPrefabs = () => {
+    setPrefabs(loadPrefabs())
   }
 
+  // T19: instantiate via the typed helper, which clears ids and
+  // tags every spawned object with `prefabInstanceId` so future
+  // edits to the source prefab can propagate.
   const instantiatePrefab = (prefab: Prefab) => {
-    const spawnOffset = [2, 0, 0] // Offset from origin
-    
-    prefab.objects.forEach((objTemplate) => {
-      const offsetPosition: [number, number, number] = [
-        objTemplate.position[0] + spawnOffset[0],
-        objTemplate.position[1] + spawnOffset[1],
-        objTemplate.position[2] + spawnOffset[2]
-      ]
-
-      // Use the store's addObject method which handles command creation internally
+    const spawnOffset: [number, number, number] = [2, 0, 0]
+    const instantiated = instantiatePrefabObjects(prefab, spawnOffset)
+    for (const objTemplate of instantiated) {
       if (objTemplate.meshType) {
-        const command = new CreateObjectCommand(objTemplate.meshType, offsetPosition)
+        const command = new CreateObjectCommand(objTemplate.meshType, objTemplate.position)
         executeCommand(command)
       }
-    })
+    }
   }
 
   const deletePrefab = (prefabId: string) => {
-    const updatedPrefabs = prefabs.filter(p => p.id !== prefabId)
-    localStorage.setItem('morgan-bevy-prefabs', JSON.stringify(updatedPrefabs))
-    setPrefabs(updatedPrefabs)
+    const next = deletePrefabFromStorage(prefabId)
+    setPrefabs(next)
+  }
+
+  // T19: sever the prefab link on every selected object so future
+  // edits to the source prefab stop propagating. Falls through to
+  // the typed helper to mutate the scene map.
+  const breakPrefabOnSelection = () => {
+    const scene = useEditorStore.getState().sceneObjects
+    const ids = selectedObjects.filter(id => scene.get(id)?.prefabInstanceId !== undefined)
+    if (ids.length === 0) return
+    const next = applyBreakPrefab(scene, ids)
+    useEditorStore.setState({ sceneObjects: next })
   }
 
   const exportPrefab = (prefab: Prefab) => {
@@ -103,7 +95,7 @@ export default function PrefabManager() {
 
   // Load prefabs on component mount
   useEffect(() => {
-    loadPrefabs()
+    loadStoredPrefabs()
   }, [])
 
   if (!isExpanded) {
@@ -131,21 +123,35 @@ export default function PrefabManager() {
           <span className="text-xs">▼</span>
           <span className="ml-2 text-sm font-medium">Prefabs ({prefabs.length})</span>
         </div>
-        <button
-          onClick={(e) => {
-            e.stopPropagation()
-            if (selectedObjects.length > 0) {
-              setShowSaveDialog(true)
-            } else {
-              alert('Select objects to create a prefab')
-            }
-          }}
-          className="text-xs hover:text-editor-accent"
-          title="Save Selected as Prefab"
-          disabled={selectedObjects.length === 0}
-        >
-          ＋
-        </button>
+        <div className="flex items-center gap-1">
+          {/* T19: Break Prefab — sever the prefab link on every selected object. */}
+          <button
+            onClick={e => {
+              e.stopPropagation()
+              breakPrefabOnSelection()
+            }}
+            className="text-xs hover:text-editor-accent px-1"
+            title="Break Prefab on selected objects (sever the link to the source prefab)"
+            disabled={selectedObjects.length === 0}
+          >
+            <Unlink className="w-3 h-3" />
+          </button>
+          <button
+            onClick={(e) => {
+              e.stopPropagation()
+              if (selectedObjects.length > 0) {
+                setShowSaveDialog(true)
+              } else {
+                alert('Select objects to create a prefab')
+              }
+            }}
+            className="text-xs hover:text-editor-accent"
+            title="Save Selected as Prefab"
+            disabled={selectedObjects.length === 0}
+          >
+            ＋
+          </button>
+        </div>
       </div>
 
       {/* Save Prefab Dialog */}

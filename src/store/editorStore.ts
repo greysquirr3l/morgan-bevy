@@ -102,6 +102,11 @@ export interface EditorState {
         emissiveIntensity?: number
         texture?: string
       }
+      // T19: when set, this object is a prefab instance. The
+      // string is the source `Prefab.id`; clearing it (via
+      // `breakPrefab` in src/utils/prefabs.ts) severs the link
+      // so future edits to the source prefab don't propagate.
+      prefabInstanceId?: string
       collision?: boolean
       walkable?: boolean
       tags?: string[]
