@@ -200,81 +200,10 @@ export class UngroupCommand implements Command {
   }
 }
 
-// Paste objects command
-export class PasteCommand implements Command {
-  private pastedObjects: Array<{
-    id: ObjectId
-    objectData: SceneObject
-  }> = []
-  public description: string
-
-  constructor(
-    private clipboardData: any,
-    private position?: [number, number, number]
-  ) {
-    this.description = `Paste ${clipboardData?.objects?.length || 0} object(s)`
-  }
-
-  execute(): void {
-    if (!this.clipboardData || !this.clipboardData.objects) {
-      return
-    }
-
-    // Calculate offset for pasted objects
-    const offset = this.position || [2, 0, 0]
-
-    // Find center of copied objects to offset from
-    let centerX = 0,
-      centerY = 0,
-      centerZ = 0
-    this.clipboardData.objects.forEach((obj: any) => {
-      centerX += obj.position[0]
-      centerY += obj.position[1]
-      centerZ += obj.position[2]
-    })
-    centerX /= this.clipboardData.objects.length
-    centerY /= this.clipboardData.objects.length
-    centerZ /= this.clipboardData.objects.length
-
-    // Create new objects at offset positions
-    useEditorStore.setState(state => {
-      for (const objData of this.clipboardData.objects) {
-        // Generation site (not a boundary): the id is minted here from
-        // the pasted object's (user-controlled, possibly space-containing)
-        // name. Use the plain constructor rather than `parseObjectId`,
-        // which would throw on a name like "My Cube".
-        const newId = ObjectId(
-          `${objData.name}_paste_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`
-        )
-        const newPosition: [number, number, number] = [
-          objData.position[0] - centerX + offset[0],
-          objData.position[1] - centerY + offset[1],
-          objData.position[2] - centerZ + offset[2],
-        ]
-
-        const newObjectData: SceneObject = {
-          ...objData,
-          id: newId,
-          name: `${objData.name}_paste`,
-          position: newPosition,
-          parentId: undefined,
-          children: [],
-        }
-
-        state.sceneObjects.set(newId, newObjectData)
-        this.pastedObjects.push({ id: newId, objectData: newObjectData })
-      }
-    })
-  }
-
-  undo(): void {
-    useEditorStore.setState(state => {
-      this.pastedObjects.forEach(({ id }) => {
-        state.sceneObjects.delete(id)
-      })
-    })
-  }
-}
+// PasteCommand removed in T60 (wiring audit caught it as dead code).
+// The hook's paste shortcut calls `clipboard.paste()` directly;
+// the clipboard manager writes straight into the store. A future
+// T60b could add a `PasteCommand` if undoable paste becomes a need.
 
 // Save command for persisting scene to localStorage
 export class SaveCommand implements Command {

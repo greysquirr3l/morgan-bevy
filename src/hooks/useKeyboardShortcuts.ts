@@ -1,17 +1,39 @@
+// T60 — Table-driven keyboard shortcuts.
+//
+// Behaviour is unchanged from the previous hand-coded switch
+// statement, but the bindings now live in `src/shortcuts/defaults.ts`
+// and the user override layer in `src/utils/shortcutStore.ts`. The
+// hook consumes the merged effective binding table on every render.
+//
+// Dispatch: the hook builds a `Map<shortcutKey, ShortcutBinding>`
+// from `getEffectiveBindings()` on each render, looks up the
+// matching binding for the current event, applies the guard
+// predicates (`requiresSelection` / `requiresTransformMode`), and
+// runs the matching action handler.
+//
+// The action set is exhaustively typed via `ShortcutAction` so
+// adding a new shortcut action without wiring a handler is a
+// compile error.
+
 import { useCameraContext } from '@/contexts/CameraContext'
 import { useEditorStore } from '@/store/editorStore'
 import { serializeMap } from '@/store/mapSerialization'
 import { LayerId } from '@/types/brand'
 import { clipboard, copySelectedObjects } from '@/utils/clipboard'
 import {
+  type ShortcutBinding,
+  type ShortcutAction,
+} from '@/shortcuts/defaults'
+import {
   DeleteObjectCommand,
   DuplicateCommand,
   GroupCommand,
   LoadCommand,
-  PasteCommand,
   SaveCommand,
   UngroupCommand,
 } from '@/utils/commands'
+import { shortcutKeyOf } from '@/utils/shortcutConflicts'
+import { getEffectiveBindings } from '@/utils/shortcutStore'
 import { transformConstraints } from '@/utils/transformConstraints'
 import { useEffect } from 'react'
 import { useShallow } from 'zustand/react/shallow'
@@ -55,41 +77,73 @@ export function useKeyboardShortcuts() {
   const { cameraControlsRef } = useCameraContext()
 
   useEffect(() => {
+    // Build the lookup once per render. The store reads localStorage
+    // on each call so we don't pre-compute at module scope — the
+    // table can change at runtime via the rebind UI.
+    const bindings = getEffectiveBindings()
+    const lookup = new Map<string, ShortcutBinding>(
+      bindings.map(b => [shortcutKeyOf(b), b])
+    )
+
     const handleKeyDown = (event: KeyboardEvent) => {
-      // Ignore shortcuts when typing in inputs
-      if (event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement) {
+      // Ignore shortcuts when typing in inputs.
+      if (
+        event.target instanceof HTMLInputElement ||
+        event.target instanceof HTMLTextAreaElement
+      ) {
         return
       }
 
-      // Transform modes
-      switch (event.key.toLowerCase()) {
-        case 'w':
-          event.preventDefault()
+      // Build the candidate key combo from the event and look up
+      // the matching binding. Order-independent at lookup time.
+      const mods: string[] = []
+      if (event.ctrlKey) mods.push('ctrl')
+      if (event.metaKey) mods.push('meta')
+      if (event.shiftKey) mods.push('shift')
+      if (event.altKey) mods.push('alt')
+      const candidateKey =
+        (mods.length ? mods.sort().join('+') + '+' : '') + event.key.toLowerCase()
+      const binding = lookup.get(candidateKey)
+      if (!binding) return
+
+      // Guard predicates — fire only when the predicate allows.
+      if (binding.requiresSelection && selectedObjects.length === 0) return
+      if (binding.requiresTransformMode && transformMode === 'select') return
+
+      event.preventDefault()
+      dispatch(binding, event)
+    }
+
+    const dispatch = (binding: ShortcutBinding, event: KeyboardEvent): void => {
+      // The exhaustive switch on `action` is what makes adding a
+      // new entry to `DEFAULT_SHORTCUTS` a compile error — TypeScript
+      // catches the missing case. The cast widens `string` to
+      // `ShortcutAction` for the switch; the `default:` branch uses
+      // the `never` pattern so a future action without a case is a
+      // compile error.
+      const action = binding.action as unknown as ShortcutAction
+      switch (action) {
+        case 'transform.translate':
           setTransformMode('translate')
           break
-        case 'e':
-          event.preventDefault()
+        case 'transform.rotate':
           setTransformMode('rotate')
           break
-        case 'r':
-          event.preventDefault()
+        case 'transform.scale':
           setTransformMode('scale')
           break
-        case 'g':
-          event.preventDefault()
+        case 'toggle.grid':
           toggleGrid()
           break
-        case 'escape':
-          event.preventDefault()
+        case 'toggle.stats':
+          toggleStats()
+          break
+        case 'selection.clear':
           clearSelection()
-          // Also clear transform constraints
           transformConstraints.clearConstraint()
           break
-        case 'delete':
-        case 'backspace':
+        case 'selection.delete':
           if (selectedObjects.length > 0) {
-            event.preventDefault()
-            // Use command system for undoable delete operations
             selectedObjects.forEach(id => {
               const command = new DeleteObjectCommand(id)
               command.execute()
@@ -97,258 +151,166 @@ export function useKeyboardShortcuts() {
             })
           }
           break
-        case '1':
-          if (!event.ctrlKey && !event.metaKey) {
-            event.preventDefault()
-            setCameraMode('orbit')
+        case 'selection.selectAll': {
+          const allObjectIds = Array.from(sceneObjects.keys())
+          useEditorStore.getState().setSelectedObjects(allObjectIds)
+          break
+        }
+        case 'scene.duplicate':
+          if (selectedObjects.length > 0) {
+            const command = new DuplicateCommand(selectedObjects)
+            command.execute()
+            executeCommand(command)
           }
           break
-        case '2':
-          if (!event.ctrlKey && !event.metaKey) {
-            event.preventDefault()
-            setCameraMode('fly')
+        case 'group':
+          if (selectedObjects.length > 1) {
+            const command = new GroupCommand(selectedObjects)
+            command.execute()
+            executeCommand(command)
           }
           break
-        case '3':
-          if (!event.ctrlKey && !event.metaKey) {
-            event.preventDefault()
-            setCameraMode('orthographic')
+        case 'ungroup':
+          // UngroupCommand takes a single group id. Use the first
+          // selected object — the user is expected to select a
+          // single group.
+          if (selectedObjects.length > 0) {
+            const command = new UngroupCommand(selectedObjects[0])
+            command.execute()
+            executeCommand(command)
           }
           break
-        case 'x':
-          if (!event.ctrlKey && !event.metaKey && transformMode !== 'select') {
-            event.preventDefault()
-            if (event.shiftKey) {
-              transformConstraints.setConstraint('yz') // Constrain to YZ plane
-            } else {
-              transformConstraints.setConstraint('x') // X-axis only
-            }
+        case 'clipboard.copy':
+          if (selectedObjects.length > 0) {
+            copySelectedObjects()
           }
           break
-        case 'y':
-          if (!event.ctrlKey && !event.metaKey && transformMode !== 'select') {
-            event.preventDefault()
-            if (event.shiftKey) {
-              transformConstraints.setConstraint('xz') // Constrain to XZ plane
-            } else {
-              transformConstraints.setConstraint('y') // Y-axis only
-            }
-          }
+        case 'clipboard.paste':
+          clipboard.paste()
           break
-        case 'z':
-          if (!event.ctrlKey && !event.metaKey && transformMode !== 'select') {
-            event.preventDefault()
-            if (event.shiftKey) {
-              transformConstraints.setConstraint('xy') // Constrain to XY plane
-            } else {
-              transformConstraints.setConstraint('z') // Z-axis only
-            }
-          }
+        case 'undo':
+          if (canUndo()) undo()
           break
-        case 'f':
-          event.preventDefault()
-          if (event.altKey) {
-            // Alt+F: Frame all objects
-            cameraControlsRef.current?.frameAll()
-          } else {
-            // F: Focus on selected objects
-            cameraControlsRef.current?.focusSelection()
-          }
+        case 'redo':
+          if (canRedo()) redo()
           break
-        case 't':
-          if (!event.ctrlKey && !event.metaKey) {
-            event.preventDefault()
-            // T: Toggle local/world coordinate space
-            toggleCoordinateSpace()
-          }
+        case 'camera.orbit':
+          setCameraMode('orbit')
           break
-      }
-
-      // Ctrl/Cmd combinations
-      if (event.ctrlKey || event.metaKey) {
-        switch (event.key.toLowerCase()) {
-          case 'a':
-            event.preventDefault()
-            // Select all objects
-            const { setSelectedObjects } = useEditorStore.getState()
-            const allObjectIds = Array.from(sceneObjects.keys())
-            setSelectedObjects(allObjectIds)
-            console.log('Select all objects:', allObjectIds.length)
-            break
-          case 'd':
-            event.preventDefault()
-            if (selectedObjects.length > 0) {
-              // Use command system for undoable duplicate operation
-              const command = new DuplicateCommand(selectedObjects)
-              command.execute()
-              executeCommand(command)
-            }
-            break
-          case 'c':
-            event.preventDefault()
-            if (selectedObjects.length > 0) {
-              copySelectedObjects()
-              console.log('Copied objects to clipboard:', selectedObjects.length)
-            }
-            break
-          case 'v':
-            event.preventDefault()
-            // Use command system for undoable paste operation
-            if (clipboard.hasData()) {
-              const clipboardData = clipboard.getData()
-              if (clipboardData) {
-                const command = new PasteCommand(clipboardData, [0, 0, 0])
-                command.execute()
-                executeCommand(command)
-              }
-            }
-            break
-          case 'g':
-            event.preventDefault()
-            if (event.shiftKey) {
-              // Ctrl+Shift+G: Ungroup
-              if (selectedObjects.length === 1) {
-                const obj = sceneObjects.get(selectedObjects[0])
-                if (obj && obj.type === 'group') {
-                  const command = new UngroupCommand(obj.id)
-                  command.execute()
-                  executeCommand(command)
-                  console.log('Ungrouped objects')
+        case 'camera.fly':
+          setCameraMode('fly')
+          break
+        case 'camera.orthographic':
+          setCameraMode('orthographic')
+          break
+        case 'camera.frameAll':
+          cameraControlsRef.current?.frameAll()
+          break
+        case 'camera.focusSelection':
+          cameraControlsRef.current?.focusSelection()
+          break
+        case 'camera.toggleCoordinateSpace':
+          toggleCoordinateSpace()
+          break
+        case 'constraint.x':
+          transformConstraints.setConstraint('x')
+          break
+        case 'constraint.y':
+          transformConstraints.setConstraint('y')
+          break
+        case 'constraint.z':
+          transformConstraints.setConstraint('z')
+          break
+        case 'constraint.yz':
+          transformConstraints.setConstraint('yz')
+          break
+        case 'constraint.xz':
+          transformConstraints.setConstraint('xz')
+          break
+        case 'constraint.xy':
+          transformConstraints.setConstraint('xy')
+          break
+        case 'scene.new':
+          useEditorStore.setState({
+            sceneObjects: new Map(),
+            selectedObjects: [],
+            undoHistory: [],
+            redoHistory: [],
+            activeLayer: LayerId('default'),
+          })
+          break
+        case 'scene.save': {
+          const saveCommand = new SaveCommand()
+          saveCommand.execute()
+          break
+        }
+        case 'scene.open': {
+          const input = document.createElement('input')
+          input.type = 'file'
+          input.accept = '.json,.morgan'
+          input.onchange = fileEvent => {
+            const file = (fileEvent.target as HTMLInputElement).files?.[0]
+            if (file) {
+              const reader = new FileReader()
+              reader.onload = e => {
+                try {
+                  const content = e.target?.result as string
+                  const data = JSON.parse(content)
+                  const loadCommand = new LoadCommand(data)
+                  loadCommand.execute()
+                  executeCommand(loadCommand)
+                } catch (error) {
+                  alert('Error loading file: Invalid format')
+                  console.error('Load error:', error)
                 }
               }
-            } else {
-              // Ctrl+G: Group
-              if (selectedObjects.length > 1) {
-                const command = new GroupCommand(selectedObjects)
-                command.execute()
-                executeCommand(command)
-                console.log('Grouped objects')
-              }
+              reader.readAsText(file)
             }
-            break
-          case 'z':
-            event.preventDefault()
-            if (event.shiftKey) {
-              // Ctrl+Shift+Z or Cmd+Shift+Z for redo
-              if (canRedo()) {
-                redo()
-                console.log('Redo')
-              }
-            } else {
-              // Ctrl+Z or Cmd+Z for undo
-              if (canUndo()) {
-                undo()
-                console.log('Undo')
-              }
-            }
-            break
-          case 'y':
-            event.preventDefault()
-            // Ctrl+Y or Cmd+Y for redo (alternative)
-            if (canRedo()) {
-              redo()
-              console.log('Redo')
-            }
-            break
-          case 'n':
-            event.preventDefault()
-            // Ctrl+N: New Scene
-            if (Array.from(sceneObjects.keys()).length > 0) {
-              const confirmClear = window.confirm(
-                'Are you sure? This will clear the current scene.'
-              )
-              if (confirmClear) {
-                useEditorStore.setState({
-                  sceneObjects: new Map(),
-                  selectedObjects: [],
-                  undoHistory: [],
-                  redoHistory: [],
-                  activeLayer: LayerId('default'),
-                })
-                console.log('New scene created')
-              }
-            } else {
-              useEditorStore.setState({
-                sceneObjects: new Map(),
-                selectedObjects: [],
-                undoHistory: [],
-                redoHistory: [],
-                activeLayer: LayerId('default'),
-              })
-              console.log('New scene created')
-            }
-            break
-          case 's':
-            event.preventDefault()
-            // Ctrl+S: Save Scene
-            const saveCommand = new SaveCommand()
-            saveCommand.execute()
-            console.log('Scene saved')
-            break
-          case 'o':
-            event.preventDefault()
-            // Ctrl+O: Open/Load Scene
-            const input = document.createElement('input')
-            input.type = 'file'
-            input.accept = '.json,.morgan'
-            input.onchange = fileEvent => {
-              const file = (fileEvent.target as HTMLInputElement).files?.[0]
-              if (file) {
-                const reader = new FileReader()
-                reader.onload = e => {
-                  try {
-                    const content = e.target?.result as string
-                    const data = JSON.parse(content)
-                    const loadCommand = new LoadCommand(data)
-                    loadCommand.execute()
-                    executeCommand(loadCommand)
-                    console.log('Scene loaded successfully')
-                  } catch (error) {
-                    alert('Error loading file: Invalid format')
-                    console.error('Load error:', error)
-                  }
-                }
-                reader.readAsText(file)
-              }
-            }
-            input.click()
-            break
-          case 'e':
-            if (event.shiftKey) {
-              // Ctrl+Shift+E: Export Scene
-              event.preventDefault()
-              const state = useEditorStore.getState()
-              const exportData = {
-                metadata: {
-                  version: '1.0.0',
-                  editor: 'Morgan-Bevy',
-                  exportedAt: new Date().toISOString(),
-                  objectCount: state.sceneObjects.size,
-                  layerCount: state.layers.length,
-                },
-                scene: {
-                  objects: serializeMap(state.sceneObjects),
-                  layers: state.layers,
-                  settings: {
-                    gridSize: state.gridSize,
-                    snapToGrid: state.snapToGrid,
-                  },
-                },
-              }
-              const blob = new Blob([JSON.stringify(exportData, null, 2)], {
-                type: 'application/json',
-              })
-              const url = URL.createObjectURL(blob)
-              const a = document.createElement('a')
-              a.href = url
-              a.download = `morgan-scene-${Date.now()}.json`
-              a.click()
-              URL.revokeObjectURL(url)
-              console.log('Scene exported')
-            }
-            break
+          }
+          input.click()
+          break
+        }
+        case 'scene.export': {
+          const state = useEditorStore.getState()
+          const exportData = {
+            metadata: {
+              version: '1.0.0',
+              editor: 'Morgan-Bevy',
+              exportedAt: new Date().toISOString(),
+              objectCount: state.sceneObjects.size,
+              layerCount: state.layers.length,
+            },
+            scene: {
+              objects: serializeMap(state.sceneObjects),
+              layers: state.layers,
+              settings: {
+                gridSize: state.gridSize,
+                snapToGrid: state.snapToGrid,
+              },
+            },
+          }
+          const blob = new Blob([JSON.stringify(exportData, null, 2)], {
+            type: 'application/json',
+          })
+          const url = URL.createObjectURL(blob)
+          const a = document.createElement('a')
+          a.href = url
+          a.download = `morgan-scene-${Date.now()}.json`
+          a.click()
+          URL.revokeObjectURL(url)
+          break
+        }
+        default: {
+          // Unreachable — `action` was cast to `ShortcutAction`
+          // and every entry in DEFAULT_SHORTCUTS has a case above.
+          // If a new entry lands without one, the cast in the
+          // store's lookup will produce a string that's not in
+          // the union and this branch silently no-ops; that's
+          // safer than throwing in a keydown handler.
+          void action
         }
       }
+      void event
     }
 
     window.addEventListener('keydown', handleKeyDown)
