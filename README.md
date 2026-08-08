@@ -38,14 +38,33 @@ Pre-built binaries for the latest release are published on
 Double-click a `.morgan` project file to launch the editor with that
 level loaded (file associations registered by the installer).
 
+### Linux (Debian / Ubuntu)
+
 ```bash
-# Linux (deb)
-sudo dpkg -i morgan-bevy_0.4.0_amd64.deb
-# macOS (drag-and-drop the .dmg)
-# Windows (run the .msi installer)
+sudo dpkg -i morgan-bevy_*.deb
 ```
 
-Homebrew, scoop, and AUR formulas are tracked in `T72`.
+### Linux (Arch)
+
+```bash
+yay -S morgan-bevy-bin
+```
+
+### macOS (Homebrew)
+
+```bash
+brew install --cask morgan-bevy
+```
+
+### Windows (scoop)
+
+```powershell
+scoop install morgan-bevy
+```
+
+### Windows (MSI)
+
+Double-click the `.msi` installer from the GitHub Release.
 
 ---
 
