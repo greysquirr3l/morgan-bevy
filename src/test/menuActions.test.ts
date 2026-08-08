@@ -58,7 +58,13 @@ describe('menu-action unions', () => {
   })
 
   it('HELP_ACTIONS lists the expected literals in order', () => {
-    expect([...HELP_ACTIONS]).toEqual(['keyboard-shortcuts', 'help', 'about'])
+    expect([...HELP_ACTIONS]).toEqual([
+      'keyboard-shortcuts',
+      'help',
+      'about',
+      'tutorial-getting-started',
+      'tutorial-procedural-generation',
+    ])
   })
 
   it('the tuples are disjoint (no overlap between namespaces)', () => {

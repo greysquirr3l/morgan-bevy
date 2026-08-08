@@ -92,7 +92,7 @@ export default function Inspector() {
 
   if (selectedObjects.length === 0) {
     return (
-      <div className="flex flex-col h-full">
+      <div className="flex flex-col h-full" data-tutorial-target="inspector-panel">
         <div className="flex-1 flex items-center justify-center text-editor-textMuted">
           <div className="text-center">
             <Search className="w-8 h-8 mb-2 mx-auto" />
@@ -121,7 +121,7 @@ export default function Inspector() {
   }
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-full" data-tutorial-target="inspector-panel">
       {/* Object count info */}
       {selectedCount > 1 && (
         <div className="p-3 border-b border-editor-border">

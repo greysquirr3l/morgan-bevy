@@ -224,14 +224,14 @@ export default function GenerationPanel(_props: GenerationPanelProps) {
   }
 
   return (
-    <div className="px-3 py-2">
+    <div className="px-3 py-2" data-tutorial-target="generation-panel">
       <div className="flex justify-between items-start mb-3">
         <div className="text-xs text-gray-400">Objects: {lastGenerated?.objects.length ?? 0}</div>
       </div>
 
       {/* Algorithm Selection */}
       <div className="grid grid-cols-2 gap-3 mb-3">
-        <div>
+        <div data-tutorial-target="generation-algorithm-select">
           <label className="block text-xs text-editor-textMuted mb-1">Algorithm</label>
           <div className="flex space-x-2">
             <label className="flex items-center space-x-1">
@@ -334,6 +334,7 @@ export default function GenerationPanel(_props: GenerationPanelProps) {
         <button
           onClick={handleGenerate}
           disabled={isGenerating}
+          data-tutorial-target="generation-generate-button"
           className={`flex-1 flex items-center justify-center space-x-1 px-3 py-1 text-xs rounded ${
             isGenerating
               ? 'bg-gray-600 text-gray-400 cursor-not-allowed'

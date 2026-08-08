@@ -39,10 +39,11 @@ export default function ActionsPanel() {
         <div>
           <h3 className="text-sm font-semibold text-editor-accent mb-2 border-b border-editor-border/30 pb-1">Create Objects</h3>
           <div className="grid grid-cols-3 gap-2">
-            <button 
+            <button
               className="flex flex-col items-center p-2 bg-editor-bg hover:bg-editor-hover rounded text-xs"
               onClick={() => createPrimitive('cube')}
               title="Create Cube"
+              data-tutorial-target="actions-create-cube"
             >
               <span className="text-2xl mb-1">⬜</span>
               <span>Cube</span>
