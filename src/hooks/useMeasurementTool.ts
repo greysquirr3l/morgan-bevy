@@ -33,8 +33,15 @@ export interface UseMeasurementToolResult {
   readonly mode: MeasurementMode | null
   /** The full list of measurements (across all modes). */
   readonly measurements: readonly Measurement[]
-  /** The most-recent measurement (for the overlay). */
-  readonly current: Measurement | null
+  /** The most-recent measurement (for the overlay). Never `null` —
+   *  an inactive/empty tool reports `EMPTY_MEASUREMENT` (`id: ''`),
+   *  not the absence of a value; callers check `current.id === ''`
+   *  rather than null-checking. (Fixed from `Measurement | null`,
+   *  which didn't match the hook's actual behaviour — `current` is
+   *  never set to `null` anywhere in the implementation below — and
+   *  forced every consumer to redundantly null-check a value that
+   *  can't be null.) */
+  readonly current: Measurement
   /** Current config (unit, ruler visibility, grid size). */
   readonly config: MeasurementConfig
   /** True iff the ruler overlay should be visible. */
