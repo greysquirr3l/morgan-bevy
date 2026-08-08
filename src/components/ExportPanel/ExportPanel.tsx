@@ -3,6 +3,7 @@ import { Download, FolderOpen, FileText, Code, Box } from 'lucide-react'
 import { invoke } from '@tauri-apps/api/core'
 import { open } from '@tauri-apps/plugin-dialog'
 import { useEditorStore } from '@/store/editorStore'
+import { buildLevelExportPayload } from '@/utils/exportPayload'
 
 interface ExportFormat {
   id: 'JSON' | 'RON' | 'RustCode' | 'GLTF' | 'FBX'
@@ -119,35 +120,10 @@ export default function ExportPanel() {
 
     setIsExporting(true)
     try {
-      // Create level data from current scene
-      const levelData = {
-        id: 'level-' + Date.now(),
-        name: 'Morgan-Bevy Level',
-        objects: Array.from(sceneObjects.values()).map(obj => ({
-          id: obj.id,
-          name: obj.name,
-          transform: {
-            position: obj.position,
-            rotation: [0, 0, 0, 1], // Convert from Euler to quaternion if needed
-            scale: obj.scale,
-          },
-          material: `material_${obj.meshType}`,
-          mesh: obj.meshType,
-          layer: obj.layerId || 'Default',
-          tags: ['exported'],
-          metadata: {
-            created_at: new Date().toISOString(),
-            mesh_type: obj.meshType,
-          },
-        })),
-        layers: ['Default', 'Generated'],
-        generation_seed: null,
-        generation_params: null,
-        bounds: {
-          min: [-50.0, -5.0, -50.0],
-          max: [50.0, 5.0, 50.0],
-        },
-      }
+      // T91d: payload built by the pure utility — markers ride
+      // along via spread-when-present so absent markers omit the
+      // key entirely (matches Rust `skip_serializing_if`).
+      const levelData = buildLevelExportPayload(sceneObjects.values())
 
       const result: ExportResult = await invoke('export_level', {
         levelData,

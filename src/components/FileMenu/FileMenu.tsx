@@ -3,6 +3,10 @@ import { AssetId, LayerId } from '@/types/brand'
 import { serializeMap } from '@/store/mapSerialization'
 import { ProjectDataSchema, type ProjectData } from '@/types/schemas'
 import { LoadCommand, SaveCommand } from '@/utils/commands'
+import {
+  buildBevyEntitiesExport,
+  buildFileMenuLevelExportPayload,
+} from '@/utils/exportPayload'
 import { collectAssetRefs, missingRefs, readAssetRefs, withAssetRefs } from '@/utils/projectAssets'
 import {
   addRecentProject,
@@ -171,21 +175,11 @@ export default function FileMenu({ isOpen, onClose, position, onManualSave }: Fi
         },
         // Bevy-compatible format
         bevy: {
-          entities: Array.from(sceneObjects.values()).map(obj => ({
-            name: obj.name,
-            components: {
-              Transform: {
-                translation: obj.position,
-                rotation: obj.rotation,
-                scale: obj.scale,
-              },
-              Visibility: {
-                is_visible: obj.visible,
-              },
-              MeshType: obj.meshType || 'cube',
-            },
-            layer: layers.find(l => l.id === obj.layerId)?.name || 'Default',
-          })),
+          // T91d: payload built by the pure utility — markers ride
+          // along as top-level keys on each entity, spread only
+          // when present (no `null` values; matches Rust
+          // `skip_serializing_if`).
+          entities: buildBevyEntitiesExport(sceneObjects.values(), layers),
         },
       }
 
@@ -321,39 +315,10 @@ export default function FileMenu({ isOpen, onClose, position, onManualSave }: Fi
 
   const handleLevelExport = async (format: 'json' | 'ron' | 'rust') => {
     try {
-      // Create level data structure
-      const levelData = {
-        id: `level_${Date.now()}`,
-        name: 'Morgan-Bevy Level',
-        objects: Array.from(sceneObjects.values()).map(obj => ({
-          id: obj.id,
-          name: obj.name,
-          transform: {
-            position: obj.position,
-            rotation: obj.rotation,
-            scale: obj.scale,
-          },
-          material: obj.material || {
-            baseColor: '#ffffff',
-            metallic: 0.0,
-            roughness: 0.5,
-          },
-          mesh: obj.meshType || 'cube',
-          layer: obj.layerId,
-          tags: obj.tags || [],
-          metadata: {
-            visible: obj.visible,
-            locked: obj.locked,
-            collision: obj.collision,
-            walkable: obj.walkable,
-          },
-        })),
-        layers: ['default', 'walls', 'floors', 'doors'],
-        bounds: {
-          min: [-50, -50, -50],
-          max: [50, 50, 50],
-        },
-      }
+      // T91d: payload built by the pure utility — markers ride
+      // along via spread-when-present so absent markers omit the
+      // key entirely (matches Rust `skip_serializing_if`).
+      const levelData = buildFileMenuLevelExportPayload(sceneObjects.values())
 
       // Export via Tauri command
       await invoke('export_level_simple', {
