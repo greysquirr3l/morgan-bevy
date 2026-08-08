@@ -1,9 +1,9 @@
-import { useState } from 'react'
-import { Download, FolderOpen, FileText, Code, Box } from 'lucide-react'
-import { invoke } from '@tauri-apps/api/core'
-import { open } from '@tauri-apps/plugin-dialog'
 import { useEditorStore } from '@/store/editorStore'
 import { buildLevelExportPayload } from '@/utils/exportPayload'
+import { invoke } from '@tauri-apps/api/core'
+import { open } from '@tauri-apps/plugin-dialog'
+import { Box, Code, Download, FileText, FolderOpen } from 'lucide-react'
+import { useState } from 'react'
 
 interface ExportFormat {
   id: 'JSON' | 'RON' | 'RustCode' | 'GLTF' | 'FBX'
@@ -34,7 +34,7 @@ export default function ExportPanel() {
   const [isExporting, setIsExporting] = useState(false)
   const [outputPath, setOutputPath] = useState('')
   const [lastExportResult, setLastExportResult] = useState<ExportResult | null>(null)
-  
+
   const [exportFormats, setExportFormats] = useState<ExportFormat[]>([
     {
       id: 'JSON',
@@ -79,11 +79,9 @@ export default function ExportPanel() {
   ])
 
   const toggleFormat = (formatId: ExportFormat['id']) => {
-    setExportFormats(formats => 
-      formats.map(format => 
-        format.id === formatId 
-          ? { ...format, enabled: !format.enabled }
-          : format
+    setExportFormats(formats =>
+      formats.map(format =>
+        format.id === formatId ? { ...format, enabled: !format.enabled } : format
       )
     )
   }
@@ -94,7 +92,7 @@ export default function ExportPanel() {
         directory: true,
         title: 'Select Export Directory',
       })
-      
+
       if (selected && typeof selected === 'string') {
         setOutputPath(selected)
       }
@@ -109,9 +107,7 @@ export default function ExportPanel() {
       return
     }
 
-    const enabledFormats = exportFormats
-      .filter(format => format.enabled)
-      .map(format => format.id)
+    const enabledFormats = exportFormats.filter(format => format.enabled).map(format => format.id)
 
     if (enabledFormats.length === 0) {
       alert('Please select at least one export format')
@@ -133,13 +129,13 @@ export default function ExportPanel() {
 
       setLastExportResult(result)
       console.log('Export completed:', result)
-      
+
       // Show success message
       const successFiles = result.exported_files.filter(f => f.success)
       if (successFiles.length > 0) {
         alert(`Successfully exported ${successFiles.length} files in ${result.export_time_ms}ms`)
       }
-      
+
       // Show errors if any
       if (result.errors.length > 0) {
         console.error('Export errors:', result.errors)
@@ -163,13 +159,11 @@ export default function ExportPanel() {
     <div className="px-3 py-2">
       {/* Export Status */}
       <div className="mb-3">
-        <div className="text-xs text-gray-400 mb-1">
-          Objects: {sceneObjects.size}
-        </div>
+        <div className="text-xs text-gray-400 mb-1">Objects: {sceneObjects.size}</div>
         {lastExportResult && (
           <div className="text-xs text-green-400">
-            Last export: {lastExportResult.exported_files.filter(f => f.success).length} files 
-            in {lastExportResult.export_time_ms}ms
+            Last export: {lastExportResult.exported_files.filter(f => f.success).length} files in{' '}
+            {lastExportResult.export_time_ms}ms
           </div>
         )}
       </div>
@@ -181,7 +175,7 @@ export default function ExportPanel() {
           <input
             type="text"
             value={outputPath}
-            onChange={(e) => setOutputPath(e.target.value)}
+            onChange={e => setOutputPath(e.target.value)}
             placeholder="Select output directory..."
             className="flex-1 px-2 py-1 text-xs bg-editor-bg border border-editor-border rounded focus:outline-none focus:border-editor-accent"
           />
@@ -199,8 +193,11 @@ export default function ExportPanel() {
       <div className="mb-3">
         <label className="block text-xs text-editor-textMuted mb-1">Export Formats</label>
         <div className="space-y-2">
-          {exportFormats.map((format) => (
-            <label key={format.id} className="flex items-center space-x-2 p-2 bg-editor-bg rounded border border-editor-border hover:bg-editor-border cursor-pointer">
+          {exportFormats.map(format => (
+            <label
+              key={format.id}
+              className="flex items-center space-x-2 p-2 bg-editor-bg rounded border border-editor-border hover:bg-editor-border cursor-pointer"
+            >
               <input
                 type="checkbox"
                 checked={format.enabled}
@@ -265,15 +262,17 @@ export default function ExportPanel() {
           <h4 className="text-xs font-medium mb-2">Last Export Results</h4>
           <div className="space-y-1">
             {lastExportResult.exported_files.map((file, index) => (
-              <div key={index} className={`text-xs p-1 rounded ${
-                file.success ? 'bg-green-900/20 text-green-400' : 'bg-red-900/20 text-red-400'
-              }`}>
+              <div
+                key={index}
+                className={`text-xs p-1 rounded ${
+                  file.success ? 'bg-green-900/20 text-green-400' : 'bg-red-900/20 text-red-400'
+                }`}
+              >
                 <div className="font-medium">{file.format}</div>
                 <div className="text-xs opacity-75">
-                  {file.success 
+                  {file.success
                     ? `${file.file_path.split('/').pop()} (${formatFileSize(file.file_size)})`
-                    : 'Export failed'
-                  }
+                    : 'Export failed'}
                 </div>
               </div>
             ))}

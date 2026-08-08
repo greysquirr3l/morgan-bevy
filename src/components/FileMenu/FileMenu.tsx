@@ -1,12 +1,9 @@
 import { useEditorStore } from '@/store/editorStore'
-import { AssetId, LayerId } from '@/types/brand'
 import { serializeMap } from '@/store/mapSerialization'
+import { AssetId, LayerId } from '@/types/brand'
 import { ProjectDataSchema, type ProjectData } from '@/types/schemas'
 import { LoadCommand, SaveCommand } from '@/utils/commands'
-import {
-  buildBevyEntitiesExport,
-  buildFileMenuLevelExportPayload,
-} from '@/utils/exportPayload'
+import { buildBevyEntitiesExport, buildFileMenuLevelExportPayload } from '@/utils/exportPayload'
 import { collectAssetRefs, missingRefs, readAssetRefs, withAssetRefs } from '@/utils/projectAssets'
 import {
   addRecentProject,

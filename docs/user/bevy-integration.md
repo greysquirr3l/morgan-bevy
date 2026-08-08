@@ -128,3 +128,70 @@ The companion crate's `version` field matches the editor's
 - [ ] Player spawns at the first `PlayerStart` spawn point.
 - [ ] Door `interactable` markers fire when the player enters the volume.
 - [ ] `NavMeshHint`-tagged surfaces are picked up by your navigation plugin.
+
+## 7. Lighting, animation, audio, VFX
+
+The editor attaches four runtime-effect markers to scene objects:
+`light`, `animation`, `audio`, and `vfx`. Each marker is a typed
+payload that crosses the export pipeline unchanged and lands as a
+Bevy `Component` on the spawned entity. The runtime mirror lives
+in [`crates/bevy-morgan-integration`](../../crates/bevy-morgan-integration/README.md).
+
+### What the editor emits
+
+For each marker that is present on an object, the exporter writes
+the marker alongside the existing `Transform` / `Mesh3d` components
+in the generated Rust source. Objects without a marker carry no
+marker payload. The wire format is internally tagged on `kind`
+with snake_case variants — see [`markers.md`](markers.md) for the
+full schema.
+
+### Components and observer systems
+
+| Marker      | Bevy component                       | System                      |
+| ----------- | ------------------------------------ | --------------------------- |
+| `light`     | `bevy_morgan_integration::Light`     | `light_observer`            |
+| `animation` | `bevy_morgan_integration::Animation` | `animation_player_observer` |
+| `audio`     | `bevy_morgan_integration::Audio`     | `audio_observer`            |
+| `vfx`       | `bevy_morgan_integration::Vfx`       | `vfx_observer`              |
+
+The four systems are registered by `MorganLevelSystems` (added by
+`add_plugins(plugin_init(...))` after the level loads) and respond
+to `OnAdd` events when the matching component is inserted. They
+wire the Bevy-side behaviour: a `PointLight` / `SpotLight` /
+`DirectionalLight` for `light`, an `AnimationPlayer` + `AnimationClip`
+for `animation`, an `AudioSource` + `PlaybackSettings` for `audio`,
+and a particle / billboard handle for `vfx`.
+
+### Quick example
+
+A torch (point light) and a fountain (ambient audio) on the same
+object would export as:
+
+```jsonc
+{
+  "id": "torch_1",
+  "transform": { "position": [2.0, 1.0, 0.0], "rotation": [0, 0, 0, 1], "scale": [0.2, 0.5, 0.2] },
+  "light": { "kind": "point", "color": [1, 1, 1], "intensity": 1000, "range": 10, "shadows": true },
+  "audio": { "kind": "ambient", "path": "fountain.ogg", "volume": 0.8, "looping": true },
+}
+```
+
+And the generated Rust source spawns the entity with both components:
+
+```rust
+commands.spawn((
+    Name::new("Torch"),
+    Transform::from_xyz(2.0, 1.0, 0.0),
+    Light::Point { color: [1.0, 1.0, 1.0], intensity: 1000.0, range: 10.0, shadows: true },
+    Audio::Ambient { path: "fountain.ogg".to_string(), volume: 0.8, looping: true },
+));
+```
+
+The observer systems take it from there.
+
+### Full reference
+
+See [`markers.md`](markers.md) for the complete reference — every
+marker, every variant, the wire format, and a worked example
+showing the editor → Bevy path for a marker-heavy level.

@@ -16,9 +16,8 @@
  */
 import { describe, expect, it } from 'vitest'
 
-import { useEditorStore } from '@/store/editorStore'
+import { useEditorStore, type SceneObject } from '@/store/editorStore'
 import { LayerId, ObjectId } from '@/types/brand'
-import { type SceneObject } from '@/store/editorStore'
 import {
   defaultAnimationMarker,
   defaultAudioMarker,
@@ -293,7 +292,9 @@ describe('T91d save → load preserves markers', () => {
     // Reset the store and seed an object with all four markers.
     useEditorStore.setState({
       sceneObjects: new Map(),
-      layers: [{ id: LayerId('default'), name: 'Default', visible: true, locked: false, color: '#fff' }],
+      layers: [
+        { id: LayerId('default'), name: 'Default', visible: true, locked: false, color: '#fff' },
+      ],
       activeLayer: LayerId('default'),
     })
 

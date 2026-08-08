@@ -45,7 +45,7 @@ export interface LayerShape {
  */
 function spreadIfPresent<T extends SceneObject, K extends 'light' | 'animation' | 'audio' | 'vfx'>(
   obj: T,
-  field: K,
+  field: K
 ): NonNullable<T[K]> extends infer V ? (V extends undefined ? {} : Partial<Record<K, V>>) : never {
   const value = obj[field]
   if (value === undefined) return {} as never
