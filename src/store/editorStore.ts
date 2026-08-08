@@ -1,5 +1,6 @@
 import { deserializeMap, serializeMap } from '@/store/mapSerialization'
 import { AssetId, isObjectId, LayerId, MaterialId, ObjectId, PrefabId } from '@/types/brand'
+import type { AnimationMarker, AudioMarker, LightMarker, VfxMarker } from '@/types/markers'
 import type { Command } from '@/utils/commands'
 import { enableMapSet, setAutoFreeze } from 'immer'
 import { create } from 'zustand'
@@ -88,6 +89,18 @@ export interface SceneObject {
   walkable?: boolean
   tags?: string[]
   metadata?: any // Allow for flexible metadata including gridPosition, tileType, etc.
+  // T91b: lighting / animation / audio / VFX markers. Each is
+  // optional — an object with no markers must serialize with the
+  // fields ABSENT (not `null`), matching the Rust
+  // `#[serde(default, skip_serializing_if = "Option::is_none")]`
+  // contract. Update actions use `delete o.light` to remove, not
+  // `o.light = undefined`; the latter JSON-encodes as `"light": null`
+  // and breaks the Rust skip rule. The shapes are owned by
+  // `src/types/markers.ts` — never redeclare them here.
+  light?: LightMarker
+  animation?: AnimationMarker
+  audio?: AudioMarker
+  vfx?: VfxMarker
 }
 
 /**
@@ -291,6 +304,16 @@ export interface EditorState {
     id: ObjectId,
     properties: { collision?: boolean; walkable?: boolean; tags?: string[]; metadata?: any }
   ) => void
+  // T91b: per-marker update actions. Pass `undefined` to REMOVE the
+  // marker (the Inspector needs a "remove this marker" affordance).
+  // Removal is implemented as `delete o.light` rather than
+  // `o.light = undefined` — the latter serializes as `"light": null`
+  // and breaks the Rust `skip_serializing_if = "Option::is_none"`
+  // contract.
+  updateObjectLight: (id: ObjectId, light: LightMarker | undefined) => void
+  updateObjectAnimation: (id: ObjectId, animation: AnimationMarker | undefined) => void
+  updateObjectAudio: (id: ObjectId, audio: AudioMarker | undefined) => void
+  updateObjectVfx: (id: ObjectId, vfx: VfxMarker | undefined) => void
   groupObjects: (ids: ObjectId[]) => ObjectId
   ungroupObject: (groupId: ObjectId) => void
   clearScene: () => void
@@ -814,6 +837,60 @@ export const useEditorStore = create<EditorState>()(
                 ...properties.metadata,
               }
           }
+        }
+      }),
+
+    // T91b: per-marker update. Pass `undefined` to REMOVE the marker
+    // (the Inspector's "remove" affordance). Removal is `delete`,
+    // never assignment of `undefined` — `undefined` would JSON-encode
+    // as `"light": null` and trip the Rust `skip_serializing_if` rule.
+    // Untrusted callers should validate the marker shape with the
+    // zod schemas in `@/types/schemas` before passing it in.
+    updateObjectLight: (id: ObjectId, light: LightMarker | undefined) =>
+      set(state => {
+        if (!state.sceneObjects.has(id)) return
+        const o = state.sceneObjects.get(id)
+        if (!o) return
+        if (light === undefined) {
+          delete o.light
+        } else {
+          o.light = light
+        }
+      }),
+
+    updateObjectAnimation: (id: ObjectId, animation: AnimationMarker | undefined) =>
+      set(state => {
+        if (!state.sceneObjects.has(id)) return
+        const o = state.sceneObjects.get(id)
+        if (!o) return
+        if (animation === undefined) {
+          delete o.animation
+        } else {
+          o.animation = animation
+        }
+      }),
+
+    updateObjectAudio: (id: ObjectId, audio: AudioMarker | undefined) =>
+      set(state => {
+        if (!state.sceneObjects.has(id)) return
+        const o = state.sceneObjects.get(id)
+        if (!o) return
+        if (audio === undefined) {
+          delete o.audio
+        } else {
+          o.audio = audio
+        }
+      }),
+
+    updateObjectVfx: (id: ObjectId, vfx: VfxMarker | undefined) =>
+      set(state => {
+        if (!state.sceneObjects.has(id)) return
+        const o = state.sceneObjects.get(id)
+        if (!o) return
+        if (vfx === undefined) {
+          delete o.vfx
+        } else {
+          o.vfx = vfx
         }
       }),
 

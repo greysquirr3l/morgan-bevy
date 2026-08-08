@@ -44,32 +44,19 @@ import {
 
 describe('T91a marker KIND literal tables', () => {
   it('LightMarkerKind is {point, spot, directional} — exact snake_case', () => {
-    expect(Object.values(LIGHT_MARKER_KINDS).sort()).toEqual([
-      'directional',
-      'point',
-      'spot',
-    ])
+    expect(Object.values(LIGHT_MARKER_KINDS).sort()).toEqual(['directional', 'point', 'spot'])
   })
 
   it('AnimationMarkerKind is {play, play_once} — not {play, playOnce}', () => {
-    expect(Object.values(ANIMATION_MARKER_KINDS).sort()).toEqual([
-      'play',
-      'play_once',
-    ])
+    expect(Object.values(ANIMATION_MARKER_KINDS).sort()).toEqual(['play', 'play_once'])
   })
 
   it('AudioMarkerKind is {ambient, one_shot} — not {ambient, oneShot}', () => {
-    expect(Object.values(AUDIO_MARKER_KINDS).sort()).toEqual([
-      'ambient',
-      'one_shot',
-    ])
+    expect(Object.values(AUDIO_MARKER_KINDS).sort()).toEqual(['ambient', 'one_shot'])
   })
 
   it('VfxMarkerKind is {particle, billboard}', () => {
-    expect(Object.values(VFX_MARKER_KINDS).sort()).toEqual([
-      'billboard',
-      'particle',
-    ])
+    expect(Object.values(VFX_MARKER_KINDS).sort()).toEqual(['billboard', 'particle'])
   })
 })
 
@@ -309,7 +296,7 @@ describe('T91a marker type guards', () => {
         intensity: 1,
         range: 1,
         shadows: false,
-      }),
+      })
     ).toBe(true)
   })
 
@@ -339,7 +326,7 @@ describe('T91a marker type guards', () => {
 
   it('isAnyMarker accepts any of the four shapes', () => {
     expect(
-      isAnyMarker({ kind: 'point', color: [1, 1, 1], intensity: 1, range: 1, shadows: false }),
+      isAnyMarker({ kind: 'point', color: [1, 1, 1], intensity: 1, range: 1, shadows: false })
     ).toBe(true)
     expect(isAnyMarker({ kind: 'play_once', clip: 'x' })).toBe(true)
     expect(isAnyMarker({ kind: 'ambient', path: 'x', volume: 1, looping: true })).toBe(true)

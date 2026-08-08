@@ -11,12 +11,12 @@
 //
 // Reference: docs/dev/typescript-counterintuitive-patterns.md §17.
 
-import { z } from 'zod';
+import { z } from 'zod'
 
 // ─── Primitive aliases ─────────────────────────────────────────────────────────
 
-export const Vec3Schema = z.tuple([z.number(), z.number(), z.number()]);
-export type Vec3 = z.infer<typeof Vec3Schema>;
+export const Vec3Schema = z.tuple([z.number(), z.number(), z.number()])
+export type Vec3 = z.infer<typeof Vec3Schema>
 
 // ─── Asset domain ─────────────────────────────────────────────────────────────
 
@@ -32,22 +32,22 @@ const AssetRecordSchema = z.object({
   checksum: z.string(),
   created_at: z.string(),
   updated_at: z.string(),
-});
-export type AssetRecord = z.infer<typeof AssetRecordSchema>;
+})
+export type AssetRecord = z.infer<typeof AssetRecordSchema>
 
 const AssetMetadataSchema = z.object({
   asset_id: z.number().int().nonnegative(),
   key: z.string(),
   value: z.string(),
-});
-export type AssetMetadata = z.infer<typeof AssetMetadataSchema>;
+})
+export type AssetMetadata = z.infer<typeof AssetMetadataSchema>
 
 export const AssetSearchResultSchema = z.object({
   asset: AssetRecordSchema,
   metadata: z.array(AssetMetadataSchema),
   has_thumbnail: z.boolean(),
-});
-export type AssetSearchResult = z.infer<typeof AssetSearchResultSchema>;
+})
+export type AssetSearchResult = z.infer<typeof AssetSearchResultSchema>
 
 export const CollectionSchema = z.object({
   id: z.number().int().nonnegative(),
@@ -55,8 +55,8 @@ export const CollectionSchema = z.object({
   description: z.string().optional(),
   license_info: z.string().optional(),
   asset_count: z.number().int().nonnegative(),
-});
-export type Collection = z.infer<typeof CollectionSchema>;
+})
+export type Collection = z.infer<typeof CollectionSchema>
 
 export const DatabaseStatsSchema = z.object({
   total_assets: z.number().int().nonnegative(),
@@ -64,8 +64,8 @@ export const DatabaseStatsSchema = z.object({
   assets_by_type: z.record(z.string(), z.number().int().nonnegative()),
   total_size_bytes: z.number().int().nonnegative(),
   collections: z.record(z.string(), z.number().int().nonnegative()),
-});
-export type DatabaseStats = z.infer<typeof DatabaseStatsSchema>;
+})
+export type DatabaseStats = z.infer<typeof DatabaseStatsSchema>
 
 export const ScanResultSchema = z.object({
   total_assets: z.number().int().nonnegative(),
@@ -73,8 +73,8 @@ export const ScanResultSchema = z.object({
   assets_by_type: z.record(z.string(), z.number().int().nonnegative()),
   scan_duration_ms: z.number().int().nonnegative(),
   errors: z.array(z.string()),
-});
-export type ScanResult = z.infer<typeof ScanResultSchema>;
+})
+export type ScanResult = z.infer<typeof ScanResultSchema>
 
 // ─── Generation ───────────────────────────────────────────────────────────────
 
@@ -83,24 +83,28 @@ export const ThemeSchema = z.object({
   name: z.string(),
   description: z.string().optional(),
   tile_chars: z.record(z.string(), z.string()).optional(),
-});
-export type Theme = z.infer<typeof ThemeSchema>;
+})
+export type Theme = z.infer<typeof ThemeSchema>
 
 export const LevelDataSchema = z.object({
-  metadata: z.object({
-    generator: z.string(),
-    seed: z.number().int(),
-    algorithm: z.string(),
-    theme: z.string(),
-  }).passthrough(),
-  dimensions: z.object({
-    width: z.number().int().positive(),
-    height: z.number().int().positive(),
-    floors: z.number().int().positive(),
-  }).passthrough(),
+  metadata: z
+    .object({
+      generator: z.string(),
+      seed: z.number().int(),
+      algorithm: z.string(),
+      theme: z.string(),
+    })
+    .passthrough(),
+  dimensions: z
+    .object({
+      width: z.number().int().positive(),
+      height: z.number().int().positive(),
+      floors: z.number().int().positive(),
+    })
+    .passthrough(),
   entities: z.array(z.object({}).passthrough()),
-});
-export type LevelData = z.infer<typeof LevelDataSchema>;
+})
+export type LevelData = z.infer<typeof LevelDataSchema>
 
 // ─── Export ───────────────────────────────────────────────────────────────────
 
@@ -111,8 +115,8 @@ export const ExportResultSchema = z.object({
   errors: z.array(z.string()),
   warnings: z.array(z.string()),
   manifest_path: z.string().optional(),
-});
-export type ExportResult = z.infer<typeof ExportResultSchema>;
+})
+export type ExportResult = z.infer<typeof ExportResultSchema>
 
 // ─── Project file ─────────────────────────────────────────────────────────────
 
@@ -120,8 +124,8 @@ export const ProjectDataSchema = z.object({
   schemaVersion: z.number().int().positive(),
   scene: z.object({}).passthrough(),
   metadata: z.object({}).passthrough().optional(),
-});
-export type ProjectData = z.infer<typeof ProjectDataSchema>;
+})
+export type ProjectData = z.infer<typeof ProjectDataSchema>
 
 // ─── Marker schemas (T91a) ────────────────────────────────────────────────────
 //
@@ -139,7 +143,7 @@ export type ProjectData = z.infer<typeof ProjectDataSchema>;
 // this file focuses on the *runtime* validation. The two are kept in
 // sync by `src/test/markerTypes.test.ts`.
 
-const Vec2Schema = z.tuple([z.number(), z.number()]);
+const Vec2Schema = z.tuple([z.number(), z.number()])
 
 // `.strict()` on every variant is the IPC-boundary safety net: any
 // unknown field on the wire (typo, camelCase drift, extra fields from
@@ -157,7 +161,7 @@ const LightPointSchema = z
     range: z.number(),
     shadows: z.boolean(),
   })
-  .strict();
+  .strict()
 
 const LightSpotSchema = z
   .object({
@@ -169,7 +173,7 @@ const LightSpotSchema = z
     outer_angle: z.number(),
     shadows: z.boolean(),
   })
-  .strict();
+  .strict()
 
 const LightDirectionalSchema = z
   .object({
@@ -178,14 +182,14 @@ const LightDirectionalSchema = z
     intensity: z.number(),
     shadows: z.boolean(),
   })
-  .strict();
+  .strict()
 
 export const LightMarkerSchema = z.discriminatedUnion('kind', [
   LightPointSchema,
   LightSpotSchema,
   LightDirectionalSchema,
-]);
-export type LightMarkerInput = z.infer<typeof LightMarkerSchema>;
+])
+export type LightMarkerInput = z.infer<typeof LightMarkerSchema>
 
 const AnimationPlaySchema = z
   .object({
@@ -194,20 +198,20 @@ const AnimationPlaySchema = z
     repeat: z.boolean(),
     speed: z.number(),
   })
-  .strict();
+  .strict()
 
 const AnimationPlayOnceSchema = z
   .object({
     kind: z.literal('play_once'),
     clip: z.string(),
   })
-  .strict();
+  .strict()
 
 export const AnimationMarkerSchema = z.discriminatedUnion('kind', [
   AnimationPlaySchema,
   AnimationPlayOnceSchema,
-]);
-export type AnimationMarkerInput = z.infer<typeof AnimationMarkerSchema>;
+])
+export type AnimationMarkerInput = z.infer<typeof AnimationMarkerSchema>
 
 const AudioAmbientSchema = z
   .object({
@@ -216,7 +220,7 @@ const AudioAmbientSchema = z
     volume: z.number(),
     looping: z.boolean(),
   })
-  .strict();
+  .strict()
 
 const AudioOneShotSchema = z
   .object({
@@ -224,13 +228,13 @@ const AudioOneShotSchema = z
     path: z.string(),
     volume: z.number(),
   })
-  .strict();
+  .strict()
 
 export const AudioMarkerSchema = z.discriminatedUnion('kind', [
   AudioAmbientSchema,
   AudioOneShotSchema,
-]);
-export type AudioMarkerInput = z.infer<typeof AudioMarkerSchema>;
+])
+export type AudioMarkerInput = z.infer<typeof AudioMarkerSchema>
 
 const VfxParticleSchema = z
   .object({
@@ -238,7 +242,7 @@ const VfxParticleSchema = z
     path: z.string(),
     count: z.number().int().nonnegative(),
   })
-  .strict();
+  .strict()
 
 const VfxBillboardSchema = z
   .object({
@@ -246,13 +250,10 @@ const VfxBillboardSchema = z
     texture: z.string(),
     size: Vec2Schema,
   })
-  .strict();
+  .strict()
 
-export const VfxMarkerSchema = z.discriminatedUnion('kind', [
-  VfxParticleSchema,
-  VfxBillboardSchema,
-]);
-export type VfxMarkerInput = z.infer<typeof VfxMarkerSchema>;
+export const VfxMarkerSchema = z.discriminatedUnion('kind', [VfxParticleSchema, VfxBillboardSchema])
+export type VfxMarkerInput = z.infer<typeof VfxMarkerSchema>
 
 // ─── Validation helper ────────────────────────────────────────────────────────
 
@@ -263,13 +264,13 @@ export type VfxMarkerInput = z.infer<typeof VfxMarkerSchema>;
 export function parseInvoke<S extends z.ZodTypeAny>(
   schema: S,
   raw: unknown,
-  command: string,
+  command: string
 ): z.infer<S> {
-  const result = schema.safeParse(raw);
+  const result = schema.safeParse(raw)
   if (!result.success) {
     throw new Error(
-      `Tauri command "${command}" returned an unexpected shape: ${result.error.message}`,
-    );
+      `Tauri command "${command}" returned an unexpected shape: ${result.error.message}`
+    )
   }
-  return result.data;
+  return result.data
 }
