@@ -309,4 +309,18 @@
 
 ---
 
+## T77b follow-up
+
+The T77 deliverable (`parseObjectId` / `isObjectId` / branded types in
+`src/types/brand.ts` + 37-case vitest suite) is shipped and live. The
+full migration to branded IDs in the editor state (selection, scene
+object keys, missing-asset refs, action signatures) was attempted in
+session 2026-08-07 but produced 92 tsc errors across 18 component files
+because the editorStore is the *single* consumer of every component's
+ID-passing path. Migrating requires per-site `as ObjectId` casts in
+each component / hook / utility, which is mechanical but not safely
+automatable (the cast script broke TSX with multi-line call
+expressions). Tracked as a follow-up — the helpers are in place and
+ready for incremental opt-in.
+
 _Audit performed 2026-08-06 against commit ca5ee95._
