@@ -30,6 +30,18 @@ interface AssetDatabaseState {
   lastScanResult: ScanResult | null;
 }
 
+/**
+ * Unwrap a `Promise.allSettled` result, falling back to a caller-
+ * supplied value on rejection instead of letting one failed request
+ * (e.g. `getStats()`) sink data the other request (`getCollections()`)
+ * already fetched successfully (T81).
+ */
+function settledOr<T>(result: PromiseSettledResult<T>, fallback: T, label: string): T {
+  if (result.status === 'fulfilled') return result.value;
+  console.error(`${label} failed:`, result.reason);
+  return fallback;
+}
+
 const initialState: AssetDatabaseState = {
   initialized: false,
   scanning: false,
@@ -58,18 +70,19 @@ export function useAssetDatabase() {
       await AssetDatabaseService.initialize();
       setState(prev => ({ ...prev, initialized: true }));
       
-      // Load initial data
-      const [collections, stats] = await Promise.all([
+      // Load initial data. allSettled so one failing request (e.g. a
+      // fresh install with no stats yet) doesn't discard the other.
+      const [collectionsResult, statsResult] = await Promise.allSettled([
         AssetDatabaseService.getCollections(),
         AssetDatabaseService.getStats(),
       ]);
-      
-      setState(prev => ({ 
-        ...prev, 
-        collections, 
-        stats,
+
+      setState(prev => ({
+        ...prev,
+        collections: settledOr(collectionsResult, prev.collections, 'getCollections'),
+        stats: settledOr(statsResult, prev.stats, 'getStats'),
       }));
-      
+
     } catch (error) {
       console.error('Failed to initialize asset database:', error);
       setState(prev => ({ 
@@ -98,17 +111,17 @@ export function useAssetDatabase() {
       }));
       
       // Refresh stats and collections
-      const [collections, stats] = await Promise.all([
+      const [collectionsResult, statsResult] = await Promise.allSettled([
         AssetDatabaseService.getCollections(),
         AssetDatabaseService.getStats(),
       ]);
-      
-      setState(prev => ({ 
-        ...prev, 
-        collections, 
-        stats,
+
+      setState(prev => ({
+        ...prev,
+        collections: settledOr(collectionsResult, prev.collections, 'getCollections'),
+        stats: settledOr(statsResult, prev.stats, 'getStats'),
       }));
-      
+
     } catch (error) {
       console.error('Asset scan failed:', error);
       setState(prev => ({ 
@@ -187,13 +200,17 @@ export function useAssetDatabase() {
   // Refresh data
   const refresh = useCallback(async () => {
     try {
-      const [collections, stats] = await Promise.all([
+      const [collectionsResult, statsResult] = await Promise.allSettled([
         AssetDatabaseService.getCollections(),
         AssetDatabaseService.getStats(),
       ]);
-      
-      setState(prev => ({ ...prev, collections, stats }));
-      
+
+      setState(prev => ({
+        ...prev,
+        collections: settledOr(collectionsResult, prev.collections, 'getCollections'),
+        stats: settledOr(statsResult, prev.stats, 'getStats'),
+      }));
+
       // Re-run current search
       await searchAssets();
       

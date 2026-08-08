@@ -2,6 +2,30 @@ import { useMemo, useRef, useState } from 'react'
 import { useFrame } from '@react-three/fiber'
 import { InstancedObjectData } from './InstancedRendering'
 
+// `performance.memory` is a non-standard Chrome/V8 extension (not in
+// the DOM lib types) — declared narrowly here instead of `as any`.
+interface PerformanceWithMemory extends Performance {
+  memory?: {
+    usedJSHeapSize: number
+    totalJSHeapSize: number
+    jsHeapSizeLimit: number
+  }
+}
+
+/** Used JS heap, in MB, or 0 when the API isn't available (non-Chrome). */
+function usedJSHeapMB(): number {
+  const memory = (performance as PerformanceWithMemory).memory
+  return memory ? Math.round(memory.usedJSHeapSize / 1024 / 1024) : 0
+}
+
+// HUD readouts (metrics, debug overlay) only need to reach React a
+// couple of times a second — sampling every render-loop frame turns
+// a 60 FPS scene into a 60 Hz React re-render storm for no visible
+// benefit (a human can't read digits that fast). Real per-frame
+// values (frame count, timing buffers) stay in refs; only the
+// throttled snapshot goes through `useState`.
+const HUD_UPDATE_INTERVAL_MS = 500
+
 // Performance metrics tracking
 interface PerformanceMetrics {
   totalObjects: number
@@ -120,7 +144,7 @@ export function usePerformanceManager(
           renderingGroups.instanced.pyramid.length
         ),
         frameRate: fps,
-        memoryUsage: Math.round((performance as any).memory?.usedJSHeapSize / 1024 / 1024 || 0)
+        memoryUsage: usedJSHeapMB()
       })
     }
   })
@@ -185,17 +209,26 @@ export function usePerformanceDebug() {
     triangles: 0,
     memoryMB: 0
   })
-  
+  const lastUpdateRef = useRef(0)
+
   useFrame((state) => {
+    // Unthrottled, this ran `setDebugInfo` on every render-loop frame
+    // — a React re-render at the viewport's frame rate just to update
+    // a HUD number. Sample the real-time clock instead of the frame
+    // count so the readout stays ~2 Hz regardless of actual FPS.
+    const now = performance.now()
+    if (now - lastUpdateRef.current < HUD_UPDATE_INTERVAL_MS) return
+    lastUpdateRef.current = now
+
     const info = state.gl.info
-    
+
     setDebugInfo({
       fps: Math.round(1 / state.clock.getDelta()),
       drawCalls: info.render.calls,
       triangles: info.render.triangles,
-      memoryMB: Math.round((performance as any).memory?.usedJSHeapSize / 1024 / 1024 || 0)
+      memoryMB: usedJSHeapMB()
     })
   })
-  
+
   return debugInfo
 }

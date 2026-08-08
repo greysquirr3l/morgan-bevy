@@ -2,6 +2,7 @@ import React, { useCallback } from 'react'
 import { useThree } from '@react-three/fiber'
 import { useEditorStore } from '@/store/editorStore'
 import { useBoxSelection } from '@/hooks/useBoxSelection'
+import type { ObjectId } from '@/types/brand'
 import * as THREE from 'three'
 
 interface BoxSelectionOverlayProps {
@@ -89,7 +90,7 @@ export default function BoxSelection() {
       
       // Only perform selection if drag was significant (minimum 5 pixels)
       if (Math.abs(maxX - minX) > 5 || Math.abs(maxY - minY) > 5) {
-        const newSelectedObjects: string[] = []
+        const newSelectedObjects: ObjectId[] = []
         
         // Check all selectable objects in the scene
         scene.traverse((object) => {

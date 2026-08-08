@@ -1,4 +1,6 @@
 import { useEditorStore } from '@/store/editorStore'
+import { AssetId, LayerId } from '@/types/brand'
+import { serializeMap } from '@/store/mapSerialization'
 import { ProjectDataSchema, type ProjectData } from '@/types/schemas'
 import { LoadCommand, SaveCommand } from '@/utils/commands'
 import { collectAssetRefs, missingRefs, readAssetRefs, withAssetRefs } from '@/utils/projectAssets'
@@ -60,7 +62,13 @@ export default function FileMenu({ isOpen, onClose, position, onManualSave }: Fi
           }
         }
         const missing = missingRefs(knownSet, refs)
-        useEditorStore.getState().setMissingAssetRefs(missing)
+        // `AssetRef` values are texture *paths* (e.g. "textures/wood.png"),
+        // not UUID-shaped ids — they legitimately contain `/` and `.`, so
+        // they will never satisfy `ID_PATTERN`. Brand them with the plain
+        // constructor (a locally-computed relabeling, not a validating
+        // parse) rather than `parseAssetId`, which would reject every
+        // real path.
+        useEditorStore.getState().setMissingAssetRefs(missing.map(AssetId))
         if (missing.length > 0) {
           console.warn(`Project loaded with ${missing.length} missing asset(s):`, missing)
         }
@@ -102,7 +110,7 @@ export default function FileMenu({ isOpen, onClose, position, onManualSave }: Fi
       selectedObjects: [],
       undoHistory: [],
       redoHistory: [],
-      activeLayer: 'default',
+      activeLayer: LayerId('default'),
     })
     onClose()
   }
@@ -154,7 +162,7 @@ export default function FileMenu({ isOpen, onClose, position, onManualSave }: Fi
           layerCount: layers.length,
         },
         scene: {
-          objects: sceneObjects,
+          objects: serializeMap(sceneObjects),
           layers: layers,
           settings: {
             gridSize: useEditorStore.getState().gridSize,
@@ -163,7 +171,7 @@ export default function FileMenu({ isOpen, onClose, position, onManualSave }: Fi
         },
         // Bevy-compatible format
         bevy: {
-          entities: Object.values(sceneObjects).map(obj => ({
+          entities: Array.from(sceneObjects.values()).map(obj => ({
             name: obj.name,
             components: {
               Transform: {
@@ -207,7 +215,7 @@ export default function FileMenu({ isOpen, onClose, position, onManualSave }: Fi
           {
             schemaVersion: 1,
             scene: {
-              objects: Array.from(state.sceneObjects.entries()),
+              objects: serializeMap(state.sceneObjects),
               layers: state.layers,
               activeLayer: state.activeLayer,
               selectedObjects: state.selectedObjects,
@@ -317,7 +325,7 @@ export default function FileMenu({ isOpen, onClose, position, onManualSave }: Fi
       const levelData = {
         id: `level_${Date.now()}`,
         name: 'Morgan-Bevy Level',
-        objects: Object.values(sceneObjects).map(obj => ({
+        objects: Array.from(sceneObjects.values()).map(obj => ({
           id: obj.id,
           name: obj.name,
           transform: {

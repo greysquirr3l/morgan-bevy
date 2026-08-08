@@ -1,1 +1,54 @@
-./.vscode/mcp.json
+{
+  "mcpServers": {
+    "github": {
+      "type": "sse",
+      "url": "https://api.githubcopilot.com/mcp/"
+    },
+    "context7": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@upstash/context7-mcp@latest"
+      ]
+    },
+    "sequentialthinking": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-sequential-thinking"
+      ]
+    },
+    "chrome-devtools": {
+      "command": "npx",
+      "args": [
+        "chrome-devtools-mcp@latest"
+      ]
+    },
+    "coraline": {
+      "command": "coraline",
+      "args": [
+        "serve",
+        "--mcp"
+      ]
+    },
+    "stygian": {
+      "type": "stdio",
+      "command": "stygian-mcp"
+    },
+    "papertowel": {
+      "type": "stdio",
+      "command": "papertowel-mcp",
+      "args": [],
+      "env": {
+        "RUST_LOG": "info"
+      }
+    },
+    "tralfamadore": {
+      "type": "stdio",
+      "command": "tralfamadore",
+      "args": [
+        "mcp"
+      ]
+    }
+  }
+}

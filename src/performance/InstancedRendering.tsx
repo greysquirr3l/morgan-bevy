@@ -1,9 +1,10 @@
+import type { ObjectId } from '@/types/brand'
 import { useRef, useMemo, useEffect } from 'react'
 import { InstancedMesh, Color, Object3D } from 'three'
 
 // Interface for instanced object data
 export interface InstancedObjectData {
-  id: string
+  id: ObjectId
   position: [number, number, number]
   rotation: [number, number, number]
   scale: [number, number, number]

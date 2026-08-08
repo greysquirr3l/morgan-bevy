@@ -13,10 +13,11 @@
  * to the source prefab no longer propagate.
  */
 import type { EditorState } from '@/store/editorStore'
+import { isValidIdString, PrefabId, type LayerId, type ObjectId } from '@/types/brand'
 
 export interface PrefabObject {
   /** Optional original id; cleared on save so the template is reusable. */
-  id?: string
+  id?: ObjectId
   name: string
   type: 'mesh' | 'light' | 'group'
   position: [number, number, number]
@@ -24,12 +25,12 @@ export interface PrefabObject {
   scale: [number, number, number]
   visible: boolean
   locked: boolean
-  layerId: string
-  parentId?: string
-  children: string[]
+  layerId: LayerId
+  parentId?: ObjectId
+  children: ObjectId[]
   meshType?: 'cube' | 'sphere' | 'pyramid'
   /** Optional nested-prefab reference. */
-  prefabId?: string
+  prefabId?: PrefabId
   /** Material reference shared with the prefab source. */
   material?: {
     baseColor: string
@@ -40,7 +41,7 @@ export interface PrefabObject {
 }
 
 export interface Prefab {
-  id: string
+  id: PrefabId
   name: string
   description?: string
   objects: PrefabObject[]
@@ -75,18 +76,22 @@ export function savePrefab(prefab: Prefab): Prefab[] {
 }
 
 /** T19: remove a prefab by id; returns the remaining prefabs. */
-export function deletePrefabById(id: string): Prefab[] {
+export function deletePrefabById(id: PrefabId): Prefab[] {
   const existing = loadPrefabs()
   const next = existing.filter(p => p.id !== id)
   localStorage.setItem(STORAGE_KEY, JSON.stringify(next))
   return next
 }
 
+// Boundary: `loadPrefabs` reads untrusted JSON out of localStorage.
+// `isValidIdString` (rather than a bare `typeof === 'string'` check)
+// ensures a corrupted/malformed `id` is rejected here rather than
+// silently flowing into the app as an ill-shaped `PrefabId`.
 function isPrefab(value: unknown): value is Prefab {
   if (!value || typeof value !== 'object') return false
   const v = value as Record<string, unknown>
   return (
-    typeof v.id === 'string' &&
+    isValidIdString(v.id) &&
     typeof v.name === 'string' &&
     Array.isArray(v.objects) &&
     typeof v.createdAt === 'string'
@@ -101,7 +106,7 @@ function isPrefab(value: unknown): value is Prefab {
  * reused on instantiate.
  */
 export function buildPrefabFromSelection(
-  selectedIds: string[],
+  selectedIds: ObjectId[],
   sceneObjects: EditorState['sceneObjects'],
   name: string,
   description?: string
@@ -128,7 +133,9 @@ export function buildPrefabFromSelection(
   }
   if (objects.length === 0) return null
   return {
-    id: `prefab_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`,
+    // Generation site (not a boundary): minted here, not parsed from
+    // untrusted input — use the plain constructor.
+    id: PrefabId(`prefab_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`),
     name: name.trim(),
     ...(description ? { description: description.trim() } : {}),
     objects,
@@ -167,10 +174,10 @@ export function instantiatePrefabObjects(
  * Pure function: does not mutate any input. The caller is
  * responsible for writing the result back into the scene.
  */
-export function breakPrefabOnObjects<T extends { prefabInstanceId?: string }>(
-  objects: Array<{ id: string; obj: T }>
-): string[] {
-  const broken: string[] = []
+export function breakPrefabOnObjects<K extends string, T extends { prefabInstanceId?: unknown }>(
+  objects: Array<{ id: K; obj: T }>
+): K[] {
+  const broken: K[] = []
   for (const { id, obj } of objects) {
     if (obj.prefabInstanceId !== undefined) {
       broken.push(id)
@@ -184,10 +191,10 @@ export function breakPrefabOnObjects<T extends { prefabInstanceId?: string }>(
  * ids to break, return a new map with the `prefabInstanceId`
  * field cleared on each entry.
  */
-export function applyBreakPrefab<T extends { prefabInstanceId?: string }>(
-  scene: Map<string, T>,
-  ids: string[]
-): Map<string, T> {
+export function applyBreakPrefab<K extends string, T extends { prefabInstanceId?: unknown }>(
+  scene: Map<K, T>,
+  ids: K[]
+): Map<K, T> {
   const next = new Map(scene)
   for (const id of ids) {
     const obj = next.get(id)

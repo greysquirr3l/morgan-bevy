@@ -55,7 +55,7 @@ export default function Inspector() {
     if (!primaryObject) return
 
     // For multi-selection, apply to all selected objects
-    selectedObjects.forEach((objectId: string) => {
+    selectedObjects.forEach(objectId => {
       const obj = sceneObjects.get(objectId)
       if (obj) {
         // Capture old transform for undo
@@ -286,7 +286,7 @@ export default function Inspector() {
           onMaterialChange={materialProps => {
             // T18: apply the change to every selected object so
             // multi-object material edits propagate atomically.
-            selectedObjects.forEach((objectId: string) => {
+            selectedObjects.forEach(objectId => {
               updateObjectMaterial(objectId, materialProps)
             })
           }}
@@ -341,7 +341,7 @@ export default function Inspector() {
               value={primaryObject?.metadata?.tileType || '1'}
               onChange={e => {
                 const tileType = e.target.value
-                selectedObjects.forEach((objectId: string) => {
+                selectedObjects.forEach(objectId => {
                   const obj = sceneObjects.get(objectId)
                   if (obj) {
                     updateObjectProperties(objectId, {
@@ -383,7 +383,7 @@ export default function Inspector() {
                 }
                 onChange={e => {
                   const char = e.target.value.slice(0, 1)
-                  selectedObjects.forEach((objectId: string) => {
+                  selectedObjects.forEach(objectId => {
                     const obj = sceneObjects.get(objectId)
                     if (obj) {
                       updateObjectProperties(objectId, {
@@ -411,7 +411,7 @@ export default function Inspector() {
                   type="checkbox"
                   checked={primaryObject?.collision || false}
                   onChange={e => {
-                    selectedObjects.forEach((objectId: string) => {
+                    selectedObjects.forEach(objectId => {
                       updateObjectProperties(objectId, { collision: e.target.checked })
                     })
                   }}
@@ -425,7 +425,7 @@ export default function Inspector() {
                   type="checkbox"
                   checked={primaryObject?.metadata?.blocksVision || false}
                   onChange={e => {
-                    selectedObjects.forEach((objectId: string) => {
+                    selectedObjects.forEach(objectId => {
                       const obj = sceneObjects.get(objectId)
                       if (obj) {
                         updateObjectProperties(objectId, {
@@ -447,7 +447,7 @@ export default function Inspector() {
                   type="checkbox"
                   checked={!(primaryObject?.walkable ?? true)}
                   onChange={e => {
-                    selectedObjects.forEach((objectId: string) => {
+                    selectedObjects.forEach(objectId => {
                       updateObjectProperties(objectId, { walkable: !e.target.checked })
                     })
                   }}
@@ -461,7 +461,7 @@ export default function Inspector() {
                   type="checkbox"
                   checked={primaryObject?.metadata?.interactive || false}
                   onChange={e => {
-                    selectedObjects.forEach((objectId: string) => {
+                    selectedObjects.forEach(objectId => {
                       const obj = sceneObjects.get(objectId)
                       if (obj) {
                         updateObjectProperties(objectId, {
@@ -492,7 +492,7 @@ export default function Inspector() {
                     .split(',')
                     .map(tag => tag.trim())
                     .filter(tag => tag.length > 0)
-                  selectedObjects.forEach((objectId: string) => {
+                  selectedObjects.forEach(objectId => {
                     updateObjectProperties(objectId, { tags })
                   })
                 }}
@@ -512,7 +512,7 @@ export default function Inspector() {
                           ? currentTags.filter(tag => tag !== preset)
                           : [...currentTags, preset]
 
-                        selectedObjects.forEach((objectId: string) => {
+                        selectedObjects.forEach(objectId => {
                           updateObjectProperties(objectId, { tags: newTags })
                         })
                       }}
@@ -542,7 +542,7 @@ export default function Inspector() {
                     value={primaryObject.metadata.gridPosition.x || 0}
                     onChange={e => {
                       const newX = parseInt(e.target.value) || 0
-                      selectedObjects.forEach((objectId: string) => {
+                      selectedObjects.forEach(objectId => {
                         const obj = sceneObjects.get(objectId)
                         if (obj && obj.metadata?.gridPosition) {
                           updateObjectProperties(objectId, {
@@ -565,7 +565,7 @@ export default function Inspector() {
                     value={primaryObject.metadata.gridPosition.y || 0}
                     onChange={e => {
                       const newY = parseInt(e.target.value) || 0
-                      selectedObjects.forEach((objectId: string) => {
+                      selectedObjects.forEach(objectId => {
                         const obj = sceneObjects.get(objectId)
                         if (obj && obj.metadata?.gridPosition) {
                           updateObjectProperties(objectId, {

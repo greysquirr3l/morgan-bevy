@@ -173,8 +173,8 @@ export function mapEntries<K, V>(map: Map<K, V>): Array<[K, V]> {
  * read-only view. The returned Record is a fresh copy — mutating it does
  * not affect the source Map.
  */
-export function mapToRecord<V>(map: Map<string, V>): Record<string, V> {
-  const out: Record<string, V> = {}
+export function mapToRecord<K extends string, V>(map: Map<K, V>): Record<K, V> {
+  const out = {} as Record<K, V>
   for (const [k, v] of map.entries()) {
     out[k] = v
   }
@@ -185,6 +185,6 @@ export function mapToRecord<V>(map: Map<string, V>): Record<string, V> {
  * Build a Map from a Record. Used by the IndexedDB autosave loader and by
  * test fixtures that construct initial state from a plain object.
  */
-export function recordToMap<V>(record: Record<string, V>): Map<string, V> {
-  return new Map(Object.entries(record))
+export function recordToMap<K extends string, V>(record: Record<K, V>): Map<K, V> {
+  return new Map(Object.entries(record) as Array<[K, V]>)
 }

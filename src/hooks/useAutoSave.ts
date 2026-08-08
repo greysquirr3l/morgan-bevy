@@ -12,7 +12,9 @@
  * correctness requirement, and the user has manual Save (Ctrl+S)
  * for definitive persistence.
  */
-import { useEditorStore } from '@/store/editorStore'
+import { serializeMap } from '@/store/mapSerialization'
+import { useEditorStore, type SceneObject } from '@/store/editorStore'
+import type { LayerId, ObjectId } from '@/types/brand'
 import { useEffect, useRef } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 
@@ -32,19 +34,24 @@ const AUTOSAVE_DEBOUNCE_MS = 5_000
  */
 export const AUTOSAVE_SCHEMA_VERSION = 1 as const
 
-/** Best-effort write of a snapshot of the editor state. */
+/**
+ * Best-effort write of a snapshot of the editor state. `sceneObjects`
+ * is a `Map` (T78) — `JSON.stringify` doesn't serialize `Map`
+ * instances (it produces `{}`), so it goes through `serializeMap`
+ * before hitting the payload.
+ */
 function writeSnapshot(state: {
-  sceneObjects: unknown
+  sceneObjects: Map<ObjectId, SceneObject>
   layers: unknown
-  activeLayer: string
-  selectedObjects: string[]
+  activeLayer: LayerId
+  selectedObjects: ObjectId[]
 }): void {
   try {
     const payload = JSON.stringify({
       schemaVersion: AUTOSAVE_SCHEMA_VERSION,
       savedAt: new Date().toISOString(),
       scene: {
-        objects: state.sceneObjects,
+        objects: serializeMap(state.sceneObjects),
         layers: state.layers,
         activeLayer: state.activeLayer,
         selectedObjects: state.selectedObjects,
@@ -63,8 +70,8 @@ export function readAutosave(): {
   scene: {
     objects: unknown
     layers: unknown
-    activeLayer: string
-    selectedObjects: string[]
+    activeLayer: LayerId
+    selectedObjects: ObjectId[]
   }
 } | null {
   try {
@@ -88,10 +95,10 @@ export function clearAutosave(): void {
 }
 
 interface AutoSaveSlice {
-  sceneObjects: unknown
+  sceneObjects: Map<ObjectId, SceneObject>
   layers: unknown
-  activeLayer: string
-  selectedObjects: string[]
+  activeLayer: LayerId
+  selectedObjects: ObjectId[]
 }
 
 /**

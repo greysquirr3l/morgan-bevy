@@ -29,18 +29,23 @@ export function useLOD(
   const { camera } = useThree()
   const frameCount = useRef(0)
   const [currentLOD, setCurrentLOD] = useState(lodLevels[0])
+  // Shadows `currentLOD` so the frame loop can skip `setCurrentLOD`
+  // when the distance bucket hasn't changed — an object sitting still
+  // at a fixed distance would otherwise re-render every
+  // `updateFrequency` frames for an identical LOD level.
+  const currentLODRef = useRef(lodLevels[0])
   const positionVector = useMemo(() => new Vector3(...position), [position])
 
   useFrame(() => {
     frameCount.current++
-    
+
     // Only update LOD every N frames to reduce performance impact
     if (frameCount.current % updateFrequency !== 0) {
       return
     }
 
     const distance = camera.position.distanceTo(positionVector)
-    
+
     // Find appropriate LOD level
     let selectedLOD = lodLevels[0]
     for (let i = lodLevels.length - 1; i >= 0; i--) {
@@ -49,8 +54,11 @@ export function useLOD(
         break
       }
     }
-    
-    setCurrentLOD(selectedLOD)
+
+    if (selectedLOD !== currentLODRef.current) {
+      currentLODRef.current = selectedLOD
+      setCurrentLOD(selectedLOD)
+    }
   })
 
   return currentLOD

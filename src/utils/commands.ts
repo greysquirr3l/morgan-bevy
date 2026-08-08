@@ -1,4 +1,6 @@
-import { useEditorStore } from '@/store/editorStore'
+import { useEditorStore, type EditorState, type SceneObject } from '@/store/editorStore'
+import { deserializeMap, serializeMap } from '@/store/mapSerialization'
+import { isObjectId, LayerId, ObjectId } from '@/types/brand'
 
 // Base command interface
 export interface Command {
@@ -9,7 +11,7 @@ export interface Command {
 
 // Transform command for object position, rotation, scale changes
 export class TransformCommand implements Command {
-  private objectId: string
+  private objectId: ObjectId
   private oldTransform: {
     position: [number, number, number]
     rotation: [number, number, number]
@@ -23,7 +25,7 @@ export class TransformCommand implements Command {
   public description: string
 
   constructor(
-    objectId: string,
+    objectId: ObjectId,
     oldTransform: {
       position: [number, number, number]
       rotation: [number, number, number]
@@ -54,7 +56,7 @@ export class TransformCommand implements Command {
 
 // Create object command
 export class CreateObjectCommand implements Command {
-  public objectId: string
+  public objectId: ObjectId
   private objectType: 'cube' | 'sphere' | 'pyramid'
   private position: [number, number, number]
   public description: string
@@ -62,7 +64,7 @@ export class CreateObjectCommand implements Command {
   constructor(objectType: 'cube' | 'sphere' | 'pyramid', position: [number, number, number]) {
     this.objectType = objectType
     this.position = position
-    this.objectId = '' // Will be set after execution
+    this.objectId = ObjectId('') // Will be set after execution
     this.description = `Create ${objectType}`
   }
 
@@ -79,23 +81,10 @@ export class CreateObjectCommand implements Command {
 
 // Delete object command
 export class DeleteObjectCommand implements Command {
-  private objectData: {
-    id: string
-    name: string
-    type: 'mesh' | 'light' | 'group'
-    position: [number, number, number]
-    rotation: [number, number, number]
-    scale: [number, number, number]
-    visible: boolean
-    locked: boolean
-    layerId: string
-    parentId?: string
-    children: string[]
-    meshType?: 'cube' | 'sphere' | 'pyramid'
-  }
+  private objectData: SceneObject
   public description: string
 
-  constructor(objectId: string) {
+  constructor(objectId: ObjectId) {
     const { sceneObjects } = useEditorStore.getState()
     const data = sceneObjects.get(objectId)
     if (!data) {
@@ -121,11 +110,11 @@ export class DeleteObjectCommand implements Command {
 
 // Duplicate objects command
 export class DuplicateCommand implements Command {
-  private sourceIds: string[]
-  private duplicatedIds: string[] = []
+  private sourceIds: ObjectId[]
+  private duplicatedIds: ObjectId[] = []
   public description: string
 
-  constructor(sourceIds: string[]) {
+  constructor(sourceIds: ObjectId[]) {
     this.sourceIds = sourceIds
     this.description = `Duplicate ${sourceIds.length} object(s)`
   }
@@ -149,11 +138,11 @@ export class DuplicateCommand implements Command {
 
 // Group objects command
 export class GroupCommand implements Command {
-  private objectIds: string[]
-  private groupId: string = ''
+  private objectIds: ObjectId[]
+  private groupId: ObjectId = ObjectId('')
   public description: string
 
-  constructor(objectIds: string[]) {
+  constructor(objectIds: ObjectId[]) {
     this.objectIds = objectIds
     this.description = `Group ${objectIds.length} object(s)`
   }
@@ -173,12 +162,12 @@ export class GroupCommand implements Command {
 
 // Ungroup objects command
 export class UngroupCommand implements Command {
-  private groupId: string
+  private groupId: ObjectId
   private groupData: any = null
-  private childIds: string[] = []
+  private childIds: ObjectId[] = []
   public description: string
 
-  constructor(groupId: string) {
+  constructor(groupId: ObjectId) {
     this.groupId = groupId
     const state = useEditorStore.getState()
     this.groupData = { ...state.sceneObjects.get(groupId) }
@@ -214,8 +203,8 @@ export class UngroupCommand implements Command {
 // Paste objects command
 export class PasteCommand implements Command {
   private pastedObjects: Array<{
-    id: string
-    objectData: any
+    id: ObjectId
+    objectData: SceneObject
   }> = []
   public description: string
 
@@ -248,16 +237,22 @@ export class PasteCommand implements Command {
     centerZ /= this.clipboardData.objects.length
 
     // Create new objects at offset positions
-    useEditorStore.setState((state: any) => {
+    useEditorStore.setState(state => {
       for (const objData of this.clipboardData.objects) {
-        const newId = `${objData.name}_paste_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`
+        // Generation site (not a boundary): the id is minted here from
+        // the pasted object's (user-controlled, possibly space-containing)
+        // name. Use the plain constructor rather than `parseObjectId`,
+        // which would throw on a name like "My Cube".
+        const newId = ObjectId(
+          `${objData.name}_paste_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`
+        )
         const newPosition: [number, number, number] = [
           objData.position[0] - centerX + offset[0],
           objData.position[1] - centerY + offset[1],
           objData.position[2] - centerZ + offset[2],
         ]
 
-        const newObjectData = {
+        const newObjectData: SceneObject = {
           ...objData,
           id: newId,
           name: `${objData.name}_paste`,
@@ -273,7 +268,7 @@ export class PasteCommand implements Command {
   }
 
   undo(): void {
-    useEditorStore.setState((state: any) => {
+    useEditorStore.setState(state => {
       this.pastedObjects.forEach(({ id }) => {
         state.sceneObjects.delete(id)
       })
@@ -303,7 +298,13 @@ export class SaveCommand implements Command {
         layerCount: state.layers.length,
       },
       scene: {
-        objects: Array.from(state.sceneObjects.entries()),
+        // A full snapshot is correct here, not a structural-sharing
+        // concern: this is a one-shot export to JSON (localStorage +
+        // file download), not a step in the undo stack. There's no
+        // "N snapshots held in memory simultaneously" cost to avoid —
+        // `undo()` below is a no-op, so this command never keeps more
+        // than the one array alive.
+        objects: serializeMap(state.sceneObjects),
         layers: state.layers,
         activeLayer: state.activeLayer,
         settings: {
@@ -333,13 +334,48 @@ export class SaveCommand implements Command {
   }
 }
 
+/**
+ * Scene payload `LoadCommand` accepts. Two calling conventions exist
+ * in the codebase: `FileMenu`/`useStartupFile` pass the zod-parsed
+ * `ProjectData.scene` sub-object directly; the raw-file `handleLoad`
+ * path and `useKeyboardShortcuts` pass the whole parsed file (which
+ * nests the same shape under `.scene`). `execute()` resolves
+ * `newData.scene ?? newData` so either convention loads correctly
+ * instead of silently no-op'ing when the two don't line up.
+ */
+interface LoadableSceneData {
+  objects?: unknown
+  layers?: EditorState['layers']
+  activeLayer?: string
+  settings?: {
+    gridSize?: number
+    snapToGrid?: boolean
+    transformMode?: EditorState['transformMode']
+    coordinateSpace?: EditorState['coordinateSpace']
+  }
+}
+type LoadCommandData = LoadableSceneData & { scene?: LoadableSceneData }
+
+interface LoadSnapshot {
+  sceneObjects: Map<ObjectId, SceneObject>
+  layers: EditorState['layers']
+  activeLayer: EditorState['activeLayer']
+  selectedObjects: ObjectId[]
+  settings: {
+    gridSize: number
+    snapToGrid: boolean
+    transformMode: EditorState['transformMode']
+    coordinateSpace: EditorState['coordinateSpace']
+  }
+}
+
 // Load command for restoring scene from data
 export class LoadCommand implements Command {
-  private previousState: any
-  private newData: any
+  private previousState: LoadSnapshot | null = null
+  private newData: LoadCommandData
   public description: string
 
-  constructor(sceneData: any) {
+  constructor(sceneData: LoadCommandData) {
     this.newData = sceneData
     this.description = 'Load scene'
   }
@@ -347,9 +383,13 @@ export class LoadCommand implements Command {
   execute(): void {
     const state = useEditorStore.getState()
 
-    // Store current state for undo
+    // Snapshot the CURRENT scene before overwriting it, for undo.
+    // `sceneObjects` is a `Map` (T78) — `new Map(...)` clones it.
+    // The previous `{ ...state.sceneObjects }` object-spread produced
+    // `{}` (a Map's entries aren't own enumerable properties), so
+    // undoing a load silently wiped every object in the scene.
     this.previousState = {
-      sceneObjects: { ...state.sceneObjects },
+      sceneObjects: new Map(state.sceneObjects),
       layers: [...state.layers],
       activeLayer: state.activeLayer,
       selectedObjects: [...state.selectedObjects],
@@ -361,36 +401,35 @@ export class LoadCommand implements Command {
       },
     }
 
-    // Load new scene data
-    useEditorStore.setState((state: any) => {
-      if (this.newData.scene) {
-        state.sceneObjects = this.newData.scene.objects || {}
-        state.layers = this.newData.scene.layers || state.layers
-        state.activeLayer = this.newData.scene.activeLayer || 'default'
-        state.selectedObjects = []
+    const scene = this.newData.scene ?? this.newData
 
-        if (this.newData.scene.settings) {
-          state.gridSize = this.newData.scene.settings.gridSize || state.gridSize
-          state.snapToGrid = this.newData.scene.settings.snapToGrid || false
-          state.transformMode = this.newData.scene.settings.transformMode || 'select'
-          state.coordinateSpace = this.newData.scene.settings.coordinateSpace || 'world'
-        }
+    useEditorStore.setState(draft => {
+      draft.sceneObjects = deserializeMap<ObjectId, SceneObject>(scene.objects, isObjectId)
+      draft.layers = scene.layers ?? draft.layers
+      draft.activeLayer = scene.activeLayer ? LayerId(scene.activeLayer) : LayerId('default')
+      draft.selectedObjects = []
+
+      if (scene.settings) {
+        draft.gridSize = scene.settings.gridSize ?? draft.gridSize
+        draft.snapToGrid = scene.settings.snapToGrid ?? false
+        draft.transformMode = scene.settings.transformMode ?? 'select'
+        draft.coordinateSpace = scene.settings.coordinateSpace ?? 'world'
       }
     })
   }
 
   undo(): void {
-    if (this.previousState) {
-      useEditorStore.setState((state: any) => {
-        state.sceneObjects = this.previousState.sceneObjects
-        state.layers = this.previousState.layers
-        state.activeLayer = this.previousState.activeLayer
-        state.selectedObjects = this.previousState.selectedObjects
-        state.gridSize = this.previousState.settings.gridSize
-        state.snapToGrid = this.previousState.settings.snapToGrid
-        state.transformMode = this.previousState.settings.transformMode
-        state.coordinateSpace = this.previousState.settings.coordinateSpace
-      })
-    }
+    const snapshot = this.previousState
+    if (!snapshot) return
+    useEditorStore.setState(draft => {
+      draft.sceneObjects = snapshot.sceneObjects
+      draft.layers = snapshot.layers
+      draft.activeLayer = snapshot.activeLayer
+      draft.selectedObjects = snapshot.selectedObjects
+      draft.gridSize = snapshot.settings.gridSize
+      draft.snapToGrid = snapshot.settings.snapToGrid
+      draft.transformMode = snapshot.settings.transformMode
+      draft.coordinateSpace = snapshot.settings.coordinateSpace
+    })
   }
 }

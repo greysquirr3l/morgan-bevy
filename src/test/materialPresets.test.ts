@@ -13,6 +13,7 @@
  *  - newPresetId produces stable, slugged ids
  */
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { MaterialId } from '../types/brand'
 import {
   DEFAULT_PRESETS,
   deleteMaterialPreset,
@@ -26,7 +27,7 @@ import {
 const STORAGE_KEY = 'morgan-bevy-material-presets'
 
 const samplePreset: MaterialPreset = {
-  id: 'unit-test-preset',
+  id: MaterialId('unit-test-preset'),
   name: 'Test Preset',
   baseColor: '#abcdef',
   metallic: 0.25,
@@ -129,7 +130,7 @@ describe('saveMaterialPreset + deleteMaterialPreset', () => {
 
 describe('effectiveMaterial', () => {
   const base: MaterialPreset = {
-    id: 'base-preset',
+    id: MaterialId('base-preset'),
     name: 'Base',
     baseColor: '#111111',
     metallic: 0.1,

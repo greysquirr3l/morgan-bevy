@@ -1,5 +1,7 @@
 import { useCameraContext } from '@/contexts/CameraContext'
 import { useEditorStore } from '@/store/editorStore'
+import { serializeMap } from '@/store/mapSerialization'
+import { LayerId } from '@/types/brand'
 import { clipboard, copySelectedObjects } from '@/utils/clipboard'
 import {
   DeleteObjectCommand,
@@ -88,7 +90,7 @@ export function useKeyboardShortcuts() {
           if (selectedObjects.length > 0) {
             event.preventDefault()
             // Use command system for undoable delete operations
-            selectedObjects.forEach((id: string) => {
+            selectedObjects.forEach(id => {
               const command = new DeleteObjectCommand(id)
               command.execute()
               executeCommand(command)
@@ -261,7 +263,7 @@ export function useKeyboardShortcuts() {
                   selectedObjects: [],
                   undoHistory: [],
                   redoHistory: [],
-                  activeLayer: 'default',
+                  activeLayer: LayerId('default'),
                 })
                 console.log('New scene created')
               }
@@ -271,7 +273,7 @@ export function useKeyboardShortcuts() {
                 selectedObjects: [],
                 undoHistory: [],
                 redoHistory: [],
-                activeLayer: 'default',
+                activeLayer: LayerId('default'),
               })
               console.log('New scene created')
             }
@@ -321,11 +323,11 @@ export function useKeyboardShortcuts() {
                   version: '1.0.0',
                   editor: 'Morgan-Bevy',
                   exportedAt: new Date().toISOString(),
-                  objectCount: Object.keys(state.sceneObjects).length,
+                  objectCount: state.sceneObjects.size,
                   layerCount: state.layers.length,
                 },
                 scene: {
-                  objects: state.sceneObjects,
+                  objects: serializeMap(state.sceneObjects),
                   layers: state.layers,
                   settings: {
                     gridSize: state.gridSize,

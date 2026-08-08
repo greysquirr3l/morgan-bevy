@@ -1,4 +1,5 @@
 // Material editor component for PBR material properties
+import { MaterialId, type ObjectId } from '@/types/brand'
 import {
   DEFAULT_PRESETS,
   deleteMaterialPreset,
@@ -12,12 +13,12 @@ import { ChevronRight, Copy, Folder, Link2, Palette, Star, Unlink, X } from 'luc
 import { useEffect, useRef, useState } from 'react'
 
 interface MaterialEditorProps {
-  selectedObjects: string[]
+  selectedObjects: ObjectId[]
   onMaterialChange?: (materialProps: any) => void
   // T18: parent supplies a callback that links selected objects
   // to a named material preset, with the editor's current
   // effective values used as the instance overrides.
-  onLinkPreset?: (presetId: string, overrides: Record<string, unknown>) => void
+  onLinkPreset?: (presetId: MaterialPreset['id'], overrides: Record<string, unknown>) => void
   // T18: parent supplies a callback that unlinks selected objects
   // from their preset. Inspector wires to `unlinkObjectFromPreset`.
   onUnlinkPreset?: () => void
@@ -348,7 +349,7 @@ export default function MaterialEditor({
             <button
               onClick={e => {
                 e.stopPropagation()
-                onLinkPreset('default-metal', currentOverrides())
+                onLinkPreset(MaterialId('default-metal'), currentOverrides())
               }}
               className="p-1 rounded hover:bg-editor-border"
               title="Link selected objects to a preset"

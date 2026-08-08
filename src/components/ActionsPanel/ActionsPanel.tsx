@@ -1,4 +1,5 @@
 import { useEditorStore } from '@/store/editorStore'
+import type { ObjectId } from '@/types/brand'
 import { Plus, Triangle } from 'lucide-react'
 import { DeleteObjectCommand, DuplicateCommand } from '@/utils/commands'
 
@@ -23,7 +24,7 @@ export default function ActionsPanel() {
 
   const deleteSelected = () => {
     if (selectedObjects.length > 0) {
-      selectedObjects.forEach((id: string) => {
+      selectedObjects.forEach((id: ObjectId) => {
         const command = new DeleteObjectCommand(id)
         command.execute()
         executeCommand(command)

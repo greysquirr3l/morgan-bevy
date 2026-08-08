@@ -552,10 +552,10 @@ const GridView = React.forwardRef<GridViewRef, GridViewProps>(({ className = '' 
         {/* Edit Mode */}
         <div className="flex items-center space-x-2">
           <label className="text-editor-textMuted">Mode:</label>
-          {['paint', 'select', 'fill'].map(mode => (
+          {(['paint', 'select', 'fill'] as const).map(mode => (
             <button
               key={mode}
-              onClick={() => setEditMode(mode as any)}
+              onClick={() => setEditMode(mode)}
               className={`px-2 py-1 rounded text-xs ${
                 editMode === mode
                   ? 'bg-editor-accent text-white'

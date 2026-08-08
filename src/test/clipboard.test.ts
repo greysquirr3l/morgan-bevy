@@ -13,13 +13,60 @@
  */
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { useEditorStore } from '../store/editorStore'
+import { LayerId, ObjectId } from '../types/brand'
 import { clipboard } from '../utils/clipboard'
 
 function populateScene() {
   useEditorStore.setState({
     sceneObjects: new Map([
-      ['a', { id: 'a', name: 'Cube_A', type: 'mesh', position: [0, 0, 0], rotation: [0, 0, 0], scale: [1, 1, 1], visible: true, locked: false, layerId: 'default', children: [], meshType: 'cube' }],
-      ['b', { id: 'b', name: 'Cube_B', type: 'mesh', position: [4, 0, 0], rotation: [0, 0, 0], scale: [1, 1, 1], visible: true, locked: false, layerId: 'default', children: [], meshType: 'cube' }],
+      [
+        ObjectId('a'),
+        {
+          id: ObjectId('a'),
+          name: 'Cube_A',
+          type: 'mesh',
+          position: [0, 0, 0],
+          rotation: [0, 0, 0],
+          scale: [1, 1, 1],
+          visible: true,
+          locked: false,
+          layerId: LayerId('default'),
+          children: [],
+          meshType: 'cube',
+        },
+      ],
+      [
+        ObjectId('b'),
+        {
+          id: ObjectId('b'),
+          name: 'Cube_B',
+          type: 'mesh',
+          position: [4, 0, 0],
+          rotation: [0, 0, 0],
+          scale: [1, 1, 1],
+          visible: true,
+          locked: false,
+          layerId: LayerId('default'),
+          children: [],
+          meshType: 'cube',
+        },
+      ],
+      [
+        ObjectId('c-with-space'),
+        {
+          id: ObjectId('c-with-space'),
+          name: 'My Cube',
+          type: 'mesh',
+          position: [8, 0, 0],
+          rotation: [0, 0, 0],
+          scale: [1, 1, 1],
+          visible: true,
+          locked: false,
+          layerId: LayerId('default'),
+          children: [],
+          meshType: 'cube',
+        },
+      ],
     ]),
   })
 }
@@ -41,20 +88,32 @@ describe('clipboard', () => {
   })
 
   it('copy() snapshots every resolved object', () => {
-    expect(clipboard.copy(['a', 'b'])).toBe(true)
+    expect(clipboard.copy([ObjectId('a'), ObjectId('b')])).toBe(true)
     expect(clipboard.hasData()).toBe(true)
   })
 
   it('copy() silently drops ids that do not resolve', () => {
-    expect(clipboard.copy(['a', 'missing', 'b'])).toBe(true)
+    expect(clipboard.copy([ObjectId('a'), ObjectId('missing'), ObjectId('b')])).toBe(true)
     expect(clipboard.hasData()).toBe(true)
   })
 
   it('clear() resets the clipboard state', () => {
-    clipboard.copy(['a'])
+    clipboard.copy([ObjectId('a')])
     expect(clipboard.hasData()).toBe(true)
     clipboard.clear()
     expect(clipboard.hasData()).toBe(false)
+  })
+
+  // T77b: object names may contain spaces (e.g. "My Cube"). The pasted
+  // object's id is minted with the plain `ObjectId(...)` constructor
+  // rather than `parseObjectId`, which would throw on an id containing
+  // a space — so copy → paste of a space-named object must not throw.
+  it('copy() then paste() of an object whose name contains a space does not throw', async () => {
+    expect(clipboard.copy([ObjectId('c-with-space')])).toBe(true)
+    const ids = await clipboard.paste([0, 0, 0])
+    expect(ids).toHaveLength(1)
+    const pasted = useEditorStore.getState().sceneObjects.get(ids[0]!)
+    expect(pasted?.name).toBe('My Cube_paste')
   })
 
   it('paste() returns no ids when nothing was copied', async () => {
@@ -77,7 +136,7 @@ describe('clipboard', () => {
   })
 
   it('paste() inserts copies with new ids and respects an offset', async () => {
-    clipboard.copy(['a', 'b'])
+    clipboard.copy([ObjectId('a'), ObjectId('b')])
     const before = new Set(useEditorStore.getState().sceneObjects.keys())
     // Source a=(0,0,0), b=(4,0,0); centre = (2,0,0).
     // No offset → default (2,0,0); cluster centre lands at (2,0,0).
@@ -95,7 +154,7 @@ describe('clipboard', () => {
   })
 
   it('paste() with no offset lands the cluster centre at (2, 0, 0)', async () => {
-    clipboard.copy(['a'])
+    clipboard.copy([ObjectId('a')])
     const ids = await clipboard.paste()
     expect(ids).toHaveLength(1)
     const obj = useEditorStore.getState().sceneObjects.get(ids[0]!)

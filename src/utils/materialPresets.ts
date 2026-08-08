@@ -15,9 +15,10 @@
  * material actually rendered for that object.
  */
 
+import { isValidIdString, MaterialId } from '@/types/brand'
 
 export interface MaterialPreset {
-  id: string
+  id: MaterialId
   name: string
   baseColor: string
   metallic: number
@@ -28,7 +29,7 @@ export interface MaterialPreset {
 }
 
 export interface MaterialInstance {
-  presetId: string
+  presetId: MaterialId
   overrides: Partial<Omit<MaterialPreset, 'id' | 'name'>>
 }
 
@@ -37,7 +38,7 @@ const STORAGE_KEY = 'morgan-bevy-material-presets'
 /** Default presets shipped with the editor. */
 export const DEFAULT_PRESETS: readonly MaterialPreset[] = Object.freeze([
   {
-    id: 'default-metal',
+    id: MaterialId('default-metal'),
     name: 'Metal',
     baseColor: '#b0b0b0',
     metallic: 1.0,
@@ -46,7 +47,7 @@ export const DEFAULT_PRESETS: readonly MaterialPreset[] = Object.freeze([
     emissiveIntensity: 0.0,
   },
   {
-    id: 'default-concrete',
+    id: MaterialId('default-concrete'),
     name: 'Concrete',
     baseColor: '#808080',
     metallic: 0.0,
@@ -55,7 +56,7 @@ export const DEFAULT_PRESETS: readonly MaterialPreset[] = Object.freeze([
     emissiveIntensity: 0.0,
   },
   {
-    id: 'default-plastic',
+    id: MaterialId('default-plastic'),
     name: 'Plastic',
     baseColor: '#ffffff',
     metallic: 0.0,
@@ -64,7 +65,7 @@ export const DEFAULT_PRESETS: readonly MaterialPreset[] = Object.freeze([
     emissiveIntensity: 0.0,
   },
   {
-    id: 'default-wood',
+    id: MaterialId('default-wood'),
     name: 'Wood',
     baseColor: '#8b4513',
     metallic: 0.0,
@@ -73,7 +74,7 @@ export const DEFAULT_PRESETS: readonly MaterialPreset[] = Object.freeze([
     emissiveIntensity: 0.0,
   },
   {
-    id: 'default-glass',
+    id: MaterialId('default-glass'),
     name: 'Glass',
     baseColor: '#ffffff',
     metallic: 0.0,
@@ -82,7 +83,7 @@ export const DEFAULT_PRESETS: readonly MaterialPreset[] = Object.freeze([
     emissiveIntensity: 0.0,
   },
   {
-    id: 'default-gold',
+    id: MaterialId('default-gold'),
     name: 'Gold',
     baseColor: '#ffd700',
     metallic: 1.0,
@@ -91,7 +92,7 @@ export const DEFAULT_PRESETS: readonly MaterialPreset[] = Object.freeze([
     emissiveIntensity: 0.0,
   },
   {
-    id: 'default-copper',
+    id: MaterialId('default-copper'),
     name: 'Copper',
     baseColor: '#b87333',
     metallic: 1.0,
@@ -100,7 +101,7 @@ export const DEFAULT_PRESETS: readonly MaterialPreset[] = Object.freeze([
     emissiveIntensity: 0.0,
   },
   {
-    id: 'default-chrome',
+    id: MaterialId('default-chrome'),
     name: 'Chrome',
     baseColor: '#c0c0c0',
     metallic: 1.0,
@@ -109,7 +110,7 @@ export const DEFAULT_PRESETS: readonly MaterialPreset[] = Object.freeze([
     emissiveIntensity: 0.0,
   },
   {
-    id: 'default-neon',
+    id: MaterialId('default-neon'),
     name: 'Neon',
     baseColor: '#ff00ff',
     metallic: 0.0,
@@ -118,7 +119,7 @@ export const DEFAULT_PRESETS: readonly MaterialPreset[] = Object.freeze([
     emissiveIntensity: 1.0,
   },
   {
-    id: 'default-led',
+    id: MaterialId('default-led'),
     name: 'LED',
     baseColor: '#ffffff',
     metallic: 0.0,
@@ -150,7 +151,7 @@ export function saveMaterialPreset(preset: MaterialPreset): void {
 }
 
 /** Remove a custom preset by id. Returns the remaining custom presets. */
-export function deleteMaterialPreset(id: string): MaterialPreset[] {
+export function deleteMaterialPreset(id: MaterialId): MaterialPreset[] {
   const existing = readCustomPresets()
   const next = existing.filter(p => p.id !== id)
   localStorage.setItem(STORAGE_KEY, JSON.stringify(next))
@@ -169,11 +170,15 @@ function readCustomPresets(): MaterialPreset[] {
   }
 }
 
+// Boundary: presets are read back out of localStorage as untrusted
+// JSON. `isValidIdString` (rather than a bare `typeof === 'string'`
+// check) rejects a corrupted/malformed `id` here instead of letting
+// it flow into the app as an ill-shaped `MaterialId`.
 function isMaterialPreset(value: unknown): value is MaterialPreset {
   if (!value || typeof value !== 'object') return false
   const v = value as Record<string, unknown>
   return (
-    typeof v.id === 'string' &&
+    isValidIdString(v.id) &&
     typeof v.name === 'string' &&
     typeof v.baseColor === 'string' &&
     typeof v.metallic === 'number' &&
@@ -196,7 +201,7 @@ export function effectiveMaterial(
   texture?: string
 } {
   const base: MaterialPreset = preset ?? {
-    id: 'fallback',
+    id: MaterialId('fallback'),
     name: 'Default',
     baseColor: '#808080',
     metallic: 0,
@@ -227,12 +232,14 @@ export function effectiveMaterial(
 }
 
 /** Create a stable preset id from a name (collision-resistant). */
-export function newPresetId(name: string): string {
+export function newPresetId(name: string): MaterialId {
   const slug = name
     .trim()
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/(^-|-$)/g, '')
   const suffix = Math.random().toString(36).slice(2, 8)
-  return `${slug || 'preset'}-${suffix}`
+  // Generation site (not a boundary): minted here, not parsed from
+  // untrusted input — use the plain constructor.
+  return MaterialId(`${slug || 'preset'}-${suffix}`)
 }

@@ -3,7 +3,12 @@ import { useCallback, useState } from 'react'
 
 // Performance testing component for generating large numbers of objects
 export default function PerformanceTestPanel() {
-  const { addObject, clearScene, sceneObjects } = useEditorStore()
+  const { addObject, clearScene } = useEditorStore()
+  // Narrowest possible subscription: this panel only ever displays the
+  // count, so subscribe to `size` directly instead of the whole Map
+  // (which would re-render on every object mutation, not just
+  // insert/delete).
+  const sceneObjectCount = useEditorStore(s => s.sceneObjects.size)
   const [isGenerating, setIsGenerating] = useState(false)
   const [lastGenerationTime, setLastGenerationTime] = useState<number | null>(null)
 
@@ -49,7 +54,7 @@ export default function PerformanceTestPanel() {
   const generateLargeScene = () => generateTestScene(5000)
   const generateMassiveScene = () => generateTestScene(10000)
 
-  const currentObjectCount = Object.keys(sceneObjects).length
+  const currentObjectCount = sceneObjectCount
 
   return (
     <div className="bg-editor-surface border border-editor-border rounded-lg p-4">

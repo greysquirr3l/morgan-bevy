@@ -99,7 +99,7 @@ export default forwardRef<CameraControlsRef, object>(function Viewport3D(_props,
 
   // Convert scene objects to performance objects for metrics
   const performanceObjects: PerformanceObject[] = useMemo(() => {
-    return Object.values(sceneObjects)
+    return Array.from(sceneObjects.values())
       .map((obj: any) => {
         if (obj.type !== 'mesh' || !obj.meshType) return null
 

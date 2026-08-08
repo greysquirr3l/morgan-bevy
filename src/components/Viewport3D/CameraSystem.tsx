@@ -16,12 +16,17 @@ export default function CameraSystem({ mode, onModeChange }: CameraSystemProps) 
   const controlsRef = useRef<CameraControls>(null)
   const [flySpeed] = useState(10)
   const [keys, setKeys] = useState<Set<string>>(new Set())
-  const [mouseMovement, setMouseMovement] = useState({ x: 0, y: 0 })
   const [isMouseLocked, setIsMouseLocked] = useState(false)
 
   // Camera position and rotation for fly mode
   const flyPosition = useRef(new Vector3(10, 10, 10))
   const flyRotation = useRef({ pitch: 0, yaw: 0 })
+  // Raw per-frame mouse delta. This used to be `useState`, written on
+  // every `mousemove` and reset to zero every render-loop frame while
+  // the pointer was locked — a React re-render at mouse-move (and
+  // frame) rate for a value nothing ever renders. It only feeds the
+  // fly-camera integration below, so a ref is the right home for it.
+  const mouseMovementRef = useRef({ x: 0, y: 0 })
 
   // Switch between camera types based on mode
   useEffect(() => {
@@ -84,10 +89,8 @@ export default function CameraSystem({ mode, onModeChange }: CameraSystemProps) 
       if (mode !== 'fly' || !isMouseLocked) return
 
       const sensitivity = 0.002
-      setMouseMovement({
-        x: event.movementX * sensitivity,
-        y: event.movementY * sensitivity,
-      })
+      mouseMovementRef.current.x = event.movementX * sensitivity
+      mouseMovementRef.current.y = event.movementY * sensitivity
     },
     [mode, isMouseLocked]
   )
@@ -133,13 +136,15 @@ export default function CameraSystem({ mode, onModeChange }: CameraSystemProps) 
 
     // Update rotation based on mouse movement
     if (isMouseLocked) {
-      flyRotation.current.yaw -= mouseMovement.x
-      flyRotation.current.pitch -= mouseMovement.y
+      const movement = mouseMovementRef.current
+      flyRotation.current.yaw -= movement.x
+      flyRotation.current.pitch -= movement.y
       flyRotation.current.pitch = Math.max(
         -Math.PI / 2,
         Math.min(Math.PI / 2, flyRotation.current.pitch)
       )
-      setMouseMovement({ x: 0, y: 0 })
+      movement.x = 0
+      movement.y = 0
     }
 
     // Update position based on keyboard input
@@ -277,7 +282,7 @@ export function useCameraControls() {
 
   const frameAll = useCallback(() => {
     const { sceneObjects } = useEditorStore.getState()
-    const objectIds = Object.keys(sceneObjects)
+    const objectIds = Array.from(sceneObjects.keys())
 
     if (objectIds.length === 0) return
 

@@ -1,4 +1,5 @@
 import { useEditorStore } from '@/store/editorStore'
+import type { ObjectId } from '@/types/brand'
 import { CreateObjectCommand } from '@/utils/commands'
 import { invoke } from '@tauri-apps/api/core'
 import { Download, Play, Shuffle } from 'lucide-react'
@@ -133,7 +134,7 @@ export default function GenerationPanel(_props: GenerationPanelProps) {
       clearSelection()
 
       // Add generated objects to scene using command system
-      const newObjectIds: string[] = []
+      const newObjectIds: ObjectId[] = []
       for (const obj of levelData.objects) {
         // Convert mesh to primitive type
         let meshType: 'cube' | 'sphere' | 'pyramid' = 'cube'

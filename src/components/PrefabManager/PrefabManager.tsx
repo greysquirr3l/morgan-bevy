@@ -1,4 +1,5 @@
 import { useEditorStore } from '@/store/editorStore'
+import type { PrefabId } from '@/types/brand'
 import { CreateObjectCommand } from '@/utils/commands'
 import {
   applyBreakPrefab,
@@ -58,7 +59,7 @@ export default function PrefabManager() {
     }
   }
 
-  const deletePrefab = (prefabId: string) => {
+  const deletePrefab = (prefabId: PrefabId) => {
     const next = deletePrefabFromStorage(prefabId)
     setPrefabs(next)
   }

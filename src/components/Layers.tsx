@@ -1,5 +1,6 @@
 // Layer management component for scene organization
 import { useEditorStore } from '@/store/editorStore'
+import { LayerId } from '@/types/brand'
 import { ChevronRight, Eye, EyeOff, Lock, Unlock, X } from 'lucide-react'
 import { useState } from 'react'
 import { useShallow } from 'zustand/react/shallow'
@@ -20,42 +21,42 @@ export default function Layers({ hideHeader = false }: LayersProps) {
     }))
   )
   const [isExpanded, setIsExpanded] = useState(true)
-  const [editingLayerId, setEditingLayerId] = useState<string | null>(null)
+  const [editingLayerId, setEditingLayerId] = useState<LayerId | null>(null)
 
-  const toggleLayerVisibility = (layerId: string) => {
-    useEditorStore.setState((state: any) => {
-      const layer = state.layers.find((l: any) => l.id === layerId)
+  const toggleLayerVisibility = (layerId: LayerId) => {
+    useEditorStore.setState(state => {
+      const layer = state.layers.find(l => l.id === layerId)
       if (layer) {
         layer.visible = !layer.visible
       }
     })
   }
 
-  const toggleLayerLock = (layerId: string) => {
+  const toggleLayerLock = (layerId: LayerId) => {
     useEditorStore.setState(state => {
-      const layer = state.layers.find((l: any) => l.id === layerId)
+      const layer = state.layers.find(l => l.id === layerId)
       if (layer) {
         layer.locked = !layer.locked
       }
     })
   }
 
-  const selectLayerObjects = (layerId: string) => {
-    const layerObjectIds = Object.values(sceneObjects)
-      .filter((obj: any) => obj.layerId === layerId)
-      .map((obj: any) => obj.id)
+  const selectLayerObjects = (layerId: LayerId) => {
+    const layerObjectIds = Array.from(sceneObjects.values())
+      .filter(obj => obj.layerId === layerId)
+      .map(obj => obj.id)
     setSelectedObjects(layerObjectIds)
   }
 
-  const setActiveLayer = (layerId: string) => {
+  const setActiveLayer = (layerId: LayerId) => {
     useEditorStore.setState(state => {
       state.activeLayer = layerId
     })
   }
 
-  const renameLayer = (layerId: string, newName: string) => {
-    useEditorStore.setState((state: any) => {
-      const layer = state.layers.find((l: any) => l.id === layerId)
+  const renameLayer = (layerId: LayerId, newName: string) => {
+    useEditorStore.setState(state => {
+      const layer = state.layers.find(l => l.id === layerId)
       if (layer) {
         layer.name = newName
       }
@@ -64,8 +65,10 @@ export default function Layers({ hideHeader = false }: LayersProps) {
   }
 
   const addLayer = () => {
-    const newLayerId = `layer_${Date.now()}`
-    useEditorStore.setState((state: any) => {
+    // Generation site (not a boundary): minted here, not parsed from
+    // untrusted input — use the plain constructor.
+    const newLayerId = LayerId(`layer_${Date.now()}`)
+    useEditorStore.setState(state => {
       state.layers.push({
         id: newLayerId,
         name: 'New Layer',
@@ -77,28 +80,28 @@ export default function Layers({ hideHeader = false }: LayersProps) {
     setEditingLayerId(newLayerId)
   }
 
-  const deleteLayer = (layerId: string) => {
+  const deleteLayer = (layerId: LayerId) => {
     // Can't delete if it's the only layer or default layer
     if (layers.length <= 1 || layerId === 'default') return
 
     // Move objects to default layer
-    useEditorStore.setState((state: any) => {
-      Object.values(state.sceneObjects).forEach((obj: any) => {
+    useEditorStore.setState(state => {
+      state.sceneObjects.forEach(obj => {
         if (obj.layerId === layerId) {
-          obj.layerId = 'default'
+          obj.layerId = LayerId('default')
         }
       })
       // Remove the layer
-      state.layers = state.layers.filter((l: any) => l.id !== layerId)
+      state.layers = state.layers.filter(l => l.id !== layerId)
       // Set active layer to default if we deleted the active layer
       if (state.activeLayer === layerId) {
-        state.activeLayer = 'default'
+        state.activeLayer = LayerId('default')
       }
     })
   }
 
-  const getLayerObjectCount = (layerId: string): number => {
-    return Object.values(sceneObjects).filter((obj: any) => obj.layerId === layerId).length
+  const getLayerObjectCount = (layerId: LayerId): number => {
+    return Array.from(sceneObjects.values()).filter(obj => obj.layerId === layerId).length
   }
 
   if (!isExpanded) {

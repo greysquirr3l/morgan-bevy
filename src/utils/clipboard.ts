@@ -1,11 +1,12 @@
 // Clipboard operations for 3D objects
 import { useEditorStore } from '@/store/editorStore'
+import { isLayerId, LayerId, ObjectId } from '@/types/brand'
 
 export interface ClipboardData {
   version: string
   timestamp: number
   objects: Array<{
-    id: string
+    id: ObjectId
     name: string
     type: 'mesh' | 'light' | 'group'
     position: [number, number, number]
@@ -13,9 +14,9 @@ export interface ClipboardData {
     scale: [number, number, number]
     visible: boolean
     locked: boolean
-    layerId: string
-    parentId?: string
-    children: string[]
+    layerId: LayerId
+    parentId?: ObjectId
+    children: ObjectId[]
     meshType?: 'cube' | 'sphere' | 'pyramid'
   }>
 }
@@ -32,7 +33,7 @@ class ClipboardManager {
   }
 
   // Copy selected objects to clipboard
-  copy(objectIds: string[]): boolean {
+  copy(objectIds: ObjectId[]): boolean {
     try {
       const { sceneObjects } = useEditorStore.getState()
       const objectsToSerialize = objectIds
@@ -74,20 +75,27 @@ class ClipboardManager {
   }
 
   // Paste objects from clipboard
-  async paste(position?: [number, number, number]): Promise<string[]> {
+  async paste(position?: [number, number, number]): Promise<ObjectId[]> {
     try {
       let clipboardData = this.data
 
-      // If no internal clipboard data, try to read from system clipboard
+      // If no internal clipboard data, try to read from system clipboard.
+      // This is an untrusted boundary — the text comes from the OS
+      // clipboard and may have been written by anything.
       if (!clipboardData && navigator.clipboard && navigator.clipboard.readText) {
         try {
           const text = await navigator.clipboard.readText()
-          clipboardData = JSON.parse(text)
+          const parsed: unknown = JSON.parse(text)
 
           // Validate clipboard data format
-          if (!clipboardData || !clipboardData.objects || !Array.isArray(clipboardData.objects)) {
+          if (
+            !parsed ||
+            typeof parsed !== 'object' ||
+            !Array.isArray((parsed as { objects?: unknown }).objects)
+          ) {
             throw new Error('Invalid clipboard data format')
           }
+          clipboardData = parsed as ClipboardData
         } catch (err) {
           console.warn('Could not read from system clipboard:', err)
           return []
@@ -99,8 +107,23 @@ class ClipboardManager {
         return []
       }
 
+      // Bulk restore: one malformed entry must not abort the whole
+      // paste. Drop objects whose `layerId` doesn't look like a valid
+      // branded id, logging a warning for each skipped entry.
+      const validObjects = clipboardData.objects.filter(obj => {
+        if (!isLayerId(obj.layerId)) {
+          console.warn('clipboard paste: skipping object with malformed layerId', obj)
+          return false
+        }
+        return true
+      })
+      if (validObjects.length === 0) {
+        console.warn('No valid objects to paste')
+        return []
+      }
+
       // Note: Using useEditorStore.setState directly instead of destructured addObject
-      const pastedIds: string[] = []
+      const pastedIds: ObjectId[] = []
 
       // T70: offset semantics — `offset` is the *target* position of the
       // cluster centre after paste. So every object shifts by
@@ -113,21 +136,27 @@ class ClipboardManager {
       let centerX = 0,
         centerY = 0,
         centerZ = 0
-      clipboardData.objects.forEach(obj => {
+      validObjects.forEach(obj => {
         centerX += obj.position[0]
         centerY += obj.position[1]
         centerZ += obj.position[2]
       })
-      centerX /= clipboardData.objects.length
-      centerY /= clipboardData.objects.length
-      centerZ /= clipboardData.objects.length
+      centerX /= validObjects.length
+      centerY /= validObjects.length
+      centerZ /= validObjects.length
       const shiftX = offset[0] - centerX
       const shiftY = offset[1] - centerY
       const shiftZ = offset[2] - centerZ
 
       // Create new objects at offset positions
-      for (const objData of clipboardData.objects) {
-        const newId = `${objData.name}_paste_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`
+      for (const objData of validObjects) {
+        // Generation site (not a boundary): the id is minted here from
+        // the copied object's (possibly space-containing) name. Use the
+        // plain constructor rather than `parseObjectId`, which would
+        // throw on a name like "My Cube".
+        const newId = ObjectId(
+          `${objData.name}_paste_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`
+        )
         const newPosition: [number, number, number] = [
           objData.position[0] + shiftX,
           objData.position[1] + shiftY,
@@ -135,7 +164,7 @@ class ClipboardManager {
         ]
 
         // Use store's setState to directly add the object
-        useEditorStore.setState((state: any) => {
+        useEditorStore.setState(state => {
           state.sceneObjects.set(newId, {
             ...objData,
             id: newId,

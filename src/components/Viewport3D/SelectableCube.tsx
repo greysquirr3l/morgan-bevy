@@ -2,11 +2,12 @@ import { useRef } from 'react'
 import { Mesh, BoxGeometry, MeshStandardMaterial } from 'three'
 import { useFrame, ThreeEvent } from '@react-three/fiber'
 import { useEditorStore } from '@/store/editorStore'
+import type { ObjectId } from '@/types/brand'
 
 interface SelectableCubeProps {
   position: [number, number, number]
   color: string
-  id: string
+  id: ObjectId
 }
 
 export default function SelectableCube({ position, color, id }: SelectableCubeProps) {

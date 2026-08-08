@@ -1,17 +1,20 @@
 import { useEditorStore } from '@/store/editorStore'
-import { beforeEach, describe, expect, it } from 'vitest'
+import { LayerId, ObjectId } from '@/types/brand'
+import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
 describe('EditorStore', () => {
   beforeEach(() => {
     // Reset store before each test
     useEditorStore.setState({
       selectedObjects: [],
-      sceneObjects: new Map<string, any>(),
+      sceneObjects: new Map(),
       gridSnapEnabled: false,
       transformMode: 'translate',
       coordinateSpace: 'world',
-      layers: [{ id: 'default', name: 'Default', visible: true, locked: false, color: '#ffffff' }],
-      activeLayer: 'default',
+      layers: [
+        { id: LayerId('default'), name: 'Default', visible: true, locked: false, color: '#ffffff' },
+      ],
+      activeLayer: LayerId('default'),
       undoHistory: [],
       redoHistory: [],
       showGrid: true,
@@ -200,6 +203,58 @@ describe('EditorStore', () => {
       expect(obj?.material?.metallic).toBe(0.8)
       expect(obj?.material?.roughness).toBe(0.2)
       expect(obj?.material?.texture).toBe('metal_texture.png')
+    })
+  })
+
+  // T77b: bulk-restore boundary robustness. `loadFromLocalStorage`
+  // rebuilds `sceneObjects` from a raw JSON snapshot; a single
+  // malformed id must not destroy the whole restore — it should be
+  // filtered out (with a warning) while every valid entry round-trips.
+  describe('Autosave boundary robustness (T77b)', () => {
+    afterEach(() => localStorage.removeItem('morgan-bevy.autosave'))
+
+    it('skips a malformed object id in a restored autosave and keeps the valid one', () => {
+      const validId = 'valid-obj-1'
+      const malformedId = 'bad id with space'
+      const validEntry = {
+        id: validId,
+        name: 'Good Object',
+        type: 'mesh',
+        position: [1, 2, 3],
+        rotation: [0, 0, 0],
+        scale: [1, 1, 1],
+        visible: true,
+        locked: false,
+        layerId: 'default',
+        children: [],
+        meshType: 'cube',
+      }
+      const malformedEntry = { ...validEntry, id: malformedId, name: 'Bad Object' }
+
+      localStorage.setItem(
+        'morgan-bevy.autosave',
+        JSON.stringify({
+          gridData: [],
+          selectedTheme: null,
+          sceneObjects: [
+            [validId, validEntry],
+            [malformedId, malformedEntry],
+          ],
+          viewportMode: '3d',
+          timestamp: new Date().toISOString(),
+        })
+      )
+
+      const loaded = useEditorStore.getState().loadFromLocalStorage()
+      expect(loaded).toBe(true)
+
+      const state = useEditorStore.getState()
+      // The malformed id (contains spaces) is dropped; the valid one
+      // round-trips intact.
+      expect(state.sceneObjects.size).toBe(1)
+      const restored = state.sceneObjects.get(ObjectId(validId))
+      expect(restored?.name).toBe('Good Object')
+      expect(state.sceneObjects.has(ObjectId(malformedId))).toBe(false)
     })
   })
 })

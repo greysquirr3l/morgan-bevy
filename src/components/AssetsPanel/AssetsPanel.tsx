@@ -22,6 +22,19 @@ interface AssetFile {
   last_modified: number
 }
 
+/**
+ * `window.__TAURI__` is injected by the Tauri webview shell at
+ * runtime; it isn't part of the DOM lib types. Narrowed here instead
+ * of `as any` so the check stays a real (if minimal) type.
+ */
+interface TauriWindow extends Window {
+  __TAURI__?: unknown
+}
+
+function isTauriRuntime(): boolean {
+  return typeof window !== 'undefined' && Boolean((window as TauriWindow).__TAURI__)
+}
+
 export default function AssetsPanel() {
   const [isCollapsed, setIsCollapsed] = useState(false)
   const [currentFolder, setCurrentFolder] = useState<string>('Assets')
@@ -38,7 +51,7 @@ export default function AssetsPanel() {
       setError(null)
       
       // Check if we're running in Tauri context
-      if (typeof window === 'undefined' || !(window as any).__TAURI__) {
+      if (!isTauriRuntime()) {
         throw new Error('Not running in Tauri context')
       }
       
@@ -85,7 +98,7 @@ export default function AssetsPanel() {
       setError(null)
       
       // Check if we're running in Tauri context
-      if (typeof window === 'undefined' || !(window as any).__TAURI__) {
+      if (!isTauriRuntime()) {
         throw new Error('Folder browsing only available in Tauri desktop app')
       }
       

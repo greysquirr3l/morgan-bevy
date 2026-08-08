@@ -1,4 +1,5 @@
 import { useEditorStore } from '@/store/editorStore'
+import type { ObjectId } from '@/types/brand'
 import {
   Box,
   Circle,
@@ -42,10 +43,10 @@ export default function Hierarchy({ hideHeader = false }: HierarchyProps) {
     }))
   )
   const [searchTerm, setSearchTerm] = useState('')
-  const [renamingId, setRenamingId] = useState<string | null>(null)
+  const [renamingId, setRenamingId] = useState<ObjectId | null>(null)
   const [renameValue, setRenameValue] = useState('')
 
-  const handleObjectClick = (id: string, event: React.MouseEvent) => {
+  const handleObjectClick = (id: ObjectId, event: React.MouseEvent) => {
     if (event.ctrlKey || event.metaKey) {
       // Add to selection
       if (selectedObjects.includes(id)) {
@@ -59,13 +60,13 @@ export default function Hierarchy({ hideHeader = false }: HierarchyProps) {
     }
   }
 
-  const handleObjectDoubleClick = (id: string) => {
+  const handleObjectDoubleClick = (id: ObjectId) => {
     // Start rename mode
     setRenamingId(id)
     setRenameValue(sceneObjects.get(id)?.name || '')
   }
 
-  const handleRenameComplete = (id: string) => {
+  const handleRenameComplete = (id: ObjectId) => {
     if (renameValue.trim()) {
       updateObjectName(id, renameValue.trim())
     }
@@ -78,7 +79,7 @@ export default function Hierarchy({ hideHeader = false }: HierarchyProps) {
     setRenameValue('')
   }
 
-  const toggleObjectVisibility = (id: string, event: React.MouseEvent) => {
+  const toggleObjectVisibility = (id: ObjectId, event: React.MouseEvent) => {
     event.stopPropagation()
     const obj = sceneObjects.get(id)
     if (obj) {
@@ -86,7 +87,7 @@ export default function Hierarchy({ hideHeader = false }: HierarchyProps) {
     }
   }
 
-  const toggleObjectLock = (id: string, event: React.MouseEvent) => {
+  const toggleObjectLock = (id: ObjectId, event: React.MouseEvent) => {
     event.stopPropagation()
     const obj = sceneObjects.get(id)
     if (obj) {
@@ -176,7 +177,7 @@ export default function Hierarchy({ hideHeader = false }: HierarchyProps) {
   }
 
   // Filter objects based on search term
-  const filteredObjects = Object.values(sceneObjects).filter((obj: any) =>
+  const filteredObjects = Array.from(sceneObjects.values()).filter(obj =>
     obj.name.toLowerCase().includes(searchTerm.toLowerCase())
   )
 
@@ -202,7 +203,7 @@ export default function Hierarchy({ hideHeader = false }: HierarchyProps) {
           <div className="flex items-center space-x-3">
             <div className="flex items-center space-x-1">
               <Package className="w-4 h-4" />
-              <span>{Object.keys(sceneObjects).length}</span>
+              <span>{sceneObjects.size}</span>
             </div>
             {selectedObjects.length > 0 && (
               <div className="flex items-center space-x-1">

@@ -2,19 +2,20 @@ import { useRef, useEffect } from 'react'
 import { TransformControls } from '@react-three/drei'
 import { useThree } from '@react-three/fiber'
 import { useEditorStore } from '@/store/editorStore'
+import type { ObjectId } from '@/types/brand'
 import { TransformCommand } from '@/utils/commands'
 import * as THREE from 'three'
 
 interface TransformGizmosProps {
-  selectedObjects: string[]
+  selectedObjects: ObjectId[]
 }
 
 export default function TransformGizmos({ selectedObjects }: TransformGizmosProps) {
-  const { 
-    transformMode, 
-    snapToGrid, 
-    gridSize, 
-    sceneObjects, 
+  const {
+    transformMode,
+    snapToGrid,
+    gridSize,
+    sceneObjects,
     updateObjectTransform,
     executeCommand
   } = useEditorStore()
@@ -23,7 +24,7 @@ export default function TransformGizmos({ selectedObjects }: TransformGizmosProp
   const groupRef = useRef<THREE.Group>(new THREE.Group())
 
   // Track initial transforms for undo/redo
-  const initialTransforms = useRef<Record<string, any>>({})
+  const initialTransforms = useRef<Record<ObjectId, any>>({})
 
   useEffect(() => {
     if (!transformRef.current || selectedObjects.length === 0) return

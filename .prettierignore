@@ -1,0 +1,7 @@
+# PROGRESS.md contains wide tables whose Notes column holds long prose.
+# Prettier pads every cell to the width of the widest cell in its column,
+# which blew the delimiter rows out to ~3,400 characters and made the file
+# unreadable in a diff. The tables are kept hand-compacted (single-space
+# cells, `---` delimiters) instead. The repo's own format scripts glob only
+# `src/**`, so this only guards against a manual whole-repo prettier run.
+PROGRESS.md

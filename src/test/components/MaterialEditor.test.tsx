@@ -26,6 +26,7 @@ vi.mock('lucide-react', () => ({
 }))
 
 import MaterialEditor from '../../components/MaterialEditor'
+import { ObjectId } from '../../types/brand'
 
 describe('MaterialEditor', () => {
   const mockOnMaterialChange = vi.fn()
@@ -41,13 +42,13 @@ describe('MaterialEditor', () => {
     })
 
     it('should show collapsed state when objects are selected', () => {
-      render(<MaterialEditor selectedObjects={['obj1']} onMaterialChange={mockOnMaterialChange} />)
+      render(<MaterialEditor selectedObjects={[ObjectId('obj1')]} onMaterialChange={mockOnMaterialChange} />)
       expect(screen.getByText('Material')).toBeInTheDocument()
       expect(screen.getByText('1 object')).toBeInTheDocument()
     })
 
     it('should expand when header is clicked', () => {
-      render(<MaterialEditor selectedObjects={['obj1']} onMaterialChange={mockOnMaterialChange} />)
+      render(<MaterialEditor selectedObjects={[ObjectId('obj1')]} onMaterialChange={mockOnMaterialChange} />)
       
       const header = screen.getByText('Material').closest('div')
       fireEvent.click(header!)
@@ -58,7 +59,7 @@ describe('MaterialEditor', () => {
 
   describe('Material Properties', () => {
     beforeEach(() => {
-      render(<MaterialEditor selectedObjects={['obj1']} onMaterialChange={mockOnMaterialChange} />)
+      render(<MaterialEditor selectedObjects={[ObjectId('obj1')]} onMaterialChange={mockOnMaterialChange} />)
       const header = screen.getByText('Material').closest('div')
       fireEvent.click(header!)
     })
@@ -115,7 +116,7 @@ describe('MaterialEditor', () => {
 
   describe('Material Presets', () => {
     beforeEach(() => {
-      render(<MaterialEditor selectedObjects={['obj1']} onMaterialChange={mockOnMaterialChange} />)
+      render(<MaterialEditor selectedObjects={[ObjectId('obj1')]} onMaterialChange={mockOnMaterialChange} />)
       const header = screen.getByText('Material').closest('div')
       fireEvent.click(header!)
     })
@@ -149,14 +150,14 @@ describe('MaterialEditor', () => {
 
   describe('Multiple Objects', () => {
     it('should show correct count for multiple objects', () => {
-      render(<MaterialEditor selectedObjects={['obj1', 'obj2', 'obj3']} onMaterialChange={mockOnMaterialChange} />)
+      render(<MaterialEditor selectedObjects={[ObjectId('obj1'), ObjectId('obj2'), ObjectId('obj3')]} onMaterialChange={mockOnMaterialChange} />)
       expect(screen.getByText('3 objects')).toBeInTheDocument()
     })
   })
 
   describe('Apply Button', () => {
     it('should call onMaterialChange when apply button is clicked', () => {
-      render(<MaterialEditor selectedObjects={['obj1']} onMaterialChange={mockOnMaterialChange} />)
+      render(<MaterialEditor selectedObjects={[ObjectId('obj1')]} onMaterialChange={mockOnMaterialChange} />)
       const header = screen.getByText('Material').closest('div')
       fireEvent.click(header!)
       

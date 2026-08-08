@@ -1,7 +1,8 @@
 import { Mesh, BoxGeometry, MeshStandardMaterial } from 'three'
 import { useRef, useMemo } from 'react'
 import { useEditorStore } from '@/store/editorStore'
-import { 
+import type { ObjectId } from '@/types/brand'
+import {
   LODSphereGeometry, 
   LODBoxGeometry, 
   LODConeGeometry,
@@ -43,8 +44,8 @@ function OptimizedSceneObject({
   visible,
   material,
   importance = 0.5 
-}: { 
-  id: string
+}: {
+  id: ObjectId
   meshType: 'cube' | 'sphere' | 'pyramid'
   position: [number, number, number]
   rotation: [number, number, number]
@@ -60,26 +61,26 @@ function OptimizedSceneObject({
 }) {
   const meshRef = useRef<Mesh>(null)
   const { selectedObjects, setSelectedObjects, addToSelection, hoveredObject, setHoveredObject } = useEditorStore()
-  
+
   const isSelected = selectedObjects.includes(id)
   const isHovered = hoveredObject === id
-  
+
   // Performance culling - check if object should render
   const { shouldRender, lodLevel } = usePerformanceCulling(
-    position, 
-    scale, 
+    position,
+    scale,
     importance > 0.8 ? 200 : 100 // Important objects render at greater distances
   )
-  
+
   // Early return if culled
   if (!visible || !shouldRender) return null
-  
+
   const handleClick = (e: any) => {
     e.stopPropagation()
-    
+
     if (e.shiftKey || e.ctrlKey || e.metaKey) {
       if (isSelected) {
-        setSelectedObjects(selectedObjects.filter((objId: string) => objId !== id))
+        setSelectedObjects(selectedObjects.filter(objId => objId !== id))
       } else {
         addToSelection(id)
       }
@@ -165,7 +166,7 @@ export default function OptimizedScene() {
   
   // Convert scene objects to performance objects
   const performanceObjects: PerformanceObject[] = useMemo(() => {
-    return Object.values(sceneObjects).map((obj: any) => {
+    return Array.from(sceneObjects.values()).map(obj => {
       if (obj.type !== 'mesh' || !obj.meshType) return null
       
       // Calculate importance based on selection, layer, and user interaction

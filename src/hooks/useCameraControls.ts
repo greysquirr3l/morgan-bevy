@@ -34,7 +34,7 @@ export const useCameraControls = () => {
     const box = new THREE.Box3()
     const sphere = new THREE.Sphere()
 
-    selectedObjects.forEach((id: string) => {
+    selectedObjects.forEach(id => {
       const obj = sceneObjects.get(id)
       if (obj) {
         const center = new THREE.Vector3(...obj.position)
@@ -71,7 +71,7 @@ export const useCameraControls = () => {
     const sphere = new THREE.Sphere()
     let hasObjects = false
 
-    Object.values(sceneObjects).forEach((obj: any) => {
+    sceneObjects.forEach(obj => {
       if (obj.type === 'mesh' && obj.visible) {
         const center = new THREE.Vector3(...obj.position)
         const size = new THREE.Vector3(...obj.scale)

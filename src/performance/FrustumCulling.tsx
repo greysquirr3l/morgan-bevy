@@ -1,6 +1,6 @@
 import { useThree, useFrame } from '@react-three/fiber'
 import { useRef, useState, useMemo } from 'react'
-import { Vector3, Frustum, Matrix4, Box3 } from 'three'
+import { Vector3, Frustum, Matrix4, Box3, Sphere } from 'three'
 
 // Hook for frustum culling - determines if objects are visible to camera
 export function useFrustumCulling(
@@ -11,15 +11,25 @@ export function useFrustumCulling(
   const { camera } = useThree()
   const frameCount = useRef(0)
   const [isVisible, setIsVisible] = useState(true)
-  
+  // Shadows `isVisible` so the frame loop can compare against the
+  // last-committed value without depending on the state closure —
+  // `setIsVisible` only fires when the answer actually flips, so a
+  // steady-state object (in or out of frustum for hundreds of
+  // frames) doesn't force a re-render every `updateFrequency` frames.
+  const isVisibleRef = useRef(true)
+
   // Cache frustum and matrix computations
   const frustum = useMemo(() => new Frustum(), [])
   const cameraMatrix = useMemo(() => new Matrix4(), [])
   const positionVector = useMemo(() => new Vector3(...position), [position])
+  const boundingSphere = useMemo(
+    () => new Sphere(positionVector, boundingRadius),
+    [positionVector, boundingRadius]
+  )
 
   useFrame(() => {
     frameCount.current++
-    
+
     // Only update culling every N frames to reduce performance impact
     if (frameCount.current % updateFrequency !== 0) {
       return
@@ -28,10 +38,13 @@ export function useFrustumCulling(
     // Update camera frustum
     cameraMatrix.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse)
     frustum.setFromProjectionMatrix(cameraMatrix)
-    
+
     // Check if object's bounding sphere intersects with frustum
-    const visible = frustum.intersectsSphere({ center: positionVector, radius: boundingRadius } as any)
-    setIsVisible(visible)
+    const visible = frustum.intersectsSphere(boundingSphere)
+    if (visible !== isVisibleRef.current) {
+      isVisibleRef.current = visible
+      setIsVisible(visible)
+    }
   })
 
   return isVisible
@@ -46,7 +59,8 @@ export function useBoundingBoxCulling(
   const { camera } = useThree()
   const frameCount = useRef(0)
   const [isVisible, setIsVisible] = useState(true)
-  
+  const isVisibleRef = useRef(true)
+
   // Cache computations
   const frustum = useMemo(() => new Frustum(), [])
   const cameraMatrix = useMemo(() => new Matrix4(), [])
@@ -60,7 +74,7 @@ export function useBoundingBoxCulling(
 
   useFrame(() => {
     frameCount.current++
-    
+
     if (frameCount.current % updateFrequency !== 0) {
       return
     }
@@ -68,15 +82,18 @@ export function useBoundingBoxCulling(
     // Update camera frustum
     cameraMatrix.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse)
     frustum.setFromProjectionMatrix(cameraMatrix)
-    
+
     // Update bounding box position
     const center = new Vector3(...position)
     const halfSize = new Vector3(...size).multiplyScalar(0.5)
     boundingBox.setFromCenterAndSize(center, halfSize.multiplyScalar(2))
-    
+
     // Check if bounding box intersects with frustum
     const visible = frustum.intersectsBox(boundingBox)
-    setIsVisible(visible)
+    if (visible !== isVisibleRef.current) {
+      isVisibleRef.current = visible
+      setIsVisible(visible)
+    }
   })
 
   return isVisible
@@ -88,7 +105,7 @@ export function usePerformanceCulling(
   size: [number, number, number] = [1, 1, 1],
   maxDistance: number = 100,
   updateFrequency: number = 8
-): { 
+): {
   isVisible: boolean
   lodLevel: number
   shouldRender: boolean
@@ -100,7 +117,10 @@ export function usePerformanceCulling(
     lodLevel: 0,
     shouldRender: true
   })
-  
+  // Mirrors `cullState` for cheap equality checks in the frame loop —
+  // see `useFrustumCulling` above for why this matters.
+  const cullStateRef = useRef(cullState)
+
   // Cache computations
   const frustum = useMemo(() => new Frustum(), [])
   const cameraMatrix = useMemo(() => new Matrix4(), [])
@@ -115,7 +135,7 @@ export function usePerformanceCulling(
 
   useFrame(() => {
     frameCount.current++
-    
+
     if (frameCount.current % updateFrequency !== 0) {
       return
     }
@@ -123,32 +143,37 @@ export function usePerformanceCulling(
     // Update camera frustum
     cameraMatrix.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse)
     frustum.setFromProjectionMatrix(cameraMatrix)
-    
+
     // Update bounding box position
     const center = new Vector3(...position)
     const halfSize = new Vector3(...size).multiplyScalar(0.5)
     boundingBox.setFromCenterAndSize(center, halfSize.multiplyScalar(2))
-    
+
     // Check frustum culling
     const isInFrustum = frustum.intersectsBox(boundingBox)
-    
+
     // Calculate distance-based LOD
     const distance = camera.position.distanceTo(positionVector)
     let lodLevel = 0
-    
+
     if (distance > 50) lodLevel = 3      // Very low detail
     else if (distance > 25) lodLevel = 2 // Low detail
     else if (distance > 10) lodLevel = 1 // Medium detail
     else lodLevel = 0                    // High detail
-    
+
     // Determine if object should render at all
     const shouldRender = isInFrustum && distance <= maxDistance
-    
-    setCullState({
-      isVisible: isInFrustum,
-      lodLevel,
-      shouldRender
-    })
+
+    const prev = cullStateRef.current
+    if (
+      prev.isVisible !== isInFrustum ||
+      prev.lodLevel !== lodLevel ||
+      prev.shouldRender !== shouldRender
+    ) {
+      const next = { isVisible: isInFrustum, lodLevel, shouldRender }
+      cullStateRef.current = next
+      setCullState(next)
+    }
   })
 
   return cullState

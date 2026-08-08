@@ -16,6 +16,7 @@
  */
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { useEditorStore } from '../store/editorStore'
+import { LayerId, ObjectId, PrefabId } from '../types/brand'
 import {
   applyBreakPrefab,
   breakPrefabOnObjects,
@@ -40,13 +41,13 @@ function samplePrefab(overrides: Partial<Prefab> = {}): Prefab {
     scale: [1, 1, 1],
     visible: true,
     locked: false,
-    layerId: 'default',
+    layerId: LayerId('default'),
     children: [],
     meshType: 'cube',
     material: { baseColor: '#ff0000', metallic: 0, roughness: 0.5 },
   }
   return {
-    id: 'prefab_test_1',
+    id: PrefabId('prefab_test_1'),
     name: 'Test',
     objects: [obj],
     createdAt: '2026-01-01T00:00:00.000Z',
@@ -82,17 +83,20 @@ describe('prefab localStorage', () => {
   })
 
   it('savePrefab appends; deleting by id removes; saving again replaces', () => {
-    const p1 = samplePrefab({ id: 'p1', name: 'P1' })
-    const p2 = samplePrefab({ id: 'p2', name: 'P2' })
+    // Ids must be at least 4 chars to satisfy `ID_PATTERN` — `loadPrefabs`
+    // validates each entry's `id` with `isValidIdString` as a boundary
+    // check, so a too-short id would be silently (and correctly) dropped.
+    const p1 = samplePrefab({ id: PrefabId('pfb-1'), name: 'P1' })
+    const p2 = samplePrefab({ id: PrefabId('pfb-2'), name: 'P2' })
     savePrefab(p1)
     savePrefab(p2)
     expect(loadPrefabs()).toHaveLength(2)
 
     const updated = savePrefab({ ...p1, name: 'P1-renamed' })
     expect(updated).toHaveLength(2)
-    expect(updated.find(p => p.id === 'p1')?.name).toBe('P1-renamed')
+    expect(updated.find(p => p.id === 'pfb-1')?.name).toBe('P1-renamed')
 
-    const remaining = deletePrefabById('p2')
+    const remaining = deletePrefabById(PrefabId('pfb-2'))
     expect(remaining).toHaveLength(1)
     expect(loadPrefabs()).toHaveLength(1)
   })
@@ -103,9 +107,9 @@ describe('buildPrefabFromSelection', () => {
     useEditorStore.setState({
       sceneObjects: new Map([
         [
-          'a',
+          ObjectId('a'),
           {
-            id: 'a',
+            id: ObjectId('a'),
             name: 'Cube_A',
             type: 'mesh',
             position: [0, 0, 0],
@@ -113,16 +117,16 @@ describe('buildPrefabFromSelection', () => {
             scale: [1, 1, 1],
             visible: true,
             locked: false,
-            layerId: 'default',
+            layerId: LayerId('default'),
             children: [],
             meshType: 'cube',
             material: { baseColor: '#aabbcc', metallic: 0.2, roughness: 0.4 },
           },
         ],
         [
-          'b',
+          ObjectId('b'),
           {
-            id: 'b',
+            id: ObjectId('b'),
             name: 'Sphere_B',
             type: 'mesh',
             position: [4, 0, 0],
@@ -130,7 +134,7 @@ describe('buildPrefabFromSelection', () => {
             scale: [1, 1, 1],
             visible: true,
             locked: false,
-            layerId: 'walls',
+            layerId: LayerId('walls'),
             children: [],
             meshType: 'sphere',
           },
@@ -145,7 +149,7 @@ describe('buildPrefabFromSelection', () => {
 
   it('strips ids and parentIds, copies position / material', () => {
     const prefab = buildPrefabFromSelection(
-      ['a', 'b'],
+      [ObjectId('a'), ObjectId('b')],
       useEditorStore.getState().sceneObjects,
       'Wall-Piece'
     )!
@@ -158,7 +162,11 @@ describe('buildPrefabFromSelection', () => {
   })
 
   it('sets name + ISO timestamp on the prefab', () => {
-    const prefab = buildPrefabFromSelection(['a'], useEditorStore.getState().sceneObjects, 'X')!
+    const prefab = buildPrefabFromSelection(
+      [ObjectId('a')],
+      useEditorStore.getState().sceneObjects,
+      'X'
+    )!
     expect(prefab.name).toBe('X')
     expect(() => new Date(prefab.createdAt).toISOString()).not.toThrow()
   })

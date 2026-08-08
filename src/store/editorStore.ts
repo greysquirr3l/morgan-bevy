@@ -1,11 +1,21 @@
+import { deserializeMap, serializeMap } from '@/store/mapSerialization'
+import { AssetId, isObjectId, LayerId, MaterialId, ObjectId, PrefabId } from '@/types/brand'
 import type { Command } from '@/utils/commands'
-import { enableMapSet } from 'immer'
+import { enableMapSet, setAutoFreeze } from 'immer'
 import { create } from 'zustand'
 import { immer } from 'zustand/middleware/immer'
 
 // Required for `state.sceneObjects.set(...)` / `.delete(...)` to work
 // inside immer producers. Maps and Sets are not native to immer drafts.
 enableMapSet()
+
+// T79: explicit, rather than relying on immer's default. Every
+// `set(state => ...)` producer's output (and everything reachable
+// from it — individual `SceneObject`s, `Map` entries) is frozen, so
+// a stale reference held by an undo command (or a component that
+// forgot to reselect) throws on mutation instead of silently
+// corrupting state that other subscribers still see as "current."
+setAutoFreeze(true)
 
 // Simple debug logger for store operations
 class StoreDebugLogger {
@@ -31,14 +41,96 @@ class StoreDebugLogger {
   }
 }
 
+/**
+ * A single object in the editor's scene graph. Extracted from the
+ * store's `sceneObjects` map value type (T77b) so consumers can name
+ * the shape directly instead of relying on structural inference.
+ */
+export interface SceneObject {
+  id: ObjectId
+  name: string
+  type: 'mesh' | 'light' | 'group'
+  position: [number, number, number]
+  rotation: [number, number, number]
+  scale: [number, number, number]
+  visible: boolean
+  locked: boolean
+  layerId: LayerId
+  parentId?: ObjectId
+  children: ObjectId[]
+  meshType?: 'cube' | 'sphere' | 'pyramid' // For primitive shapes
+  material?: {
+    baseColor: string
+    metallic: number
+    roughness: number
+    emissive?: string
+    emissiveIntensity?: number
+    texture?: string
+  }
+  // T18: link to a named MaterialPreset. When set, the
+  // object's resolved material is `preset + overrides`. When
+  // null, the `material` field is the source of truth.
+  materialPresetId?: MaterialId
+  materialOverrides?: {
+    baseColor?: string
+    metallic?: number
+    roughness?: number
+    emissive?: string
+    emissiveIntensity?: number
+    texture?: string
+  }
+  // T19: when set, this object is a prefab instance. The id is the
+  // source `Prefab.id`; clearing it (via `breakPrefab` in
+  // src/utils/prefabs.ts) severs the link so future edits to the
+  // source prefab don't propagate.
+  prefabInstanceId?: PrefabId
+  collision?: boolean
+  walkable?: boolean
+  tags?: string[]
+  metadata?: any // Allow for flexible metadata including gridPosition, tileType, etc.
+}
+
+/**
+ * A single tile's rendering + gameplay data within a grid theme
+ * (T24/T26). Mirrors the Rust-side tile definition surfaced by the
+ * `list_themes` / `get_theme` Tauri commands. The index signatures
+ * accept fields this store doesn't interpret itself (GridView and
+ * App's grid-to-scene sync read them) without falling back to `any`.
+ */
+export interface TileMeshDefinition {
+  tile_type?: string
+  name?: string
+  description?: string
+  visual: {
+    icon: string
+    color: string
+    background_color?: string | null
+  }
+  mesh: {
+    mesh_type?: string
+  }
+  collision?: boolean
+  walkable?: boolean
+  tags?: string[]
+}
+
+/** A grid theme: the palette of tiles GridView paints with (T24). */
+export interface SelectedTheme {
+  id: string
+  name?: string
+  description?: string
+  tiles: Record<string, TileMeshDefinition>
+  [key: string]: unknown
+}
+
 export interface EditorState {
   // Selection
-  selectedObjects: string[]
-  hoveredObject: string | null
+  selectedObjects: ObjectId[]
+  hoveredObject: ObjectId | null
 
   // Grid data for 2D/3D sync
   gridData: string[][]
-  selectedTheme: any | null
+  selectedTheme: SelectedTheme | null
 
   // Transform
   transformMode: 'select' | 'translate' | 'rotate' | 'scale'
@@ -54,9 +146,9 @@ export interface EditorState {
   cameraMode: 'orbit' | 'fly' | 'orthographic'
 
   // Layers
-  activeLayer: string
+  activeLayer: LayerId
   layers: Array<{
-    id: string
+    id: LayerId
     name: string
     visible: boolean
     locked: boolean
@@ -67,52 +159,7 @@ export interface EditorState {
   // (vs `Record`, where `delete` deoptimises V8's hidden class). Components
   // that need a plain `Record` view should use the `useSceneObjectsRecord`
   // selector below.
-  sceneObjects: Map<
-    string,
-    {
-      id: string
-      name: string
-      type: 'mesh' | 'light' | 'group'
-      position: [number, number, number]
-      rotation: [number, number, number]
-      scale: [number, number, number]
-      visible: boolean
-      locked: boolean
-      layerId: string
-      parentId?: string
-      children: string[]
-      meshType?: 'cube' | 'sphere' | 'pyramid' // For primitive shapes
-      material?: {
-        baseColor: string
-        metallic: number
-        roughness: number
-        emissive?: string
-        emissiveIntensity?: number
-        texture?: string
-      }
-      // T18: link to a named MaterialPreset. When set, the
-      // object's resolved material is `preset + overrides`. When
-      // null, the `material` field is the source of truth.
-      materialPresetId?: string
-      materialOverrides?: {
-        baseColor?: string
-        metallic?: number
-        roughness?: number
-        emissive?: string
-        emissiveIntensity?: number
-        texture?: string
-      }
-      // T19: when set, this object is a prefab instance. The
-      // string is the source `Prefab.id`; clearing it (via
-      // `breakPrefab` in src/utils/prefabs.ts) severs the link
-      // so future edits to the source prefab don't propagate.
-      prefabInstanceId?: string
-      collision?: boolean
-      walkable?: boolean
-      tags?: string[]
-      metadata?: any // Allow for flexible metadata including gridPosition, tileType, etc.
-    }
-  >
+  sceneObjects: Map<ObjectId, SceneObject>
 
   // UI state
   showGrid: boolean
@@ -124,7 +171,7 @@ export interface EditorState {
   // list of asset IDs the most-recent project file referenced that
   // the asset database could not resolve; rendered as a banner / badge.
   currentProjectPath: string | null
-  missingAssetRefs: string[]
+  missingAssetRefs: AssetId[]
 
   // T55: lighting rig. `setLights` writes the entire array in one
   // call (used by the auto-placement helper); per-light edits go
@@ -147,11 +194,11 @@ export interface EditorState {
   maxHistorySize: number
 
   // Actions
-  setSelectedObjects: (ids: string[]) => void
-  addToSelection: (id: string) => void
-  removeFromSelection: (id: string) => void
+  setSelectedObjects: (ids: ObjectId[]) => void
+  addToSelection: (id: ObjectId) => void
+  removeFromSelection: (id: ObjectId) => void
   clearSelection: () => void
-  setHoveredObject: (id: string | null) => void
+  setHoveredObject: (id: ObjectId | null) => void
   setTransformMode: (mode: 'select' | 'translate' | 'rotate' | 'scale') => void
   toggleCoordinateSpace: () => void
   toggleGridSnap: () => void
@@ -160,13 +207,13 @@ export interface EditorState {
   setViewportMode: (mode: '3d' | '2d') => void
   setCameraMode: (mode: 'orbit' | 'fly' | 'orthographic') => void
   setGridData: (data: string[][]) => void
-  setSelectedTheme: (theme: any) => void
+  setSelectedTheme: (theme: SelectedTheme | null) => void
   toggleGrid: () => void
   toggleStats: () => void
 
   // Project file (T20)
   setCurrentProjectPath: (path: string | null) => void
-  setMissingAssetRefs: (ids: string[]) => void
+  setMissingAssetRefs: (ids: AssetId[]) => void
 
   // Lighting (T55)
   setLights: (
@@ -209,39 +256,43 @@ export interface EditorState {
   ) => void
 
   // Object management
-  addObject: (type: 'cube' | 'sphere' | 'pyramid', position?: [number, number, number]) => string
+  addObject: (type: 'cube' | 'sphere' | 'pyramid', position?: [number, number, number]) => ObjectId
   addObjectDirect: (objectData: any) => void
-  removeObject: (id: string) => void
-  duplicateObjects: (ids: string[]) => string[]
+  removeObject: (id: ObjectId) => void
+  duplicateObjects: (ids: ObjectId[]) => ObjectId[]
   updateObjectTransform: (
-    id: string,
+    id: ObjectId,
     transform: Partial<{
       position: [number, number, number]
       rotation: [number, number, number]
       scale: [number, number, number]
     }>
   ) => void
-  updateObjectName: (id: string, name: string) => void
-  updateObjectVisibility: (id: string, visible: boolean) => void
-  updateObjectLock: (id: string, locked: boolean) => void
+  updateObjectName: (id: ObjectId, name: string) => void
+  updateObjectVisibility: (id: ObjectId, visible: boolean) => void
+  updateObjectLock: (id: ObjectId, locked: boolean) => void
   updateObjectMaterial: (
-    id: string,
+    id: ObjectId,
     material: { baseColor: string; metallic: number; roughness: number; texture?: string }
   ) => void
   // T18: bind a scene object to a material preset. The object's
   // resolved material = preset + overrides. Pass an empty
   // overrides object to start fresh.
-  linkObjectToPreset: (id: string, presetId: string, overrides: Record<string, unknown>) => void
+  linkObjectToPreset: (
+    id: ObjectId,
+    presetId: MaterialId,
+    overrides: Record<string, unknown>
+  ) => void
   // T18: unlink an object from its preset, copying the currently
   // effective material into the object's `material` field.
-  unlinkObjectFromPreset: (id: string) => void
-  updateObjectMesh: (id: string, meshType: 'cube' | 'sphere' | 'pyramid') => void
+  unlinkObjectFromPreset: (id: ObjectId) => void
+  updateObjectMesh: (id: ObjectId, meshType: 'cube' | 'sphere' | 'pyramid') => void
   updateObjectProperties: (
-    id: string,
+    id: ObjectId,
     properties: { collision?: boolean; walkable?: boolean; tags?: string[]; metadata?: any }
   ) => void
-  groupObjects: (ids: string[]) => string
-  ungroupObject: (groupId: string) => void
+  groupObjects: (ids: ObjectId[]) => ObjectId
+  ungroupObject: (groupId: ObjectId) => void
   clearScene: () => void
 
   // Undo/Redo system
@@ -262,10 +313,10 @@ export interface EditorState {
 export const useEditorStore = create<EditorState>()(
   immer(set => ({
     // Initial state
-    selectedObjects: [] as string[],
-    hoveredObject: null as string | null,
+    selectedObjects: [] as ObjectId[],
+    hoveredObject: null as ObjectId | null,
     gridData: [] as string[][],
-    selectedTheme: null as any | null,
+    selectedTheme: null as SelectedTheme | null,
     transformMode: 'select',
     coordinateSpace: 'world',
     gridSnapEnabled: true,
@@ -273,54 +324,15 @@ export const useEditorStore = create<EditorState>()(
     gridSize: 1.0,
     viewportMode: '3d' as '3d' | '2d',
     cameraMode: 'orbit',
-    activeLayer: 'default',
+    activeLayer: LayerId('default'),
     layers: [
-      { id: 'default', name: 'Default', visible: true, locked: false, color: '#ffffff' },
-      { id: 'walls', name: 'Walls', visible: true, locked: false, color: '#8b5cf6' },
-      { id: 'floors', name: 'Floors', visible: true, locked: false, color: '#10b981' },
-      { id: 'doors', name: 'Doors', visible: true, locked: false, color: '#f59e0b' },
-      { id: 'lights', name: 'Lights', visible: true, locked: false, color: '#fbbf24' },
+      { id: LayerId('default'), name: 'Default', visible: true, locked: false, color: '#ffffff' },
+      { id: LayerId('walls'), name: 'Walls', visible: true, locked: false, color: '#8b5cf6' },
+      { id: LayerId('floors'), name: 'Floors', visible: true, locked: false, color: '#10b981' },
+      { id: LayerId('doors'), name: 'Doors', visible: true, locked: false, color: '#f59e0b' },
+      { id: LayerId('lights'), name: 'Lights', visible: true, locked: false, color: '#fbbf24' },
     ],
-    sceneObjects: new Map<
-      string,
-      {
-        id: string
-        name: string
-        type: 'mesh' | 'light' | 'group'
-        position: [number, number, number]
-        rotation: [number, number, number]
-        scale: [number, number, number]
-        visible: boolean
-        locked: boolean
-        layerId: string
-        parentId?: string
-        children: string[]
-        meshType?: 'cube' | 'sphere' | 'pyramid'
-        material?: {
-          baseColor: string
-          metallic: number
-          roughness: number
-          emissive?: string
-          emissiveIntensity?: number
-          texture?: string
-        }
-        // T18: link to a named MaterialPreset. When set, the
-        // object's resolved material is `preset + overrides`. When
-        // null, the `material` field is the source of truth.
-        materialPresetId?: string
-        materialOverrides?: {
-          baseColor?: string
-          metallic?: number
-          roughness?: number
-          emissive?: string
-          emissiveIntensity?: number
-          texture?: string
-        }
-        collision?: boolean
-        walkable?: boolean
-        tags?: string[]
-      }
-    >(),
+    sceneObjects: new Map<ObjectId, SceneObject>(),
     showGrid: true,
     showStats: false,
 
@@ -334,7 +346,7 @@ export const useEditorStore = create<EditorState>()(
     // we cross-check the project's `metadata.assetRefs` against the
     // asset database and populate this list with the missing IDs.
     // Consumers can render a banner / badge off this state.
-    missingAssetRefs: [] as string[],
+    missingAssetRefs: [] as AssetId[],
 
     // T55: lighting. Stored as a `LightSource[]` so the auto-
     // placement helper can write the entire rig in one
@@ -358,19 +370,19 @@ export const useEditorStore = create<EditorState>()(
     maxHistorySize: 50,
 
     // Actions
-    setSelectedObjects: (ids: string[]) =>
+    setSelectedObjects: (ids: ObjectId[]) =>
       set(state => {
         state.selectedObjects = ids
       }),
 
-    addToSelection: (id: string) =>
+    addToSelection: (id: ObjectId) =>
       set(state => {
         if (!state.selectedObjects.includes(id)) {
           state.selectedObjects.push(id)
         }
       }),
 
-    removeFromSelection: (id: string) =>
+    removeFromSelection: (id: ObjectId) =>
       set(state => {
         state.selectedObjects = state.selectedObjects.filter(objId => objId !== id)
       }),
@@ -380,7 +392,7 @@ export const useEditorStore = create<EditorState>()(
         state.selectedObjects = []
       }),
 
-    setHoveredObject: (id: string | null) =>
+    setHoveredObject: (id: ObjectId | null) =>
       set(state => {
         state.hoveredObject = id
       }),
@@ -458,7 +470,7 @@ export const useEditorStore = create<EditorState>()(
         state.gridData = data
       }),
 
-    setSelectedTheme: (theme: any) =>
+    setSelectedTheme: (theme: SelectedTheme | null) =>
       set(state => {
         state.selectedTheme = theme
       }),
@@ -486,7 +498,7 @@ export const useEditorStore = create<EditorState>()(
         state.missingAssetRefs = []
       }),
 
-    setMissingAssetRefs: (ids: string[]) =>
+    setMissingAssetRefs: (ids: AssetId[]) =>
       set(state => {
         state.missingAssetRefs = ids
       }),
@@ -521,7 +533,10 @@ export const useEditorStore = create<EditorState>()(
       type: 'cube' | 'sphere' | 'pyramid',
       position = [0, 0, 0] as [number, number, number]
     ) => {
-      const id = `${type}_${Date.now()}`
+      // Generation site (not a boundary): the id is minted here, not
+      // parsed from untrusted input, so we use the plain constructor
+      // rather than `parseObjectId` (which would throw needlessly).
+      const id = ObjectId(`${type}_${Date.now()}`)
       set(state => {
         state.sceneObjects.set(id, {
           id,
@@ -601,15 +616,21 @@ export const useEditorStore = create<EditorState>()(
         state.viewportMode = '3d'
 
         // Reset to default layer
-        state.activeLayer = 'default'
+        state.activeLayer = LayerId('default')
 
         // Reset layers to default set
         state.layers = [
-          { id: 'default', name: 'Default', visible: true, locked: false, color: '#ffffff' },
-          { id: 'walls', name: 'Walls', visible: true, locked: false, color: '#8b5cf6' },
-          { id: 'floors', name: 'Floors', visible: true, locked: false, color: '#10b981' },
-          { id: 'doors', name: 'Doors', visible: true, locked: false, color: '#f59e0b' },
-          { id: 'lights', name: 'Lights', visible: true, locked: false, color: '#fbbf24' },
+          {
+            id: LayerId('default'),
+            name: 'Default',
+            visible: true,
+            locked: false,
+            color: '#ffffff',
+          },
+          { id: LayerId('walls'), name: 'Walls', visible: true, locked: false, color: '#8b5cf6' },
+          { id: LayerId('floors'), name: 'Floors', visible: true, locked: false, color: '#10b981' },
+          { id: LayerId('doors'), name: 'Doors', visible: true, locked: false, color: '#f59e0b' },
+          { id: LayerId('lights'), name: 'Lights', visible: true, locked: false, color: '#fbbf24' },
         ]
 
         // Clear undo/redo history
@@ -620,7 +641,7 @@ export const useEditorStore = create<EditorState>()(
       useEditorStore.getState().debouncedAutoSave()
     },
 
-    removeObject: (id: string) => {
+    removeObject: (id: ObjectId) => {
       set(state => {
         state.sceneObjects.delete(id)
         state.selectedObjects = state.selectedObjects.filter(objId => objId !== id)
@@ -629,13 +650,15 @@ export const useEditorStore = create<EditorState>()(
       useEditorStore.getState().debouncedAutoSave()
     },
 
-    duplicateObjects: (ids: string[]) => {
-      const newIds: string[] = []
+    duplicateObjects: (ids: ObjectId[]) => {
+      const newIds: ObjectId[] = []
       set(state => {
         ids.forEach(id => {
           const original = state.sceneObjects.get(id)
           if (original) {
-            const newId = `${original.name}_copy_${Date.now()}`
+            // Generation site: minted here, not parsed from
+            // untrusted input — use the plain constructor.
+            const newId = ObjectId(`${original.name}_copy_${Date.now()}`)
             state.sceneObjects.set(newId, {
               ...original,
               id: newId,
@@ -650,7 +673,7 @@ export const useEditorStore = create<EditorState>()(
     },
 
     updateObjectTransform: (
-      id: string,
+      id: ObjectId,
       transform: Partial<{
         position: [number, number, number]
         rotation: [number, number, number]
@@ -687,7 +710,7 @@ export const useEditorStore = create<EditorState>()(
         }
       }),
 
-    updateObjectName: (id: string, name: string) =>
+    updateObjectName: (id: ObjectId, name: string) =>
       set(state => {
         if (state.sceneObjects.has(id)) {
           const o = state.sceneObjects.get(id)
@@ -695,7 +718,7 @@ export const useEditorStore = create<EditorState>()(
         }
       }),
 
-    updateObjectVisibility: (id: string, visible: boolean) =>
+    updateObjectVisibility: (id: ObjectId, visible: boolean) =>
       set(state => {
         if (state.sceneObjects.has(id)) {
           const o = state.sceneObjects.get(id)
@@ -703,7 +726,7 @@ export const useEditorStore = create<EditorState>()(
         }
       }),
 
-    updateObjectLock: (id: string, locked: boolean) =>
+    updateObjectLock: (id: ObjectId, locked: boolean) =>
       set(state => {
         if (state.sceneObjects.has(id)) {
           const o = state.sceneObjects.get(id)
@@ -712,7 +735,7 @@ export const useEditorStore = create<EditorState>()(
       }),
 
     updateObjectMaterial: (
-      id: string,
+      id: ObjectId,
       material: { baseColor: string; metallic: number; roughness: number; texture?: string }
     ) =>
       set(state => {
@@ -725,7 +748,7 @@ export const useEditorStore = create<EditorState>()(
     // T18: link an object to a named preset. The object's resolved
     // material becomes preset + overrides; any prior material field
     // is retained for backward compatibility until the user unlinks.
-    linkObjectToPreset: (id: string, presetId: string, overrides: Record<string, unknown>) =>
+    linkObjectToPreset: (id: ObjectId, presetId: MaterialId, overrides: Record<string, unknown>) =>
       set(state => {
         if (state.sceneObjects.has(id)) {
           const o = state.sceneObjects.get(id)
@@ -743,7 +766,7 @@ export const useEditorStore = create<EditorState>()(
         }
       }),
 
-    unlinkObjectFromPreset: (id: string) =>
+    unlinkObjectFromPreset: (id: ObjectId) =>
       set(state => {
         if (state.sceneObjects.has(id)) {
           const o = state.sceneObjects.get(id)
@@ -754,7 +777,7 @@ export const useEditorStore = create<EditorState>()(
         }
       }),
 
-    updateObjectMesh: (id: string, meshType: 'cube' | 'sphere' | 'pyramid') =>
+    updateObjectMesh: (id: ObjectId, meshType: 'cube' | 'sphere' | 'pyramid') =>
       set(state => {
         if (state.sceneObjects.has(id)) {
           const o = state.sceneObjects.get(id)
@@ -766,7 +789,7 @@ export const useEditorStore = create<EditorState>()(
       }),
 
     updateObjectProperties: (
-      id: string,
+      id: ObjectId,
       properties: { collision?: boolean; walkable?: boolean; tags?: string[]; metadata?: any }
     ) =>
       set(state => {
@@ -794,8 +817,10 @@ export const useEditorStore = create<EditorState>()(
         }
       }),
 
-    groupObjects: (ids: string[]) => {
-      const groupId = `group_${Date.now()}`
+    groupObjects: (ids: ObjectId[]) => {
+      // Generation site: minted here, not parsed from untrusted
+      // input — use the plain constructor.
+      const groupId = ObjectId(`group_${Date.now()}`)
       set(state => {
         // Calculate center position of selected objects
         let centerX = 0,
@@ -844,7 +869,7 @@ export const useEditorStore = create<EditorState>()(
       return groupId
     },
 
-    ungroupObject: (groupId: string) =>
+    ungroupObject: (groupId: ObjectId) =>
       set(state => {
         const group = state.sceneObjects.get(groupId)
         if (group && group.type === 'group') {
@@ -924,7 +949,7 @@ export const useEditorStore = create<EditorState>()(
       const saveData = {
         gridData: state.gridData,
         selectedTheme: state.selectedTheme,
-        sceneObjects: Array.from(state.sceneObjects.entries()),
+        sceneObjects: serializeMap(state.sceneObjects),
         viewportMode: state.viewportMode,
         timestamp: new Date().toISOString(),
       }
@@ -963,15 +988,14 @@ export const useEditorStore = create<EditorState>()(
             }
             if (saveData.sceneObjects) {
               // Backwards-compat: a previous version may have stored
-              // sceneObjects as a Record<string, T>. New versions store
-              // it as an Array<[id, T]> (Map entries). Detect by shape.
-              if (Array.isArray(saveData.sceneObjects)) {
-                state.sceneObjects = new Map(saveData.sceneObjects)
-              } else if (typeof saveData.sceneObjects === 'object') {
-                state.sceneObjects = new Map(Object.entries(saveData.sceneObjects))
-              } else {
-                state.sceneObjects = new Map()
-              }
+              // sceneObjects as a Record<string, T>; new versions store
+              // Array<[id, T]> (Map entries). `deserializeMap` normalizes
+              // both shapes and drops (rather than throws on) any entry
+              // whose id fails validation.
+              state.sceneObjects = deserializeMap<ObjectId, SceneObject>(
+                saveData.sceneObjects,
+                isObjectId
+              )
             }
             if (saveData.viewportMode) {
               state.viewportMode = saveData.viewportMode
@@ -1018,6 +1042,6 @@ export const useEditorStore = create<EditorState>()(
  * or `Object.keys(sceneObjects)` need to switch to `map.entries()` /
  * `Array.from(map.keys())`.
  */
-export function useSceneObjects(): Map<string, unknown> {
+export function useSceneObjects(): Map<ObjectId, SceneObject> {
   return useEditorStore(s => s.sceneObjects)
 }
