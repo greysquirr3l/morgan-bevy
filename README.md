@@ -124,6 +124,15 @@ tools** to enable rapid level design and iteration.
 - ✅ **Strict TypeScript** - `strict: true`, no `any`, zod-validated Tauri IPC
 - ✅ **Crash-safe** - Panic hook + rolling crash log + frontend error capture
 
+### 📚 User documentation
+
+- [Getting Started](docs/user/getting-started.md) — install, first scene, export in ten minutes.
+- [Features Reference](docs/user/features.md) — every major feature in one page.
+- [Markers](docs/user/markers.md) — the ten runtime markers + their Bevy-side mirrors.
+- [Bevy Integration](docs/user/bevy-integration.md) — how to wire the companion crate into a Bevy project.
+- [Export Formats](docs/user/export-formats.md) — Rust source, JSON, RON, GLTF, FBX wire shapes.
+- [Hello Bevy Tutorial](docs/user/hello-bevy.md) — generate → export → load in Bevy → Rapier collision → player spawn.
+
 ---
 
 ## 🚧 Upcoming
