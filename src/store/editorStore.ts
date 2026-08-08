@@ -101,6 +101,13 @@ export interface SceneObject {
   animation?: AnimationMarker
   audio?: AudioMarker
   vfx?: VfxMarker
+  // T51: optional snap points attached to this object. Empty
+  // arrays are normalised to "absent" by the JSON round-trip
+  // helpers (see `src/store/mapSerialization.ts`); the field is
+  // present only when at least one snap point exists. The
+  // shapes are owned by `src/types/snapPoints.ts` — never
+  // redeclare them here.
+  snapPoints?: import('@/types/snapPoints').SnapPoint[]
 }
 
 /**
