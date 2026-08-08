@@ -6,16 +6,176 @@
   },
   "scene": {
     "objects": [
-      ["ground",     { "id": "ground",     "name": "Courtyard",     "type": "mesh", "position": [0, 0, 0],    "rotation": [0, 0, 0], "scale": [20, 0.1, 20], "visible": true, "locked": false, "layerId": "default", "children": [], "meshType": "cube", "material": { "baseColor": "#9e9e9e", "metallic": 0.0, "roughness": 0.9 } }],
-      ["wall_n",     { "id": "wall_n",     "name": "Wall North",    "type": "mesh", "position": [0, 2, 9],    "rotation": [0, 0, 0], "scale": [18, 4, 0.5], "visible": true, "locked": false, "layerId": "default", "children": [], "meshType": "cube", "material": { "baseColor": "#bdbdbd", "metallic": 0.0, "roughness": 0.95 } }],
-      ["wall_s",     { "id": "wall_s",     "name": "Wall South",    "type": "mesh", "position": [0, 2, -9],   "rotation": [0, 0, 0], "scale": [18, 4, 0.5], "visible": true, "locked": false, "layerId": "default", "children": [], "meshType": "cube", "material": { "baseColor": "#bdbdbd", "metallic": 0.0, "roughness": 0.95 } }],
-      ["wall_e",     { "id": "wall_e",     "name": "Wall East",     "type": "mesh", "position": [9, 2, 0],    "rotation": [0, 0, 0], "scale": [0.5, 4, 18], "visible": true, "locked": false, "layerId": "default", "children": [], "meshType": "cube", "material": { "baseColor": "#bdbdbd", "metallic": 0.0, "roughness": 0.95 } }],
-      ["wall_w",     { "id": "wall_w",     "name": "Wall West",     "type": "mesh", "position": [-9, 2, 0],   "rotation": [0, 0, 0], "scale": [0.5, 4, 18], "visible": true, "locked": false, "layerId": "default", "children": [], "meshType": "cube", "material": { "baseColor": "#bdbdbd", "metallic": 0.0, "roughness": 0.95 } }],
-      ["tower_ne",    { "id": "tower_ne",    "name": "Tower NE",      "type": "mesh", "position": [8.25, 3, 8.25], "rotation": [0, 0, 0], "scale": [1.5, 6, 1.5], "visible": true, "locked": false, "layerId": "default", "children": [], "meshType": "cube", "material": { "baseColor": "#9e9e9e", "metallic": 0.0, "roughness": 0.9 } }],
-      ["tower_nw",    { "id": "tower_nw",    "name": "Tower NW",      "type": "mesh", "position": [-8.25, 3, 8.25], "rotation": [0, 0, 0], "scale": [1.5, 6, 1.5], "visible": true, "locked": false, "layerId": "default", "children": [], "meshType": "cube", "material": { "baseColor": "#9e9e9e", "metallic": 0.0, "roughness": 0.9 } }],
-      ["tower_se",    { "id": "tower_se",    "name": "Tower SE",      "type": "mesh", "position": [8.25, 3, -8.25], "rotation": [0, 0, 0], "scale": [1.5, 6, 1.5], "visible": true, "locked": false, "layerId": "default", "children": [], "meshType": "cube", "material": { "baseColor": "#9e9e9e", "metallic": 0.0, "roughness": 0.9 } }],
-      ["tower_sw",    { "id": "tower_sw",    "name": "Tower SW",      "type": "mesh", "position": [-8.25, 3, -8.25], "rotation": [0, 0, 0], "scale": [1.5, 6, 1.5], "visible": true, "locked": false, "layerId": "default", "children": [], "meshType": "cube", "material": { "baseColor": "#9e9e9e", "metallic": 0.0, "roughness": 0.9 } }],
-      ["gate",        { "id": "gate",        "name": "Gate",          "type": "mesh", "position": [0, 1.5, 9.5], "rotation": [0, 0, 0], "scale": [3, 3, 0.5], "visible": true, "locked": false, "layerId": "default", "children": [], "meshType": "cube", "material": { "baseColor": "#6d4c41", "metallic": 0.0, "roughness": 0.8 } }]
+      [
+        "ground",
+        {
+          "id": "ground",
+          "name": "Courtyard",
+          "type": "mesh",
+          "position": [0, 0, 0],
+          "rotation": [0, 0, 0],
+          "scale": [20, 0.1, 20],
+          "visible": true,
+          "locked": false,
+          "layerId": "default",
+          "children": [],
+          "meshType": "cube",
+          "material": { "baseColor": "#9e9e9e", "metallic": 0.0, "roughness": 0.9 }
+        }
+      ],
+      [
+        "wall_n",
+        {
+          "id": "wall_n",
+          "name": "Wall North",
+          "type": "mesh",
+          "position": [0, 2, 9],
+          "rotation": [0, 0, 0],
+          "scale": [18, 4, 0.5],
+          "visible": true,
+          "locked": false,
+          "layerId": "default",
+          "children": [],
+          "meshType": "cube",
+          "material": { "baseColor": "#bdbdbd", "metallic": 0.0, "roughness": 0.95 }
+        }
+      ],
+      [
+        "wall_s",
+        {
+          "id": "wall_s",
+          "name": "Wall South",
+          "type": "mesh",
+          "position": [0, 2, -9],
+          "rotation": [0, 0, 0],
+          "scale": [18, 4, 0.5],
+          "visible": true,
+          "locked": false,
+          "layerId": "default",
+          "children": [],
+          "meshType": "cube",
+          "material": { "baseColor": "#bdbdbd", "metallic": 0.0, "roughness": 0.95 }
+        }
+      ],
+      [
+        "wall_e",
+        {
+          "id": "wall_e",
+          "name": "Wall East",
+          "type": "mesh",
+          "position": [9, 2, 0],
+          "rotation": [0, 0, 0],
+          "scale": [0.5, 4, 18],
+          "visible": true,
+          "locked": false,
+          "layerId": "default",
+          "children": [],
+          "meshType": "cube",
+          "material": { "baseColor": "#bdbdbd", "metallic": 0.0, "roughness": 0.95 }
+        }
+      ],
+      [
+        "wall_w",
+        {
+          "id": "wall_w",
+          "name": "Wall West",
+          "type": "mesh",
+          "position": [-9, 2, 0],
+          "rotation": [0, 0, 0],
+          "scale": [0.5, 4, 18],
+          "visible": true,
+          "locked": false,
+          "layerId": "default",
+          "children": [],
+          "meshType": "cube",
+          "material": { "baseColor": "#bdbdbd", "metallic": 0.0, "roughness": 0.95 }
+        }
+      ],
+      [
+        "tower_ne",
+        {
+          "id": "tower_ne",
+          "name": "Tower NE",
+          "type": "mesh",
+          "position": [8.25, 3, 8.25],
+          "rotation": [0, 0, 0],
+          "scale": [1.5, 6, 1.5],
+          "visible": true,
+          "locked": false,
+          "layerId": "default",
+          "children": [],
+          "meshType": "cube",
+          "material": { "baseColor": "#9e9e9e", "metallic": 0.0, "roughness": 0.9 }
+        }
+      ],
+      [
+        "tower_nw",
+        {
+          "id": "tower_nw",
+          "name": "Tower NW",
+          "type": "mesh",
+          "position": [-8.25, 3, 8.25],
+          "rotation": [0, 0, 0],
+          "scale": [1.5, 6, 1.5],
+          "visible": true,
+          "locked": false,
+          "layerId": "default",
+          "children": [],
+          "meshType": "cube",
+          "material": { "baseColor": "#9e9e9e", "metallic": 0.0, "roughness": 0.9 }
+        }
+      ],
+      [
+        "tower_se",
+        {
+          "id": "tower_se",
+          "name": "Tower SE",
+          "type": "mesh",
+          "position": [8.25, 3, -8.25],
+          "rotation": [0, 0, 0],
+          "scale": [1.5, 6, 1.5],
+          "visible": true,
+          "locked": false,
+          "layerId": "default",
+          "children": [],
+          "meshType": "cube",
+          "material": { "baseColor": "#9e9e9e", "metallic": 0.0, "roughness": 0.9 }
+        }
+      ],
+      [
+        "tower_sw",
+        {
+          "id": "tower_sw",
+          "name": "Tower SW",
+          "type": "mesh",
+          "position": [-8.25, 3, -8.25],
+          "rotation": [0, 0, 0],
+          "scale": [1.5, 6, 1.5],
+          "visible": true,
+          "locked": false,
+          "layerId": "default",
+          "children": [],
+          "meshType": "cube",
+          "material": { "baseColor": "#9e9e9e", "metallic": 0.0, "roughness": 0.9 }
+        }
+      ],
+      [
+        "gate",
+        {
+          "id": "gate",
+          "name": "Gate",
+          "type": "mesh",
+          "position": [0, 1.5, 9.5],
+          "rotation": [0, 0, 0],
+          "scale": [3, 3, 0.5],
+          "visible": true,
+          "locked": false,
+          "layerId": "default",
+          "children": [],
+          "meshType": "cube",
+          "material": { "baseColor": "#6d4c41", "metallic": 0.0, "roughness": 0.8 }
+        }
+      ]
     ],
     "layers": [
       { "id": "default", "name": "Default", "visible": true, "locked": false, "color": "#ffffff" }

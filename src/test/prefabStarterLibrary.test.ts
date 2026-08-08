@@ -22,6 +22,7 @@
  */
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
+import { PrefabId } from '@/types/brand'
 import {
   bootstrapStarterPrefabsIfNeeded,
   loadPrefabs,
@@ -30,7 +31,6 @@ import {
   savePrefab,
   type Prefab,
 } from '@/utils/prefabs'
-import { PrefabId } from '@/types/brand'
 
 const STORAGE_KEY = 'morgan-bevy-prefabs'
 const BOOTSTRAP_KEY = 'morgan-bevy-prefab-starters-bootstrapped'

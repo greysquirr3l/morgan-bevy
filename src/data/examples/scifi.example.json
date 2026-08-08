@@ -6,13 +6,132 @@
   },
   "scene": {
     "objects": [
-      ["deck",         { "id": "deck",         "name": "Outpost Deck",    "type": "mesh", "position": [0, 0, 0],     "rotation": [0, 0, 0], "scale": [14, 0.2, 14], "visible": true, "locked": false, "layerId": "default", "children": [], "meshType": "cube", "material": { "baseColor": "#37474f", "metallic": 0.6, "roughness": 0.3 } }],
-      ["console",      { "id": "console",      "name": "Console",         "type": "mesh", "position": [0, 0.8, 0],   "rotation": [0, 0, 0], "scale": [2.0, 1.4, 0.8], "visible": true, "locked": false, "layerId": "default", "children": [], "meshType": "cube", "material": { "baseColor": "#263238", "metallic": 0.8, "roughness": 0.2 } }],
-      ["platform_ne",  { "id": "platform_ne",  "name": "Platform NE",     "type": "mesh", "position": [5, 1.5, 5],   "rotation": [0, 0, 0], "scale": [2, 0.2, 2],  "visible": true, "locked": false, "layerId": "default", "children": [], "meshType": "cube", "material": { "baseColor": "#0288d1", "metallic": 0.4, "roughness": 0.4 } }],
-      ["platform_nw",  { "id": "platform_nw",  "name": "Platform NW",     "type": "mesh", "position": [-5, 1.5, 5],  "rotation": [0, 0, 0], "scale": [2, 0.2, 2],  "visible": true, "locked": false, "layerId": "default", "children": [], "meshType": "cube", "material": { "baseColor": "#0288d1", "metallic": 0.4, "roughness": 0.4 } }],
-      ["platform_se",  { "id": "platform_se",  "name": "Platform SE",     "type": "mesh", "position": [5, 1.5, -5],  "rotation": [0, 0, 0], "scale": [2, 0.2, 2],  "visible": true, "locked": false, "layerId": "default", "children": [], "meshType": "cube", "material": { "baseColor": "#0288d1", "metallic": 0.4, "roughness": 0.4 } }],
-      ["platform_sw",  { "id": "platform_sw",  "name": "Platform SW",     "type": "mesh", "position": [-5, 1.5, -5], "rotation": [0, 0, 0], "scale": [2, 0.2, 2],  "visible": true, "locked": false, "layerId": "default", "children": [], "meshType": "cube", "material": { "baseColor": "#0288d1", "metallic": 0.4, "roughness": 0.4 } }],
-      ["tower_light",  { "id": "tower_light",  "name": "Light Tower",     "type": "mesh", "position": [0, 4, -6],    "rotation": [0, 0, 0], "scale": [0.6, 8, 0.6], "visible": true, "locked": false, "layerId": "default", "children": [], "meshType": "cube", "material": { "baseColor": "#90a4ae", "metallic": 0.7, "roughness": 0.3 }, "light": { "kind": "point", "color": [1.0, 0.8, 0.4], "intensity": 1500, "range": 12, "shadows": true } }]
+      [
+        "deck",
+        {
+          "id": "deck",
+          "name": "Outpost Deck",
+          "type": "mesh",
+          "position": [0, 0, 0],
+          "rotation": [0, 0, 0],
+          "scale": [14, 0.2, 14],
+          "visible": true,
+          "locked": false,
+          "layerId": "default",
+          "children": [],
+          "meshType": "cube",
+          "material": { "baseColor": "#37474f", "metallic": 0.6, "roughness": 0.3 }
+        }
+      ],
+      [
+        "console",
+        {
+          "id": "console",
+          "name": "Console",
+          "type": "mesh",
+          "position": [0, 0.8, 0],
+          "rotation": [0, 0, 0],
+          "scale": [2.0, 1.4, 0.8],
+          "visible": true,
+          "locked": false,
+          "layerId": "default",
+          "children": [],
+          "meshType": "cube",
+          "material": { "baseColor": "#263238", "metallic": 0.8, "roughness": 0.2 }
+        }
+      ],
+      [
+        "platform_ne",
+        {
+          "id": "platform_ne",
+          "name": "Platform NE",
+          "type": "mesh",
+          "position": [5, 1.5, 5],
+          "rotation": [0, 0, 0],
+          "scale": [2, 0.2, 2],
+          "visible": true,
+          "locked": false,
+          "layerId": "default",
+          "children": [],
+          "meshType": "cube",
+          "material": { "baseColor": "#0288d1", "metallic": 0.4, "roughness": 0.4 }
+        }
+      ],
+      [
+        "platform_nw",
+        {
+          "id": "platform_nw",
+          "name": "Platform NW",
+          "type": "mesh",
+          "position": [-5, 1.5, 5],
+          "rotation": [0, 0, 0],
+          "scale": [2, 0.2, 2],
+          "visible": true,
+          "locked": false,
+          "layerId": "default",
+          "children": [],
+          "meshType": "cube",
+          "material": { "baseColor": "#0288d1", "metallic": 0.4, "roughness": 0.4 }
+        }
+      ],
+      [
+        "platform_se",
+        {
+          "id": "platform_se",
+          "name": "Platform SE",
+          "type": "mesh",
+          "position": [5, 1.5, -5],
+          "rotation": [0, 0, 0],
+          "scale": [2, 0.2, 2],
+          "visible": true,
+          "locked": false,
+          "layerId": "default",
+          "children": [],
+          "meshType": "cube",
+          "material": { "baseColor": "#0288d1", "metallic": 0.4, "roughness": 0.4 }
+        }
+      ],
+      [
+        "platform_sw",
+        {
+          "id": "platform_sw",
+          "name": "Platform SW",
+          "type": "mesh",
+          "position": [-5, 1.5, -5],
+          "rotation": [0, 0, 0],
+          "scale": [2, 0.2, 2],
+          "visible": true,
+          "locked": false,
+          "layerId": "default",
+          "children": [],
+          "meshType": "cube",
+          "material": { "baseColor": "#0288d1", "metallic": 0.4, "roughness": 0.4 }
+        }
+      ],
+      [
+        "tower_light",
+        {
+          "id": "tower_light",
+          "name": "Light Tower",
+          "type": "mesh",
+          "position": [0, 4, -6],
+          "rotation": [0, 0, 0],
+          "scale": [0.6, 8, 0.6],
+          "visible": true,
+          "locked": false,
+          "layerId": "default",
+          "children": [],
+          "meshType": "cube",
+          "material": { "baseColor": "#90a4ae", "metallic": 0.7, "roughness": 0.3 },
+          "light": {
+            "kind": "point",
+            "color": [1.0, 0.8, 0.4],
+            "intensity": 1500,
+            "range": 12,
+            "shadows": true
+          }
+        }
+      ]
     ],
     "layers": [
       { "id": "default", "name": "Default", "visible": true, "locked": false, "color": "#ffffff" }

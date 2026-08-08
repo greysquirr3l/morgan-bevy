@@ -6,16 +6,176 @@
   },
   "scene": {
     "objects": [
-      ["floor",     { "id": "floor",     "name": "Stone Floor",   "type": "mesh", "position": [0, 0, 0],    "rotation": [0, 0, 0], "scale": [16, 0.1, 16], "visible": true, "locked": false, "layerId": "default", "children": [], "meshType": "cube", "material": { "baseColor": "#4a4a4a", "metallic": 0.0, "roughness": 0.9 } }],
-      ["chamber_n",  { "id": "chamber_n",  "name": "North Chamber", "type": "mesh", "position": [0, 1.5, 6],   "rotation": [0, 0, 0], "scale": [6, 3, 0.1],  "visible": true, "locked": false, "layerId": "default", "children": [], "meshType": "cube", "material": { "baseColor": "#707070", "metallic": 0.0, "roughness": 0.95 } }],
-      ["chamber_s",  { "id": "chamber_s",  "name": "South Chamber", "type": "mesh", "position": [0, 1.5, -6],  "rotation": [0, 0, 0], "scale": [6, 3, 0.1],  "visible": true, "locked": false, "layerId": "default", "children": [], "meshType": "cube", "material": { "baseColor": "#707070", "metallic": 0.0, "roughness": 0.95 } }],
-      ["chamber_e",  { "id": "chamber_e",  "name": "East Chamber",  "type": "mesh", "position": [6, 1.5, 0],   "rotation": [0, 0, 0], "scale": [0.1, 3, 6],  "visible": true, "locked": false, "layerId": "default", "children": [], "meshType": "cube", "material": { "baseColor": "#707070", "metallic": 0.0, "roughness": 0.95 } }],
-      ["chamber_w",  { "id": "chamber_w",  "name": "West Chamber",  "type": "mesh", "position": [-6, 1.5, 0],  "rotation": [0, 0, 0], "scale": [0.1, 3, 6],  "visible": true, "locked": false, "layerId": "default", "children": [], "meshType": "cube", "material": { "baseColor": "#707070", "metallic": 0.0, "roughness": 0.95 } }],
-      ["pillar_nw",  { "id": "pillar_nw",  "name": "Pillar NW",     "type": "mesh", "position": [-2, 1.5, 4],  "rotation": [0, 0, 0], "scale": [0.4, 3, 0.4], "visible": true, "locked": false, "layerId": "default", "children": [], "meshType": "cube", "material": { "baseColor": "#555555", "metallic": 0.0, "roughness": 0.9 } }],
-      ["pillar_ne",  { "id": "pillar_ne",  "name": "Pillar NE",     "type": "mesh", "position": [2, 1.5, 4],   "rotation": [0, 0, 0], "scale": [0.4, 3, 0.4], "visible": true, "locked": false, "layerId": "default", "children": [], "meshType": "cube", "material": { "baseColor": "#555555", "metallic": 0.0, "roughness": 0.9 } }],
-      ["pillar_sw",  { "id": "pillar_sw",  "name": "Pillar SW",     "type": "mesh", "position": [-2, 1.5, -4], "rotation": [0, 0, 0], "scale": [0.4, 3, 0.4], "visible": true, "locked": false, "layerId": "default", "children": [], "meshType": "cube", "material": { "baseColor": "#555555", "metallic": 0.0, "roughness": 0.9 } }],
-      ["pillar_se",  { "id": "pillar_se",  "name": "Pillar SE",     "type": "mesh", "position": [2, 1.5, -4],  "rotation": [0, 0, 0], "scale": [0.4, 3, 0.4], "visible": true, "locked": false, "layerId": "default", "children": [], "meshType": "cube", "material": { "baseColor": "#555555", "metallic": 0.0, "roughness": 0.9 } }],
-      ["altar",      { "id": "altar",      "name": "Altar",         "type": "mesh", "position": [0, 0.5, 0],   "rotation": [0, 0, 0], "scale": [1.0, 1.0, 0.6], "visible": true, "locked": false, "layerId": "default", "children": [], "meshType": "cube", "material": { "baseColor": "#8b4513", "metallic": 0.0, "roughness": 0.7 } }]
+      [
+        "floor",
+        {
+          "id": "floor",
+          "name": "Stone Floor",
+          "type": "mesh",
+          "position": [0, 0, 0],
+          "rotation": [0, 0, 0],
+          "scale": [16, 0.1, 16],
+          "visible": true,
+          "locked": false,
+          "layerId": "default",
+          "children": [],
+          "meshType": "cube",
+          "material": { "baseColor": "#4a4a4a", "metallic": 0.0, "roughness": 0.9 }
+        }
+      ],
+      [
+        "chamber_n",
+        {
+          "id": "chamber_n",
+          "name": "North Chamber",
+          "type": "mesh",
+          "position": [0, 1.5, 6],
+          "rotation": [0, 0, 0],
+          "scale": [6, 3, 0.1],
+          "visible": true,
+          "locked": false,
+          "layerId": "default",
+          "children": [],
+          "meshType": "cube",
+          "material": { "baseColor": "#707070", "metallic": 0.0, "roughness": 0.95 }
+        }
+      ],
+      [
+        "chamber_s",
+        {
+          "id": "chamber_s",
+          "name": "South Chamber",
+          "type": "mesh",
+          "position": [0, 1.5, -6],
+          "rotation": [0, 0, 0],
+          "scale": [6, 3, 0.1],
+          "visible": true,
+          "locked": false,
+          "layerId": "default",
+          "children": [],
+          "meshType": "cube",
+          "material": { "baseColor": "#707070", "metallic": 0.0, "roughness": 0.95 }
+        }
+      ],
+      [
+        "chamber_e",
+        {
+          "id": "chamber_e",
+          "name": "East Chamber",
+          "type": "mesh",
+          "position": [6, 1.5, 0],
+          "rotation": [0, 0, 0],
+          "scale": [0.1, 3, 6],
+          "visible": true,
+          "locked": false,
+          "layerId": "default",
+          "children": [],
+          "meshType": "cube",
+          "material": { "baseColor": "#707070", "metallic": 0.0, "roughness": 0.95 }
+        }
+      ],
+      [
+        "chamber_w",
+        {
+          "id": "chamber_w",
+          "name": "West Chamber",
+          "type": "mesh",
+          "position": [-6, 1.5, 0],
+          "rotation": [0, 0, 0],
+          "scale": [0.1, 3, 6],
+          "visible": true,
+          "locked": false,
+          "layerId": "default",
+          "children": [],
+          "meshType": "cube",
+          "material": { "baseColor": "#707070", "metallic": 0.0, "roughness": 0.95 }
+        }
+      ],
+      [
+        "pillar_nw",
+        {
+          "id": "pillar_nw",
+          "name": "Pillar NW",
+          "type": "mesh",
+          "position": [-2, 1.5, 4],
+          "rotation": [0, 0, 0],
+          "scale": [0.4, 3, 0.4],
+          "visible": true,
+          "locked": false,
+          "layerId": "default",
+          "children": [],
+          "meshType": "cube",
+          "material": { "baseColor": "#555555", "metallic": 0.0, "roughness": 0.9 }
+        }
+      ],
+      [
+        "pillar_ne",
+        {
+          "id": "pillar_ne",
+          "name": "Pillar NE",
+          "type": "mesh",
+          "position": [2, 1.5, 4],
+          "rotation": [0, 0, 0],
+          "scale": [0.4, 3, 0.4],
+          "visible": true,
+          "locked": false,
+          "layerId": "default",
+          "children": [],
+          "meshType": "cube",
+          "material": { "baseColor": "#555555", "metallic": 0.0, "roughness": 0.9 }
+        }
+      ],
+      [
+        "pillar_sw",
+        {
+          "id": "pillar_sw",
+          "name": "Pillar SW",
+          "type": "mesh",
+          "position": [-2, 1.5, -4],
+          "rotation": [0, 0, 0],
+          "scale": [0.4, 3, 0.4],
+          "visible": true,
+          "locked": false,
+          "layerId": "default",
+          "children": [],
+          "meshType": "cube",
+          "material": { "baseColor": "#555555", "metallic": 0.0, "roughness": 0.9 }
+        }
+      ],
+      [
+        "pillar_se",
+        {
+          "id": "pillar_se",
+          "name": "Pillar SE",
+          "type": "mesh",
+          "position": [2, 1.5, -4],
+          "rotation": [0, 0, 0],
+          "scale": [0.4, 3, 0.4],
+          "visible": true,
+          "locked": false,
+          "layerId": "default",
+          "children": [],
+          "meshType": "cube",
+          "material": { "baseColor": "#555555", "metallic": 0.0, "roughness": 0.9 }
+        }
+      ],
+      [
+        "altar",
+        {
+          "id": "altar",
+          "name": "Altar",
+          "type": "mesh",
+          "position": [0, 0.5, 0],
+          "rotation": [0, 0, 0],
+          "scale": [1.0, 1.0, 0.6],
+          "visible": true,
+          "locked": false,
+          "layerId": "default",
+          "children": [],
+          "meshType": "cube",
+          "material": { "baseColor": "#8b4513", "metallic": 0.0, "roughness": 0.7 }
+        }
+      ]
     ],
     "layers": [
       { "id": "default", "name": "Default", "visible": true, "locked": false, "color": "#ffffff" }

@@ -62,7 +62,11 @@ export function loadExampleLevels(): ExampleLevelMeta[] {
     // lives in `ProjectDataSchema.safeParse` at load time (T20).
     const scene = (candidate as { scene?: unknown }).scene
     const schemaVersion = (candidate as { schemaVersion?: unknown }).schemaVersion
-    if (typeof schemaVersion !== 'number' || !Number.isInteger(schemaVersion) || schemaVersion < 1) {
+    if (
+      typeof schemaVersion !== 'number' ||
+      !Number.isInteger(schemaVersion) ||
+      schemaVersion < 1
+    ) {
       console.warn(`exampleLevels: dropping ${fileName} — invalid schemaVersion`)
       continue
     }

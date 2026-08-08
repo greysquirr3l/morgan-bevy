@@ -163,11 +163,7 @@ export default function FileMenu({ isOpen, onClose, position, onManualSave }: Fi
   const loadTemplate = (id: string) => {
     const eg = exampleProjects.find(e => e.id === id)
     if (!eg) return
-    if (
-      !confirm(
-        `Load template "${eg.name}"? Your current scene will be discarded.`
-      )
-    ) {
+    if (!confirm(`Load template "${eg.name}"? Your current scene will be discarded.`)) {
       return
     }
     try {

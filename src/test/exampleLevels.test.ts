@@ -77,7 +77,9 @@ describe('T61 loadExampleLevels', () => {
   it('SciFi example includes a light marker on the light tower (T91 demo)', () => {
     const scifi = loadExampleLevels().find(e => e.id === 'scifi')
     expect(scifi).toBeDefined()
-    const objects = (scifi?.projectData.scene as { objects?: Array<[string, Record<string, unknown>]> }).objects
+    const objects = (
+      scifi?.projectData.scene as { objects?: Array<[string, Record<string, unknown>]> }
+    ).objects
     expect(objects).toBeDefined()
     const tower = objects?.find(([id]) => id === 'tower_light')?.[1]
     expect(tower).toBeDefined()

@@ -1,5 +1,6 @@
 import { useState, useCallback, useEffect } from 'react'
 import { invoke } from '@tauri-apps/api/core'
+import BrokenLinksPanel from './BrokenLinksPanel'
 import {
   Target,
   Image,
@@ -231,6 +232,12 @@ export default function AssetsPanel() {
               </div>
             )}
           </div>
+
+          {/* T34: Broken Links report — appears when project load
+              (or a stale asset reference) leaves an asset in the
+              `missingAssetRefs` slice. Sits above the grid so it's
+              always visible while at least one missing ref is open. */}
+          <BrokenLinksPanel />
 
           {/* Assets Grid */}
           <div className="flex-1 p-2 overflow-y-auto custom-scrollbar">
