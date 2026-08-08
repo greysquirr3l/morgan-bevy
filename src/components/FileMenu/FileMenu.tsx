@@ -3,6 +3,7 @@ import { serializeMap } from '@/store/mapSerialization'
 import { AssetId, LayerId } from '@/types/brand'
 import { ProjectDataSchema, type ProjectData } from '@/types/schemas'
 import { LoadCommand, SaveCommand } from '@/utils/commands'
+import { loadExampleLevels } from '@/utils/exampleLevels'
 import { buildBevyEntitiesExport, buildFileMenuLevelExportPayload } from '@/utils/exportPayload'
 import { collectAssetRefs, missingRefs, readAssetRefs, withAssetRefs } from '@/utils/projectAssets'
 import {
@@ -14,7 +15,7 @@ import {
   type RecentProject,
 } from '@/utils/recentProjects'
 import { invoke } from '@tauri-apps/api/core'
-import { Clock, Download, FileText, FolderOpen, Save, X } from 'lucide-react'
+import { BookOpen, Clock, Download, FileText, FolderOpen, Save, X } from 'lucide-react'
 import { useEffect, useState } from 'react'
 
 interface FileMenuProps {
@@ -30,6 +31,12 @@ export default function FileMenu({ isOpen, onClose, position, onManualSave }: Fi
   const [showExportModal, setShowExportModal] = useState(false)
   const [recentProjects, setRecentProjects] = useState<RecentProject[]>([])
   const [, setLastSavedPath] = useState<string | null>(null)
+
+  // T61: bundled example projects (Office / Dungeon / Castle /
+  // SciFi). Loaded eagerly so the menu renders without a flash;
+  // `loadExampleLevels` is fast because the data is inlined at
+  // build time by Vite's `import.meta.glob`.
+  const exampleProjects = loadExampleLevels()
 
   // Apply a parsed `ProjectData` to the editor store. Mirrors the
   // historical `LoadCommand` shape but works with the zod-validated
@@ -147,6 +154,30 @@ export default function FileMenu({ isOpen, onClose, position, onManualSave }: Fi
     }
     input.click()
     onClose()
+  }
+
+  // T61: replace the current scene with one of the bundled
+  // example projects. Confirms with the user first because the
+  // current scene is discarded (no undo for "Open Project" — the
+  // spec mentions that constraint explicitly).
+  const loadTemplate = (id: string) => {
+    const eg = exampleProjects.find(e => e.id === id)
+    if (!eg) return
+    if (
+      !confirm(
+        `Load template "${eg.name}"? Your current scene will be discarded.`
+      )
+    ) {
+      return
+    }
+    try {
+      const command = new LoadCommand(eg.projectData as never)
+      executeCommand(command)
+      onClose()
+    } catch (error) {
+      alert(`Failed to load template: ${error}`)
+      console.error('Template load error:', error)
+    }
   }
 
   const handleExport = async () => {
@@ -462,6 +493,33 @@ export default function FileMenu({ isOpen, onClose, position, onManualSave }: Fi
             ))}
           </>
         )}
+
+        {/* Separator */}
+        <div className="border-t border-editor-border my-1" />
+
+        {/* T61: Example projects (Templates). Bundled at build time
+            via Vite's import.meta.glob — Office / Dungeon / Castle /
+            SciFi. Clicking one replaces the current scene. The
+            user is warned via `confirm` because there's no undo for
+            Open Project. */}
+        <div className="px-3 pt-1 pb-1 text-[10px] uppercase tracking-wider text-editor-textMuted flex items-center space-x-1">
+          <BookOpen className="w-3 h-3" />
+          <span>Templates</span>
+        </div>
+        {exampleProjects.map(eg => (
+          <button
+            key={eg.id}
+            className="w-full px-3 py-2 text-left text-sm hover:bg-editor-border flex items-center space-x-2"
+            onClick={() => loadTemplate(eg.id)}
+            title={eg.description}
+          >
+            <FileText className="w-4 h-4" />
+            <span>{eg.name}</span>
+            <span className="ml-auto text-xs text-editor-textMuted truncate max-w-[8rem]">
+              {eg.description.split('.')[0]}
+            </span>
+          </button>
+        ))}
 
         {/* Separator */}
         <div className="border-t border-editor-border my-1" />

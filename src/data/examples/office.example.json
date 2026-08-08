@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 1,
+  "metadata": {
+    "name": "Office",
+    "description": "An open-plan office with a meeting table and four desks. Demonstrates prefab instantiation and material overrides."
+  },
+  "scene": {
+    "objects": [
+      ["floor",     { "id": "floor",     "name": "Floor",        "type": "mesh", "position": [0, 0, 0],    "rotation": [0, 0, 0], "scale": [12, 0.1, 12], "visible": true, "locked": false, "layerId": "default", "children": [], "meshType": "cube", "material": { "baseColor": "#808080", "metallic": 0.0, "roughness": 0.8 } }],
+      ["wall_n",    { "id": "wall_n",    "name": "Wall North",   "type": "mesh", "position": [0, 1.5, 6],   "rotation": [0, 0, 0], "scale": [12, 3, 0.1],  "visible": true, "locked": false, "layerId": "default", "children": [], "meshType": "cube", "material": { "baseColor": "#d3d3d3", "metallic": 0.0, "roughness": 0.9 } }],
+      ["wall_s",    { "id": "wall_s",    "name": "Wall South",   "type": "mesh", "position": [0, 1.5, -6],  "rotation": [0, 0, 0], "scale": [12, 3, 0.1],  "visible": true, "locked": false, "layerId": "default", "children": [], "meshType": "cube", "material": { "baseColor": "#d3d3d3", "metallic": 0.0, "roughness": 0.9 } }],
+      ["wall_e",    { "id": "wall_e",    "name": "Wall East",    "type": "mesh", "position": [6, 1.5, 0],   "rotation": [0, 0, 0], "scale": [0.1, 3, 12], "visible": true, "locked": false, "layerId": "default", "children": [], "meshType": "cube", "material": { "baseColor": "#d3d3d3", "metallic": 0.0, "roughness": 0.9 } }],
+      ["wall_w",    { "id": "wall_w",    "name": "Wall West",    "type": "mesh", "position": [-6, 1.5, 0],  "rotation": [0, 0, 0], "scale": [0.1, 3, 12], "visible": true, "locked": false, "layerId": "default", "children": [], "meshType": "cube", "material": { "baseColor": "#d3d3d3", "metallic": 0.0, "roughness": 0.9 } }],
+      ["meeting",   { "id": "meeting",   "name": "MeetingTable", "type": "mesh", "position": [0, 0.4, 0],   "rotation": [0, 0, 0], "scale": [2.4, 0.8, 1.0], "visible": true, "locked": false, "layerId": "default", "children": [], "meshType": "cube", "material": { "baseColor": "#3e2723", "metallic": 0.0, "roughness": 0.5 } }],
+      ["desk_1",    { "id": "desk_1",    "name": "Desk 1",       "type": "mesh", "position": [-4, 0.35, 4], "rotation": [0, 0, 0], "scale": [1.4, 0.7, 0.7], "visible": true, "locked": false, "layerId": "default", "children": [], "meshType": "cube", "material": { "baseColor": "#deb887", "metallic": 0.0, "roughness": 0.6 } }],
+      ["desk_2",    { "id": "desk_2",    "name": "Desk 2",       "type": "mesh", "position": [-2, 0.35, 4], "rotation": [0, 0, 0], "scale": [1.4, 0.7, 0.7], "visible": true, "locked": false, "layerId": "default", "children": [], "meshType": "cube", "material": { "baseColor": "#deb887", "metallic": 0.0, "roughness": 0.6 } }],
+      ["desk_3",    { "id": "desk_3",    "name": "Desk 3",       "type": "mesh", "position": [2, 0.35, 4],  "rotation": [0, 0, 0], "scale": [1.4, 0.7, 0.7], "visible": true, "locked": false, "layerId": "default", "children": [], "meshType": "cube", "material": { "baseColor": "#deb887", "metallic": 0.0, "roughness": 0.6 } }],
+      ["desk_4",    { "id": "desk_4",    "name": "Desk 4",       "type": "mesh", "position": [4, 0.35, 4],  "rotation": [0, 0, 0], "scale": [1.4, 0.7, 0.7], "visible": true, "locked": false, "layerId": "default", "children": [], "meshType": "cube", "material": { "baseColor": "#deb887", "metallic": 0.0, "roughness": 0.6 } }],
+      ["ceiling",   { "id": "ceiling",   "name": "Ceiling",      "type": "mesh", "position": [0, 3, 0],    "rotation": [0, 0, 0], "scale": [12, 0.1, 12], "visible": true, "locked": false, "layerId": "default", "children": [], "meshType": "cube", "material": { "baseColor": "#f5f5f5", "metallic": 0.0, "roughness": 0.9 } }]
+    ],
+    "layers": [
+      { "id": "default", "name": "Default", "visible": true, "locked": false, "color": "#ffffff" }
+    ],
+    "activeLayer": "default",
+    "settings": { "gridSize": 1, "snapToGrid": true }
+  }
+}
