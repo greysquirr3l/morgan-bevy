@@ -70,6 +70,15 @@ pub struct AssetDatabase {
 }
 
 impl AssetDatabase {
+    /// Test-only accessor for the underlying SQLite connection.
+    /// Used by `#[cfg(test)]` modules (the thumbnail pipeline
+    /// tests seed fixtures via the bare connection). Stripped from
+    /// production builds.
+    #[cfg(test)]
+    pub fn _test_connection(&self) -> &Connection {
+        &self.connection
+    }
+
     /// T32: in-memory variant used by unit tests. Calls
     /// `initialize_schema` so callers get a fully-initialised
     /// database without touching the filesystem.
@@ -144,12 +153,19 @@ impl AssetDatabase {
             [],
         )?;
 
-        // Thumbnails table
+        // Thumbnails table (T33). `thumbnail_size` is the rendered
+        // edge length in pixels (default 256; the spec mentions 64/128/256
+        // but v1 ships one size to keep the pipeline tractable). The
+        // `source_mtime` column records the source asset's mtime at
+        // generation time so the worker can detect staleness and
+        // re-queue without comparing to disk every time.
         self.connection.execute(
             "CREATE TABLE IF NOT EXISTS thumbnails (
                 asset_id INTEGER PRIMARY KEY,
                 thumbnail_path TEXT NOT NULL,
                 generated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                thumbnail_size INTEGER NOT NULL DEFAULT 256,
+                source_mtime INTEGER NOT NULL DEFAULT 0,
                 FOREIGN KEY (asset_id) REFERENCES assets (id) ON DELETE CASCADE
             )",
             [],
@@ -194,6 +210,21 @@ impl AssetDatabase {
         if !self.column_exists("assets", "is_favorite")? {
             self.connection.execute(
                 "ALTER TABLE assets ADD COLUMN is_favorite INTEGER NOT NULL DEFAULT 0",
+                [],
+            )?;
+        }
+
+        // T33: in-place migration for the thumbnail columns. Same
+        // idempotent pattern — older databases upgrade cleanly.
+        if !self.column_exists("thumbnails", "thumbnail_size")? {
+            self.connection.execute(
+                "ALTER TABLE thumbnails ADD COLUMN thumbnail_size INTEGER NOT NULL DEFAULT 256",
+                [],
+            )?;
+        }
+        if !self.column_exists("thumbnails", "source_mtime")? {
+            self.connection.execute(
+                "ALTER TABLE thumbnails ADD COLUMN source_mtime INTEGER NOT NULL DEFAULT 0",
                 [],
             )?;
         }
@@ -517,6 +548,85 @@ impl AssetDatabase {
         self.connection.execute(
             "INSERT OR REPLACE INTO thumbnails (asset_id, thumbnail_path) VALUES (?1, ?2)",
             params![asset_id, thumbnail_path],
+        )?;
+        Ok(())
+    }
+
+    /// T33: write a freshly-generated thumbnail with the size + source
+    /// mtime recorded so the worker can detect staleness on the next
+    /// scan. `idempotent` — a re-queue hit on the same asset just
+    /// refreshes the row.
+    pub fn upsert_thumbnail(
+        &self,
+        asset_id: i64,
+        thumbnail_path: &str,
+        size: u32,
+        source_mtime: i64,
+    ) -> SqlResult<()> {
+        self.connection.execute(
+            "INSERT INTO thumbnails (asset_id, thumbnail_path, thumbnail_size, source_mtime)
+             VALUES (?1, ?2, ?3, ?4)
+             ON CONFLICT (asset_id) DO UPDATE SET
+                thumbnail_path = excluded.thumbnail_path,
+                thumbnail_size = excluded.thumbnail_size,
+                source_mtime = excluded.source_mtime,
+                generated_at = CURRENT_TIMESTAMP",
+            params![asset_id, thumbnail_path, size as i64, source_mtime],
+        )?;
+        Ok(())
+    }
+
+    /// T33: every asset id that is missing a thumbnail OR whose
+    /// recorded `source_mtime` is older than the supplied mtime. The
+    /// worker uses this to decide what to enqueue after a scan.
+    /// The fourth column is the asset's `updated_at` as a unix
+    /// timestamp (`strftime('%s', updated_at)`), not the raw TEXT
+    /// — the caller compares it against the recorded `source_mtime`
+    /// which is also a unix timestamp.
+    pub fn list_assets_needing_thumbnails(
+        &self,
+        target_size: u32,
+    ) -> SqlResult<Vec<(i64, String, String, i64)>> {
+        let mut stmt = self.connection.prepare(
+            "SELECT a.id, a.file_path, a.asset_type,
+                    CAST(strftime('%s', a.updated_at) AS INTEGER)
+             FROM assets a
+             LEFT JOIN thumbnails t ON a.id = t.asset_id
+             WHERE t.asset_id IS NULL
+                OR COALESCE(t.thumbnail_size, 0) != ?1
+                OR COALESCE(t.source_mtime, 0) < CAST(strftime('%s', a.updated_at) AS INTEGER)",
+        )?;
+        let rows = stmt.query_map([target_size as i64], |row| {
+            Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?))
+        })?;
+        let mut out = Vec::new();
+        for r in rows {
+            out.push(r?);
+        }
+        Ok(out)
+    }
+
+    /// T33: every `thumbnail_path` the DB has on record. Used by
+    /// `cleanup_orphans` to find files on disk that no longer
+    /// have a matching row.
+    pub fn list_all_thumbnail_paths(&self) -> SqlResult<Vec<String>> {
+        let mut stmt = self
+            .connection
+            .prepare("SELECT thumbnail_path FROM thumbnails")?;
+        let rows = stmt.query_map([], |row| row.get::<_, String>(0))?;
+        let mut out = Vec::new();
+        for r in rows {
+            out.push(r?);
+        }
+        Ok(out)
+    }
+
+    /// T33: drop a thumbnail row by its path (used by the cleanup
+    /// sweep when the file is missing but the DB row persists).
+    pub fn delete_thumbnail_by_path(&self, path: &str) -> SqlResult<()> {
+        self.connection.execute(
+            "DELETE FROM thumbnails WHERE thumbnail_path = ?1",
+            params![path],
         )?;
         Ok(())
     }

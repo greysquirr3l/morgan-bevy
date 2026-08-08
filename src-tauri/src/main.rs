@@ -792,6 +792,9 @@ fn main() {
             assets::toggle_asset_favorite,
             assets::save_smart_folder,
             assets::evaluate_smart_folder,
+            // T33: thumbnail pipeline
+            assets::generate_thumbnails,
+            assets::cleanup_thumbnails,
             // Crash reporting
             crash_log::append_frontend_crash_log,
             // Recent-projects support

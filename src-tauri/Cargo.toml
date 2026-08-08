@@ -66,6 +66,18 @@ env_logger = "0.10"
 nalgebra = "0.32"
 glam = "0.24"
 
+# T33 — headless thumbnail pipeline.
+#   image: texture decode + downscale + waveform PNG encode.
+#   webp: 256x256 WebP output for texture thumbnails.
+#   hound: WAV decode for audio waveform rendering.
+# The placeholder renderer (placeholder.rs) uses a hand-authored
+# 5x7 bitmap font rather than a font crate, keeping the dep graph
+# at minimum and avoiding the unmaintained `ttf-parser` advisory
+# that `ab_glyph` would pull in.
+image = { version = "0.25", default-features = false, features = ["png", "jpeg"] }
+webp = "0.3"
+hound = "3.5"
+
 [dev-dependencies]
 tokio-test = "0.4"
 tempfile = "3.8"
