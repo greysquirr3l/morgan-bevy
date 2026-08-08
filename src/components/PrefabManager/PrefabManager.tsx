@@ -3,6 +3,7 @@ import type { PrefabId } from '@/types/brand'
 import { CreateObjectCommand } from '@/utils/commands'
 import {
   applyBreakPrefab,
+  bootstrapStarterPrefabsIfNeeded,
   buildPrefabFromSelection,
   deletePrefabById as deletePrefabFromStorage,
   instantiatePrefabObjects,
@@ -94,8 +95,13 @@ export default function PrefabManager() {
     URL.revokeObjectURL(url)
   }
 
-  // Load prefabs on component mount
+  // Load prefabs on component mount. T62: first-run bootstrap
+  // installs the bundled starter prefabs (door, window, desk,
+  // meeting table, corridor section, room kit, stairwell) into
+  // the user's localStorage library when the flag is unset.
+  // The bootstrap is idempotent — a re-render does not reinstall.
   useEffect(() => {
+    bootstrapStarterPrefabsIfNeeded()
     loadStoredPrefabs()
   }, [])
 

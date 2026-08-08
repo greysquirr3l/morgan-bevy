@@ -1,0 +1,25 @@
+{
+  "id": "prefab_door_standard",
+  "name": "Door (Standard)",
+  "description": "A standard 1.0m x 2.0m door, brown wooden finish.",
+  "objects": [
+    {
+      "name": "Door",
+      "type": "mesh",
+      "position": [0, 1.0, 0],
+      "rotation": [0, 0, 0],
+      "scale": [1.0, 2.0, 0.1],
+      "visible": true,
+      "locked": false,
+      "layerId": "default",
+      "children": [],
+      "meshType": "cube",
+      "material": {
+        "baseColor": "#8b4513",
+        "metallic": 0.0,
+        "roughness": 0.7
+      }
+    }
+  ],
+  "createdAt": "2026-08-08T00:00:00.000Z"
+}

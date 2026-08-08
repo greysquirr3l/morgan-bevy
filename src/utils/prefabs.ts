@@ -50,6 +50,81 @@ export interface Prefab {
 }
 
 const STORAGE_KEY = 'morgan-bevy-prefabs'
+const STARTER_BOOTSTRAP_KEY = 'morgan-bevy-prefab-starters-bootstrapped'
+
+// ─── Starter library (Vite-bundled) ──────────────────────────────────────
+//
+// Vite's `import.meta.glob` with `eager: true` and `import: 'default'`
+// inlines every `.prefab.json` file under `src/data/prefabs/` at
+// build time. The result is a plain object map of path -> parsed
+// JSON value, ready to validate and ship to the PrefabManager.
+// The library is bundled into the frontend's JS, so there's no
+// runtime fetch / no `tauri.conf.json` `resources` entry needed.
+
+const STARTER_PREFAB_MODULES = import.meta.glob<{ default: Prefab }>(
+  '../data/prefabs/*.prefab.json',
+  { eager: true }
+)
+
+/**
+ * T62: load the bundled starter prefab library. Each entry has
+ * already been parsed by Vite's JSON importer, but the boundary
+ * is still untrusted (a hand-edited `.prefab.json` could be
+ * malformed) so `isPrefab` re-validates each one before returning.
+ * Drops anything that fails validation with a `console.warn` —
+ * one bad file must not sink the whole library.
+ */
+export function loadStarterPrefabs(): Prefab[] {
+  const out: Prefab[] = []
+  for (const [path, mod] of Object.entries(STARTER_PREFAB_MODULES)) {
+    const candidate = mod.default
+    if (!isPrefab(candidate)) {
+      console.warn(`loadStarterPrefabs: dropping invalid prefab at ${path}`)
+      continue
+    }
+    out.push(candidate)
+  }
+  return out
+}
+
+/**
+ * T62: bootstrap the user's library with the starter prefabs on
+ * first run. Idempotent — if every starter id is already present
+ * in the user's library, or the user has marked the bootstrap
+ * done via `STARTER_BOOTSTRAP_KEY`, the function returns
+ * `false` (no changes). Returns `true` if the user now has the
+ * starter prefabs.
+ */
+export function bootstrapStarterPrefabsIfNeeded(): boolean {
+  const flag = localStorage.getItem(STARTER_BOOTSTRAP_KEY)
+  if (flag === '1') return false
+
+  const existing = loadPrefabs()
+  const starters = loadStarterPrefabs()
+  if (starters.length === 0) {
+    // No starters bundled; still mark as done so we don't keep
+    // trying on every load.
+    localStorage.setItem(STARTER_BOOTSTRAP_KEY, '1')
+    return false
+  }
+
+  const existingIds = new Set(existing.map(p => p.id))
+  const missing = starters.filter(p => !existingIds.has(p.id))
+  if (missing.length === 0) {
+    localStorage.setItem(STARTER_BOOTSTRAP_KEY, '1')
+    return false
+  }
+
+  const next = [...existing, ...missing]
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(next))
+  localStorage.setItem(STARTER_BOOTSTRAP_KEY, '1')
+  return true
+}
+
+/** Reset the bootstrap flag so the next call re-installs the starters. */
+export function resetStarterBootstrap(): void {
+  localStorage.removeItem(STARTER_BOOTSTRAP_KEY)
+}
 
 // ─── localStorage layer ──────────────────────────────────────────────────
 

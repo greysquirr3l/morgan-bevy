@@ -1,0 +1,25 @@
+{
+  "id": "prefab_window_standard",
+  "name": "Window (Standard)",
+  "description": "A 1.2m x 1.0m window, light blue glass tint.",
+  "objects": [
+    {
+      "name": "Window",
+      "type": "mesh",
+      "position": [0, 1.5, 0],
+      "rotation": [0, 0, 0],
+      "scale": [1.2, 1.0, 0.05],
+      "visible": true,
+      "locked": false,
+      "layerId": "default",
+      "children": [],
+      "meshType": "cube",
+      "material": {
+        "baseColor": "#87ceeb",
+        "metallic": 0.2,
+        "roughness": 0.1
+      }
+    }
+  ],
+  "createdAt": "2026-08-08T00:00:00.000Z"
+}
