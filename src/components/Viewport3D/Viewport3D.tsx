@@ -6,6 +6,7 @@ import { useEditorStore } from '@/store/editorStore'
 import { Grid, Stats } from '@react-three/drei'
 import { Canvas } from '@react-three/fiber'
 import React, { forwardRef, useCallback, useImperativeHandle, useMemo, useState } from 'react'
+import { PaintSettingsPanel, PaintToolViewport } from '../PaintTool'
 import TransformConstraintIndicator from '../TransformConstraintIndicator'
 import TransformGizmos from '../TransformGizmos'
 import BoxSelection, { BoxSelectionOverlay } from './BoxSelection'
@@ -281,9 +282,15 @@ export default forwardRef<CameraControlsRef, object>(function Viewport3D(_props,
         {/* Box Selection - needs to be inside Canvas for R3F hooks */}
         <BoxSelection />
 
+        {/* Paint Tool brush indicator - needs to be inside Canvas for R3F hooks (T54) */}
+        <PaintToolViewport />
+
         {/* Performance Stats */}
         {showStats && <Stats />}
       </Canvas>
+
+      {/* Paint Tool settings overlay (T54) */}
+      <PaintSettingsPanel />
 
       {/* Viewport UI Overlay */}
       <div className="absolute top-2 left-2 bg-black bg-opacity-50 text-white text-xs p-2 rounded">

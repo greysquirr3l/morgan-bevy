@@ -54,6 +54,8 @@ export function useKeyboardShortcuts() {
     canRedo,
     sceneObjects,
     toggleCoordinateSpace,
+    paintToolActive,
+    setPaintToolActive,
   } = useEditorStore(
     useShallow(s => ({
       selectedObjects: s.selectedObjects,
@@ -70,6 +72,8 @@ export function useKeyboardShortcuts() {
       canRedo: s.canRedo,
       sceneObjects: s.sceneObjects,
       toggleCoordinateSpace: s.toggleCoordinateSpace,
+      paintToolActive: s.paintToolActive,
+      setPaintToolActive: s.setPaintToolActive,
     }))
   )
 
@@ -137,6 +141,9 @@ export function useKeyboardShortcuts() {
           break
         case 'toggle.stats':
           toggleStats()
+          break
+        case 'tool.paint':
+          setPaintToolActive(!paintToolActive)
           break
         case 'selection.clear':
           clearSelection()
@@ -331,6 +338,8 @@ export function useKeyboardShortcuts() {
     transformMode,
     toggleCoordinateSpace,
     cameraControlsRef,
+    paintToolActive,
+    setPaintToolActive,
   ])
 
   return { transformMode }

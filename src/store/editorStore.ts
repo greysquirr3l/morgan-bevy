@@ -2,6 +2,8 @@ import { deserializeMap, serializeMap } from '@/store/mapSerialization'
 import { AssetId, isObjectId, LayerId, MaterialId, ObjectId, PrefabId } from '@/types/brand'
 import type { AnimationMarker, AudioMarker, LightMarker, VfxMarker } from '@/types/markers'
 import type { Command } from '@/utils/commands'
+import { DEFAULT_BRUSH_FALLOFF, DEFAULT_BRUSH_RADIUS, type BrushFalloff } from '@/utils/paintTool'
+import type { UVTransform } from '@/utils/uvTransform'
 import { enableMapSet, setAutoFreeze } from 'immer'
 import { create } from 'zustand'
 import { immer } from 'zustand/middleware/immer'
@@ -108,6 +110,12 @@ export interface SceneObject {
   // shapes are owned by `src/types/snapPoints.ts` — never
   // redeclare them here.
   snapPoints?: import('@/types/snapPoints').SnapPoint[]
+  // T54: per-mesh UV offset/scale set by the UV editor. Absent means
+  // identity (the mesh's authored UVs, unmodified) — mirrors the
+  // `snapPoints` convention above of "field present only when it
+  // differs from the default," so untouched objects don't carry
+  // dead weight through save/load.
+  uvTransform?: UVTransform
 }
 
 /**
@@ -158,6 +166,16 @@ export interface EditorState {
   gridSnapEnabled: boolean
   snapToGrid: boolean
   gridSize: number
+
+  // T54: material paint tool. Distinct from `transformMode` — the
+  // paint tool is a separate interaction mode (P key) that doesn't
+  // interfere with the transform gizmo. Brush settings persist
+  // across toggles so re-activating keeps the last radius/falloff/
+  // material.
+  paintToolActive: boolean
+  paintBrushRadius: number
+  paintBrushFalloff: BrushFalloff
+  paintTargetMaterialId: MaterialId | null
 
   // Viewport
   viewportMode: '3d' | '2d'
@@ -221,6 +239,13 @@ export interface EditorState {
   setHoveredObject: (id: ObjectId | null) => void
   setTransformMode: (mode: 'select' | 'translate' | 'rotate' | 'scale') => void
   toggleCoordinateSpace: () => void
+
+  // T54: material paint tool.
+  setPaintToolActive: (active: boolean) => void
+  setPaintBrushRadius: (radius: number) => void
+  setPaintBrushFalloff: (falloff: BrushFalloff) => void
+  setPaintTargetMaterialId: (id: MaterialId | null) => void
+  updateObjectUVTransform: (id: ObjectId, transform: UVTransform) => void
   toggleGridSnap: () => void
   toggleSnapToGrid: () => void
   setGridSize: (size: number) => void
@@ -352,6 +377,10 @@ export const useEditorStore = create<EditorState>()(
     gridSnapEnabled: true,
     snapToGrid: true,
     gridSize: 1.0,
+    paintToolActive: false,
+    paintBrushRadius: DEFAULT_BRUSH_RADIUS,
+    paintBrushFalloff: DEFAULT_BRUSH_FALLOFF,
+    paintTargetMaterialId: null as MaterialId | null,
     viewportMode: '3d' as '3d' | '2d',
     cameraMode: 'orbit',
     activeLayer: LayerId('default'),
@@ -435,6 +464,35 @@ export const useEditorStore = create<EditorState>()(
     toggleCoordinateSpace: () =>
       set(state => {
         state.coordinateSpace = state.coordinateSpace === 'world' ? 'local' : 'world'
+      }),
+
+    setPaintToolActive: (active: boolean) =>
+      set(state => {
+        state.paintToolActive = active
+      }),
+
+    setPaintBrushRadius: (radius: number) =>
+      set(state => {
+        // Guard against 0/negative radii reaching the brush math —
+        // a non-positive radius would make `computeBrushHits` reject
+        // every candidate silently, which reads as "the tool broke."
+        state.paintBrushRadius = radius > 0 ? radius : state.paintBrushRadius
+      }),
+
+    setPaintBrushFalloff: (falloff: BrushFalloff) =>
+      set(state => {
+        state.paintBrushFalloff = falloff
+      }),
+
+    setPaintTargetMaterialId: (id: MaterialId | null) =>
+      set(state => {
+        state.paintTargetMaterialId = id
+      }),
+
+    updateObjectUVTransform: (id: ObjectId, transform: UVTransform) =>
+      set(state => {
+        const o = state.sceneObjects.get(id)
+        if (o) o.uvTransform = transform
       }),
 
     toggleGridSnap: () =>

@@ -45,7 +45,11 @@ export default function BoxSelection() {
   const handlePointerDown = useCallback((event: PointerEvent) => {
     // Only start box selection on left mouse button with no modifiers (except shift for additive)
     if (event.button !== 0 || event.target !== gl.domElement) return
-    
+
+    // T54: the paint tool (P) owns click-and-drag on the canvas while
+    // active — don't compete with it for the same gesture.
+    if (useEditorStore.getState().paintToolActive) return
+
     // Don't start box selection if clicking on a specific object (let object selection handle it)
     const raycaster = new THREE.Raycaster()
     const mouse = new THREE.Vector2()

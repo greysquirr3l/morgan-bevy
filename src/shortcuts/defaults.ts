@@ -58,6 +58,9 @@ export const DEFAULT_SHORTCUTS: readonly ShortcutBinding[] = [
   { action: 'toggle.grid',  label: 'Toggle Grid', key: 'g', modifiers: [], category: 'View', description: 'Toggle the grid overlay.' },
   { action: 'toggle.stats', label: 'Toggle Stats', key: 'f', modifiers: ['shift'], category: 'View', description: 'Toggle the FPS / object-count stats overlay.' },
 
+  // ─── Tools (P) ──────────────────────────────────────────────────────
+  { action: 'tool.paint', label: 'Paint Tool', key: 'p', modifiers: [], category: 'Tools', description: 'Toggle the material paint tool: brush a target material onto surfaces under the cursor.' },
+
   // ─── Camera modes (1 / 2 / 3) ────────────────────────────────────────
   { action: 'camera.orbit',        label: 'Orbit Camera',   key: '1', modifiers: [], category: 'Camera', description: 'Switch to orbit camera.' },
   { action: 'camera.fly',          label: 'Fly Camera',     key: '2', modifiers: [], category: 'Camera', description: 'Switch to fly camera.' },

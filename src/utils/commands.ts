@@ -1,6 +1,6 @@
 import { useEditorStore, type EditorState, type SceneObject } from '@/store/editorStore'
 import { deserializeMap, serializeMap } from '@/store/mapSerialization'
-import { isObjectId, LayerId, ObjectId } from '@/types/brand'
+import { isObjectId, LayerId, MaterialId, ObjectId } from '@/types/brand'
 
 // Base command interface
 export interface Command {
@@ -51,6 +51,67 @@ export class TransformCommand implements Command {
   undo(): void {
     const { updateObjectTransform } = useEditorStore.getState()
     updateObjectTransform(this.objectId, this.oldTransform)
+  }
+}
+
+// T54 — Paint command: one command per brush stroke, not per hit.
+// A stroke can touch many objects as the cursor drags across the
+// scene; `usePaintTool` accumulates every distinct object touched
+// during the pointer-down..pointer-up window (applying the material
+// live for immediate feedback) and builds a single `PaintCommand`
+// on pointer-up covering all of them. That keeps the undo stack at
+// one entry per stroke, matching `TransformCommand`'s one-entry-
+// per-drag shape rather than one entry per mousemove.
+//
+// Each target snapshots exactly enough of its PRE-stroke material
+// state to restore it: either the preset it was linked to (+ its
+// overrides), or its raw `material` field if it wasn't linked to a
+// preset, or neither if the object had no material at all. This is
+// a delta, not a full-object snapshot — consistent with
+// `TransformCommand` capturing only old/new transforms rather than
+// the whole `SceneObject`.
+export interface PaintTargetSnapshot {
+  objectId: ObjectId
+  previousMaterialPresetId?: MaterialId
+  previousMaterialOverrides?: SceneObject['materialOverrides']
+  previousMaterial?: SceneObject['material']
+}
+
+export class PaintCommand implements Command {
+  private targets: PaintTargetSnapshot[]
+  private materialPresetId: MaterialId
+  public description: string
+
+  constructor(targets: PaintTargetSnapshot[], materialPresetId: MaterialId) {
+    this.targets = targets
+    this.materialPresetId = materialPresetId
+    this.description = `Paint ${targets.length} object(s)`
+  }
+
+  execute(): void {
+    const { linkObjectToPreset } = useEditorStore.getState()
+    this.targets.forEach(target => {
+      linkObjectToPreset(target.objectId, this.materialPresetId, {})
+    })
+  }
+
+  undo(): void {
+    const { linkObjectToPreset, unlinkObjectFromPreset, updateObjectMaterial } =
+      useEditorStore.getState()
+    this.targets.forEach(target => {
+      if (target.previousMaterialPresetId) {
+        linkObjectToPreset(
+          target.objectId,
+          target.previousMaterialPresetId,
+          target.previousMaterialOverrides ?? {}
+        )
+      } else if (target.previousMaterial) {
+        unlinkObjectFromPreset(target.objectId)
+        updateObjectMaterial(target.objectId, target.previousMaterial)
+      } else {
+        unlinkObjectFromPreset(target.objectId)
+      }
+    })
   }
 }
 

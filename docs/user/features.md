@@ -14,6 +14,7 @@
 | Selection (click / Shift+Click / Ctrl+A)            | Viewport                              | [getting-started.md](getting-started.md#place-your-first-object) |
 | Duplicate / copy / paste / delete / group / ungroup | Ctrl+D / C / V / Delete / G / Shift+G | [getting-started.md](getting-started.md#place-your-first-object) |
 | Undo / redo                                         | Ctrl+Z / Ctrl+Y                       | [getting-started.md](getting-started.md#place-your-first-object) |
+| Material paint tool (brush + UV editor)             | P                                     | [Material paint tool](#material-paint-tool) below                |
 
 ## Procedural generation
 
@@ -33,6 +34,36 @@
 | Thumbnail generation                            | Background            | `src-tauri/src/assets/thumbnail/`                                   |
 | Broken Links report                             | Assets panel banner   | [Broken Links code](../components/AssetsPanel/BrokenLinksPanel.tsx) |
 | Batch import (texture compression + validation) | Project settings      | `src-tauri/src/assets/import.rs`                                    |
+
+## Material paint tool
+
+Press **P** to toggle the paint tool. A settings bar appears at the
+top of the viewport:
+
+| Control          | What it does                                                                 |
+| ----------------- | ----------------------------------------------------------------------------- |
+| Radius slider     | Brush size, in world units.                                                   |
+| Falloff (linear / smooth / flat) | How strongly the brush affects objects near the edge of its radius — `flat` paints everything inside the radius equally; `linear`/`smooth` taper off, so `smooth` can exclude an edge object that `flat` would still catch. |
+| Target material    | Which preset (from [Material presets](#customising)) the brush applies.       |
+| UV Editor          | Opens a pan/zoom editor for the selected object's UV offset + scale.          |
+
+Click-and-drag over the scene to paint: a raycast finds the surface
+under the cursor, and every unlocked mesh object within the brush
+radius of the hit point is linked to the target material. Locked
+objects (Layers/Hierarchy lock state) are never painted. A brush-
+shaped circle indicator follows the cursor on the surface. Each
+click-drag-release stroke is a single undo entry (Ctrl+Z), regardless
+of how many objects it touched.
+
+The UV editor doesn't re-unwrap a mesh — it applies a single
+offset+scale transform on top of the mesh's existing UVs. Drag inside
+the editor to pan the offset; scroll to scale. Reset restores the
+identity transform (the mesh's authored UVs, unmodified).
+
+Source: `src/utils/paintTool.ts` (brush/falloff math),
+`src/utils/uvTransform.ts` (UV pan/zoom math),
+`src/hooks/usePaintTool.ts` (raycasting + stroke handling),
+`src/components/PaintTool/` (UI).
 
 ## Prefab system
 
