@@ -133,6 +133,13 @@ tools** to enable rapid level design and iteration.
 - [Export Formats](docs/user/export-formats.md) — Rust source, JSON, RON, GLTF, FBX wire shapes.
 - [Hello Bevy Tutorial](docs/user/hello-bevy.md) — generate → export → load in Bevy → Rapier collision → player spawn.
 
+### 🛠️ Developer documentation
+
+- [Architecture](docs/developer/architecture.md) — Tauri / React / Three.js / Rust layout, anti-corruption boundaries, the store-vs-Map-vs-Ref rule.
+- [Authoring Generators](docs/developer/authoring-generators.md) — add a new procedural algorithm end-to-end (worked Voronoi example).
+- [Authoring Exports](docs/developer/authoring-exports.md) — add a new export format with one file + one dispatcher line.
+- [Customisation FAQ](docs/developer/customisation-faq.md) — the common "I just want to change X" recipes.
+
 ---
 
 ## 🚧 Upcoming
