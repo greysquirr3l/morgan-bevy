@@ -36,6 +36,7 @@ import { PanelLeft, PanelRight } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import HelpModal from './components/HelpModal'
 import Inspector from './components/Inspector/Inspector'
+import TutorialOverlay from './components/Tutorial'
 import UpdateNotification from './components/Update/UpdateNotification'
 
 // Robust debug logging system
@@ -365,6 +366,8 @@ function AppContent() {
   const [activeMenu, setActiveMenu] = useState<string | null>(null)
   const [menuPosition, setMenuPosition] = useState({ x: 0, y: 0 })
   const [helpOpen, setHelpOpen] = useState(false)
+  // T58: which tutorial (if any) the TutorialOverlay is showing.
+  const [activeTutorialId, setActiveTutorialId] = useState<string | null>(null)
   const lastViewportChangeRef = useRef(0)
 
   // Keyboard shortcuts modal
@@ -605,6 +608,12 @@ function AppContent() {
       case 'about':
         setHelpOpen(true)
         break
+      case 'tutorial-getting-started':
+        setActiveTutorialId('getting-started')
+        break
+      case 'tutorial-procedural-generation':
+        setActiveTutorialId('procedural-generation')
+        break
       default:
         assertNeverAction(action, HELP_ACTIONS)
     }
@@ -673,6 +682,7 @@ function AppContent() {
           <span
             className={`hover:text-editor-accent cursor-pointer px-2 py-1 rounded ${activeMenu === 'File' || fileMenuOpen ? 'bg-editor-accent text-white' : ''}`}
             onClick={e => handleMenuClick('File', e)}
+            data-tutorial-target="file-menu-trigger"
           >
             File
           </span>
@@ -1281,6 +1291,19 @@ function AppContent() {
                 >
                   About Morgan-Bevy
                 </button>
+                <div className="border-t border-editor-border my-1"></div>
+                <button
+                  className="w-full text-left px-4 py-2 text-sm hover:bg-editor-hover"
+                  onClick={() => handleHelpAction('tutorial-getting-started')}
+                >
+                  Getting Started Tutorial
+                </button>
+                <button
+                  className="w-full text-left px-4 py-2 text-sm hover:bg-editor-hover"
+                  onClick={() => handleHelpAction('tutorial-procedural-generation')}
+                >
+                  Procedural Generation Tutorial
+                </button>
               </div>
             )}
           </div>
@@ -1330,6 +1353,9 @@ function AppContent() {
 
       {/* Help Modal */}
       <HelpModal isOpen={helpOpen} onClose={() => setHelpOpen(false)} />
+
+      {/* T58: Tutorial overlay */}
+      <TutorialOverlay tutorialId={activeTutorialId} onClose={() => setActiveTutorialId(null)} />
 
       {/* T68: In-app update notification (renders null if no update / plugin unreachable). */}
       <UpdateNotification />

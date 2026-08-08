@@ -119,6 +119,10 @@ the **Broken Links** banner at the top of the Assets panel.
 
 ## Next steps
 
+- [Interactive tutorial](tutorial.md) — the same first-object →
+  select → inspect → move → save flow above, but guided step by
+  step inside the editor itself. Open **Help → Getting Started
+  Tutorial**.
 - [Features reference](features.md) — every major feature in one
   page, with links to the detailed guide for each.
 - [Markers](markers.md) — the 10 runtime markers the editor can

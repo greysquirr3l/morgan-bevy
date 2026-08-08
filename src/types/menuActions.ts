@@ -57,7 +57,13 @@ export const TOOLS_ACTIONS = [
 ] as const
 export type ToolsAction = (typeof TOOLS_ACTIONS)[number]
 
-export const HELP_ACTIONS = ['keyboard-shortcuts', 'help', 'about'] as const
+export const HELP_ACTIONS = [
+  'keyboard-shortcuts',
+  'help',
+  'about',
+  'tutorial-getting-started',
+  'tutorial-procedural-generation',
+] as const
 export type HelpAction = (typeof HELP_ACTIONS)[number]
 
 /**

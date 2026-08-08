@@ -216,7 +216,10 @@ export default function Hierarchy({ hideHeader = false }: HierarchyProps) {
       </div>
 
       {/* Tree View */}
-      <div className="flex-1 overflow-auto custom-scrollbar">
+      <div
+        className="flex-1 overflow-auto custom-scrollbar"
+        data-tutorial-target="hierarchy-object-list"
+      >
         {filteredObjects.length === 0 ? (
           <div className="p-4 text-center text-editor-textMuted text-sm">
             {searchTerm ? 'No objects match your search' : 'No objects in scene'}

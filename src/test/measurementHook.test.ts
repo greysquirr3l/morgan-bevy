@@ -33,7 +33,7 @@ describe('T53 useMeasurementTool', () => {
       gridSize: 1,
     })
     expect(result.current.measurements).toEqual([])
-    expect(result.current.current.id).toBe('')
+    expect(result.current.current!.id).toBe('')
   })
 
   it('cycleMode moves through the three modes in order', () => {
@@ -62,14 +62,14 @@ describe('T53 useMeasurementTool', () => {
     const { result } = renderHook(() => useMeasurementTool())
     act(() => result.current.setMode('distance'))
     act(() => result.current.addPoint([0, 0, 0]))
-    expect(result.current.current.points).toHaveLength(1)
+    expect(result.current.current!.points).toHaveLength(1)
     expect(result.current.measurements).toHaveLength(1)
     act(() => result.current.addPoint([3, 0, 4]))
-    expect(result.current.current.points).toHaveLength(2)
+    expect(result.current.current!.points).toHaveLength(2)
     // distance mode: 2 points max; a third add starts a NEW measurement.
     act(() => result.current.addPoint([6, 0, 0]))
     expect(result.current.measurements).toHaveLength(2)
-    expect(result.current.current.id).not.toBe(result.current.measurements[0]!.id)
+    expect(result.current.current!.id).not.toBe(result.current.measurements[0]!.id)
   })
 
   it('addPoint is a no-op when the tool is inactive', () => {
@@ -85,9 +85,9 @@ describe('T53 useMeasurementTool', () => {
     act(() => result.current.addPoint([0, 0, 0]))
     act(() => result.current.addPoint([1, 0, 0]))
     act(() => result.current.addPoint([0, 1, 0]))
-    expect(result.current.current.points).toHaveLength(3)
+    expect(result.current.current!.points).toHaveLength(3)
     act(() => result.current.removeLastPoint())
-    expect(result.current.current.points).toHaveLength(2)
+    expect(result.current.current!.points).toHaveLength(2)
   })
 
   it('clear empties the current measurement', () => {
@@ -95,7 +95,7 @@ describe('T53 useMeasurementTool', () => {
     act(() => result.current.setMode('area'))
     act(() => result.current.addPoint([0, 0, 0]))
     act(() => result.current.clear())
-    expect(result.current.current.id).toBe('')
+    expect(result.current.current!.id).toBe('')
   })
 
   it('toggleRuler flips the ruler visibility', () => {

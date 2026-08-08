@@ -186,6 +186,15 @@ export default function HelpModal({ isOpen, onClose }: HelpModalProps) {
               </li>
               <li>
                 <a
+                  href="docs/user/tutorial.md"
+                  className="text-editor-accent hover:underline inline-flex items-center gap-2"
+                >
+                  <FileText className="w-3.5 h-3.5" />
+                  In-app tutorial guide
+                </a>
+              </li>
+              <li>
+                <a
                   href="https://github.com/greysquirr3l/morgan-bevy/issues"
                   className="text-editor-accent hover:underline inline-flex items-center gap-2"
                 >

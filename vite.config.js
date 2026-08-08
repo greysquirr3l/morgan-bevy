@@ -28,6 +28,7 @@ export default defineConfig(function () { return ({
             '@': resolve(__dirname, './src'),
             '@/components': resolve(__dirname, './src/components'),
             '@/hooks': resolve(__dirname, './src/hooks'),
+            '@/state': resolve(__dirname, './src/state'),
             '@/store': resolve(__dirname, './src/store'),
             '@/types': resolve(__dirname, './src/types'),
             '@/utils': resolve(__dirname, './src/utils'),
