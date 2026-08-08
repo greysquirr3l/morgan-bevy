@@ -795,6 +795,8 @@ fn main() {
             // T33: thumbnail pipeline
             assets::generate_thumbnails,
             assets::cleanup_thumbnails,
+            // T35: asset import pipeline
+            assets::import_assets,
             // Crash reporting
             crash_log::append_frontend_crash_log,
             // Recent-projects support

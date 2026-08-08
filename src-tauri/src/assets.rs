@@ -1,4 +1,5 @@
 pub mod database;
+pub mod import;
 pub mod scanner;
 pub mod thumbnail;
 
@@ -639,4 +640,39 @@ pub async fn cleanup_thumbnails(app_handle: tauri::AppHandle) -> Result<usize, S
     let db = AssetDatabase::new(&app_data_dir.join("assets.db"))
         .map_err(|e| format!("Failed to open DB: {e}"))?;
     thumbnail::cleanup::cleanup_orphans(&db, &thumbnails_dir)
+}
+
+// ─── T35 — Asset import pipeline ───────────────────────────────────────────────
+
+use import::{run_import, ImportResult, ImportSettings};
+
+/// T35: batch-import a list of source paths through the texture
+/// compression + magic-byte validation pipeline. The original
+/// files are never modified — outputs land in the per-project
+/// `.morgana/imports/` cache directory.
+#[tauri::command]
+pub async fn import_assets(
+    sources: Vec<String>,
+    settings: ImportSettings,
+    cache_dir: Option<String>,
+) -> Result<ImportResult, String> {
+    let cache = match cache_dir {
+        Some(p) => PathBuf::from(p),
+        None => default_import_cache_dir()?,
+    };
+    let paths: Vec<PathBuf> = sources.into_iter().map(PathBuf::from).collect();
+    Ok(run_import(&paths, &settings, &cache, None::<fn(&str)>))
+}
+
+fn default_import_cache_dir() -> Result<PathBuf, String> {
+    let app_data = std::env::var("MORGANA_APP_DATA")
+        .ok()
+        .map(PathBuf::from)
+        .or_else(|| {
+            std::env::var("HOME")
+                .ok()
+                .map(|h| PathBuf::from(h).join(".morgana").join("imports"))
+        })
+        .ok_or_else(|| "could not resolve app data directory".to_string())?;
+    Ok(app_data)
 }
