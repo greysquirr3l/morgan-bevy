@@ -3,6 +3,10 @@ import { TransformCommand } from '@/utils/commands'
 import { Search } from 'lucide-react'
 import { useShallow } from 'zustand/react/shallow'
 import MaterialEditor from '../MaterialEditor'
+import { ConnectedAnimationMarkerPanel } from './AnimationMarkerPanel'
+import { ConnectedAudioMarkerPanel } from './AudioMarkerPanel'
+import { ConnectedLightMarkerPanel } from './LightMarkerPanel'
+import { ConnectedVfxMarkerPanel } from './VfxMarkerPanel'
 
 // Helper function to get default tile character for tile types
 const getTileChar = (tileType: string): string => {
@@ -326,6 +330,19 @@ export default function Inspector() {
             <option value="pyramid">Pyramid</option>
           </select>
         </div>
+
+        {/* T91c: marker panels — composition only. The four
+            ConnectedXyzMarkerPanel wrappers pull their own slices
+            from the store and wire the T91b update actions. Single-
+            selection only. */}
+        {selectedCount === 1 && primaryObject && (
+          <div className="space-y-4">
+            <ConnectedLightMarkerPanel objectId={primaryObject.id} />
+            <ConnectedAnimationMarkerPanel objectId={primaryObject.id} />
+            <ConnectedAudioMarkerPanel objectId={primaryObject.id} />
+            <ConnectedVfxMarkerPanel objectId={primaryObject.id} />
+          </div>
+        )}
 
         {/* Tile Properties */}
         <div className="space-y-3">

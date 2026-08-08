@@ -209,3 +209,123 @@ export function isAnyMarker(value: unknown): boolean {
     isLightMarker(value) || isAnimationMarker(value) || isAudioMarker(value) || isVfxMarker(value)
   )
 }
+
+// ─── Default marker factories ─────────────────────────────────────────────────
+//
+// Used by T91c's Inspector panels to seed an "Add <marker>" affordance
+// and to backfill the variant-specific fields when a user switches the
+// `kind` of an existing marker. Every default passes its corresponding
+// zod schema (T91a) — these are the canonical "fresh" marker values.
+//
+// IMPORTANT: when switching `kind`, the new variant is built from a
+// default and selectively carries over fields the two variants share
+// (e.g. LightMarker.Point → Spot carries `color`, `intensity`, `range`,
+// `shadows`; Point → Directional carries `color`, `intensity`, `shadows`).
+// A half-populated variant (e.g. `spot` missing `outer_angle`) would
+// fail the schema and the Rust deserialize — the panel tests pin this
+// by parsing the resulting store value with the zod schema.
+
+export function defaultLightMarker(kind: LightMarkerKind = LIGHT_MARKER_KINDS.point): LightMarker {
+  switch (kind) {
+    case LIGHT_MARKER_KINDS.point:
+      return {
+        kind: LIGHT_MARKER_KINDS.point,
+        color: [1, 1, 1],
+        intensity: 1000,
+        range: 10,
+        shadows: true,
+      }
+    case LIGHT_MARKER_KINDS.spot:
+      return {
+        kind: LIGHT_MARKER_KINDS.spot,
+        color: [1, 1, 1],
+        intensity: 1000,
+        range: 10,
+        inner_angle: 0.3,
+        outer_angle: 0.6,
+        shadows: true,
+      }
+    case LIGHT_MARKER_KINDS.directional:
+      return {
+        kind: LIGHT_MARKER_KINDS.directional,
+        color: [1, 1, 1],
+        intensity: 1.0,
+        shadows: false,
+      }
+    default: {
+      // Exhaustiveness — a new variant in LIGHT_MARKER_KINDS that
+      // doesn't get a case here becomes a compile error rather than
+      // a silently-broken default.
+      const _exhaustive: never = kind
+      throw new Error(`defaultLightMarker: unknown kind ${String(_exhaustive)}`)
+    }
+  }
+}
+
+export function defaultAnimationMarker(
+  kind: AnimationMarkerKind = ANIMATION_MARKER_KINDS.play,
+): AnimationMarker {
+  switch (kind) {
+    case ANIMATION_MARKER_KINDS.play:
+      return {
+        kind: ANIMATION_MARKER_KINDS.play,
+        clip: '',
+        repeat: true,
+        speed: 1.0,
+      }
+    case ANIMATION_MARKER_KINDS.play_once:
+      return {
+        kind: ANIMATION_MARKER_KINDS.play_once,
+        clip: '',
+      }
+    default: {
+      const _exhaustive: never = kind
+      throw new Error(`defaultAnimationMarker: unknown kind ${String(_exhaustive)}`)
+    }
+  }
+}
+
+export function defaultAudioMarker(
+  kind: AudioMarkerKind = AUDIO_MARKER_KINDS.ambient,
+): AudioMarker {
+  switch (kind) {
+    case AUDIO_MARKER_KINDS.ambient:
+      return {
+        kind: AUDIO_MARKER_KINDS.ambient,
+        path: '',
+        volume: 1.0,
+        looping: true,
+      }
+    case AUDIO_MARKER_KINDS.one_shot:
+      return {
+        kind: AUDIO_MARKER_KINDS.one_shot,
+        path: '',
+        volume: 1.0,
+      }
+    default: {
+      const _exhaustive: never = kind
+      throw new Error(`defaultAudioMarker: unknown kind ${String(_exhaustive)}`)
+    }
+  }
+}
+
+export function defaultVfxMarker(kind: VfxMarkerKind = VFX_MARKER_KINDS.particle): VfxMarker {
+  switch (kind) {
+    case VFX_MARKER_KINDS.particle:
+      return {
+        kind: VFX_MARKER_KINDS.particle,
+        path: '',
+        count: 100,
+      }
+    case VFX_MARKER_KINDS.billboard:
+      return {
+        kind: VFX_MARKER_KINDS.billboard,
+        texture: '',
+        size: [1, 1],
+      }
+    default: {
+      const _exhaustive: never = kind
+      throw new Error(`defaultVfxMarker: unknown kind ${String(_exhaustive)}`)
+    }
+  }
+}

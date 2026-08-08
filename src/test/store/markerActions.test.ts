@@ -16,7 +16,7 @@
  *   - An object with no markers serializes with no `light`/`animation`/
  *     `audio`/`vfx` keys at all.
  */
-import { describe, expect, it, beforeEach } from 'vitest'
+import { beforeEach, describe, expect, it } from 'vitest'
 
 import { useEditorStore } from '@/store/editorStore'
 import { deserializeMap, serializeMap } from '@/store/mapSerialization'
@@ -196,10 +196,10 @@ describe('T91b persistence round-trip', () => {
     const state = useEditorStore.getState()
     const wire = JSON.stringify(serializeMap(state.sceneObjects))
     const parsed = JSON.parse(wire) as unknown
-    const restored = deserializeMap<ObjectId, (typeof state.sceneObjects extends Map<ObjectId, infer V> ? V : never)>(
-      parsed,
-      (k): k is ObjectId => typeof k === 'string',
-    )
+    const restored = deserializeMap<
+      ObjectId,
+      typeof state.sceneObjects extends Map<ObjectId, infer V> ? V : never
+    >(parsed, (k): k is ObjectId => typeof k === 'string')
 
     const obj = restored.get(id)
     expect(obj?.light).toEqual(pointLight)
