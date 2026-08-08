@@ -1,0 +1,34 @@
+name: Question
+description: Ask a quick question about the project — a single thread, no need for an issue.
+title: "[Question]: "
+labels:
+  - "question"
+body:
+  - type: markdown
+    attributes:
+      value: |
+        For broader questions (design topics, "what do you think of X?"), use **GitHub Discussions → Q&A** instead — Issues are for actionable work.
+  - type: textarea
+    id: question
+    attributes:
+      label: Question
+      description: Be specific. "How do I…" questions are welcome; "is the project alive?" is not.
+      placeholder: |
+        How do I configure the editor to skip texture compression for a specific asset? The `metadata.importSettings` field in the project file seems right but I can't find docs on which keys are honoured.
+    validations:
+      required: true
+  - type: textarea
+    id: tried
+    attributes:
+      label: What I've already tried
+      description: |
+        Show your work — it saves a round-trip. Links to docs you've read, search terms you've used, code snippets.
+    validations:
+      required: true
+  - type: textarea
+    id: context
+    attributes:
+      label: Context
+      description: |
+        What version of the editor, what platform, what you're trying to accomplish.
+        If the question is Bevy-side, mention the Bevy version too.

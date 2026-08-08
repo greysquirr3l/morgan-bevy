@@ -1,0 +1,89 @@
+name: Bug
+description: Report a defect — something the editor does wrong or unexpectedly.
+title: "[Bug]: "
+labels:
+  - "bug"
+  - "needs-triage"
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for filing a bug! Please fill in the sections below — the more specific, the faster we can reproduce and fix.
+  - type: dropdown
+    id: severity
+    attributes:
+      label: Severity
+      description: How bad is the impact?
+      options:
+        - label: "Blocker — can't use a major feature at all"
+          value: blocker
+        - label: "Major — a feature misbehaves but a workaround exists"
+          value: major
+        - label: "Minor — small visual / UX issue, doesn't block work"
+          value: minor
+        - label: "Cosmetic — typo, alignment, etc."
+          value: cosmetic
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: The version of Morgan-Bevy you saw this on (commit SHA, tag, or release).
+      placeholder: "v0.4.0 or commit ca5ee95"
+    validations:
+      required: true
+  - type: dropdown
+    id: os
+    attributes:
+      label: Operating system
+      options:
+        - macOS
+        - Linux
+        - Windows
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      description: Numbered, minimal. We should be able to follow these exactly.
+      placeholder: |
+        1. Open the editor with an empty scene
+        2. Click File → Open Template → Office
+        3. Press W
+        4. Observe the broken behaviour
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behaviour
+      description: What did you expect to happen?
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behaviour
+      description: What actually happened? Paste error messages / log lines verbatim.
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs / screenshots
+      description: |
+        Anything else that helps reproduce — `~/.morgana/logs/crash.log`,
+        DevTools console output, a screenshot. Code blocks are preferred
+        for log excerpts (paste raw, not as a screenshot).
+      render: shell
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Pre-flight
+      description: Confirm before submitting — this saves a triage round.
+      options:
+        - label: I searched existing issues and didn't find a duplicate.
+        - label: I tested on the latest commit on `main`.
+        - label: I ran `npm run lint && npm test && cargo test` and the failure persists.

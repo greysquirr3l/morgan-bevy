@@ -1,0 +1,9 @@
+blank_issues_enabled: false
+contact_links:
+  - name: GitHub Discussions — questions / ideas / show-and-tell
+    url: https://github.com/greysquirr3l/morgan-bevy/discussions
+    about: Use Discussions for questions, ideas, and showcase. Issues are for actionable bugs and features only.
+issue_templates:
+  - bug.yml
+  - feature.yml
+  - question.yml

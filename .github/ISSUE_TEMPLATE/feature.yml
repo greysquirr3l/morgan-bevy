@@ -1,0 +1,76 @@
+name: Feature
+description: Propose a new feature or a change to existing behaviour.
+title: "[Feature]: "
+labels:
+  - "enhancement"
+  - "needs-triage"
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Describe the use case and the proposed behaviour. Avoid pure design discussions — those belong in **Discussions → Ideas**.
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What user-visible problem does this solve? What's the workaround today?
+      placeholder: |
+        Today, every shader edit requires a full editor restart. The user has to discard any unsaved scene to see the change take effect.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed behaviour
+      description: What should the editor do? Be specific about user-visible outcomes.
+      placeholder: |
+        A "Restart shaders" button next to the shader name in the Inspector that hot-reloads the shader file without restarting the editor.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: |
+        What else did you consider? Why is this the right path?
+        This helps reviewers understand the trade-offs.
+    validations:
+      required: false
+  - type: textarea
+    id: implementation
+    attributes:
+      label: Sketch of the implementation (optional)
+      description: |
+        Files you'd touch, new modules / commands / Tauri-side work, schema migrations.
+        Don't write the full patch — just enough for reviewers to gauge scope.
+  - type: dropdown
+    id: scope
+    attributes:
+      label: Scope
+      options:
+        - "Frontend only (src/)"
+        - "Backend only (src-tauri/)"
+        - "Companion crate (crates/bevy-morgan-integration/)"
+        - "Cross-cutting (frontend + backend + companion)"
+        - "Docs only"
+    validations:
+      required: true
+  - type: dropdown
+    id: size
+    attributes:
+      label: Estimated size
+      description: Roughly. The maintainer will adjust.
+      options:
+        - "Small — one file, one test"
+        - "Medium — 3-5 files, several tests"
+        - "Large — substantial work across modules"
+    validations:
+      required: true
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Pre-flight
+      options:
+        - label: I searched existing issues / Discussions for duplicates.
+        - label: I've described the user-visible problem, not the implementation.
+        - label: I've considered at least one alternative.
