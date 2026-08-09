@@ -1,9 +1,6 @@
 /** @type {import('tailwindcss').Config} */
 export default {
-  content: [
-    "./index.html",
-    "./src/**/*.{js,ts,jsx,tsx}",
-  ],
+  content: ['./index.html', './src/**/*.{js,ts,jsx,tsx}'],
   theme: {
     extend: {
       colors: {
@@ -14,12 +11,14 @@ export default {
           accent: '#007acc',
           text: '#cccccc',
           textMuted: '#969696',
+          hover: '#2a2d2e',
+          surface: '#2d2d30',
         },
         generation: {
           bsp: '#4ade80',
           wfc: '#f59e0b',
           manual: '#ef4444',
-        }
+        },
       },
       fontFamily: {
         mono: ['Consolas', 'Monaco', 'Courier New', 'monospace'],
@@ -27,7 +26,7 @@ export default {
     },
   },
   plugins: [
-    function({ addUtilities }) {
+    function ({ addUtilities }) {
       addUtilities({
         '.scrollbar-hide': {
           /* Hide scrollbar for Chrome, Safari and Opera */
@@ -39,6 +38,6 @@ export default {
           'scrollbar-width': 'none',
         },
       })
-    }
+    },
   ],
 }

@@ -306,10 +306,13 @@ export class SaveCommand implements Command {
       },
     }
 
-    // Save to localStorage
-    localStorage.setItem('morgan-bevy.scene', JSON.stringify(this.savedData))
-
-    // Also create downloadable backup
+    // Save the canonical backup as a downloadable file. We do NOT
+    // mirror to `localStorage` here — the `useAutoSave` hook already
+    // persists the live editor state under the `morgan-bevy.autosave`
+    // key. Writing the same data under `morgan-bevy.scene` was
+    // orphaned (no code read it back) and just doubled the storage
+    // cost on every save. File download + autosave are the two save
+    // paths now.
     const blob = new Blob([JSON.stringify(this.savedData, null, 2)], { type: 'application/json' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')

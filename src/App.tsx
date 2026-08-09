@@ -40,9 +40,33 @@ import TutorialOverlay from './components/Tutorial'
 import UpdateNotification from './components/Update/UpdateNotification'
 
 // Robust debug logging system
+function isObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
+}
+
 class DebugLogger {
   private logs: string[] = []
   private startTime = Date.now()
+
+  constructor() {
+    // Rehydrate the log buffer from a previous session so the
+    // "export logs" feature can include logs from before the most
+    // recent page load. The `morgan-bevy.debug-logs` key is the
+    // canonical store; without this read, every page load starts
+    // with an empty buffer and `exportLogs()` only captures the
+    // current session.
+    try {
+      const raw = localStorage.getItem('morgan-bevy.debug-logs')
+      if (raw) {
+        const parsed: unknown = JSON.parse(raw)
+        if (isObject(parsed) && Array.isArray(parsed['logs'])) {
+          this.logs = parsed['logs'].filter((e): e is string => typeof e === 'string')
+        }
+      }
+    } catch (e) {
+      console.error('Failed to rehydrate debug logs:', e)
+    }
+  }
 
   log(category: string, message: string, data?: any) {
     const timestamp = Date.now() - this.startTime
