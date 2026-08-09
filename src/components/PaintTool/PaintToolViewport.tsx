@@ -15,7 +15,10 @@ export default function PaintToolViewport() {
   if (!paintToolActive) return null
 
   return (
-    <mesh ref={brushIndicatorRef} visible={false} renderOrder={999} data-testid="paint-brush-ring">
+    // Note: don't use `data-testid` here — R3F's applyProps walks
+    // `instance.data.testid`, which crashes on Three.js objects
+    // (no `.data` property). `name` is a real Object3D property.
+    <mesh ref={brushIndicatorRef} name="paint-brush-ring" visible={false} renderOrder={999}>
       <ringGeometry args={[0.85, 1, 48]} />
       <meshBasicMaterial
         color="#60a5fa"

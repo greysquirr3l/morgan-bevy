@@ -31,12 +31,12 @@ describe('PaintToolViewport', () => {
 
   it('renders nothing when the paint tool is inactive', () => {
     const { container } = render(<PaintToolViewport />)
-    expect(container.querySelector('[data-testid="paint-brush-ring"]')).toBeNull()
+    expect(container.querySelector('[name="paint-brush-ring"]')).toBeNull()
   })
 
   it('renders the brush ring indicator once the paint tool is active', () => {
     useEditorStore.setState({ paintToolActive: true })
     const { container } = render(<PaintToolViewport />)
-    expect(container.querySelector('[data-testid="paint-brush-ring"]')).not.toBeNull()
+    expect(container.querySelector('[name="paint-brush-ring"]')).not.toBeNull()
   })
 })

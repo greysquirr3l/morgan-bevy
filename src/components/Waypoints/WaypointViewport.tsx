@@ -54,21 +54,21 @@ export default function WaypointViewport({ navMesh }: WaypointViewportProps) {
   const pathGeometry = usePathLineGeometry(pathPositions)
 
   return (
-    <group name="waypoint-overlay" renderOrder={11} data-testid="waypoint-overlay">
+    // Note: do NOT use `data-testid` on R3F elements. R3F's applyProps
+    // walks `instance.data.testid` to resolve nested keys, but Three.js
+    // objects don't have a `.data` property, so it crashes with
+    // "Cannot read properties of undefined (reading 'testid')". Use
+    // `name` (a real Three.js Object3D property) for selectors instead.
+    <group name="waypoint-overlay" renderOrder={11}>
       {waypoints.map(wp => (
-        <mesh
-          key={wp.id}
-          position={wp.position}
-          renderOrder={12}
-          data-testid={`waypoint-sphere-${wp.id}`}
-        >
+        <mesh key={wp.id} name={`waypoint-sphere-${wp.id}`} position={wp.position} renderOrder={12}>
           <sphereGeometry args={[WAYPOINT_SPHERE_RADIUS, 12, 12]} />
           <meshBasicMaterial color="#34d399" depthTest={false} transparent opacity={0.9} />
         </mesh>
       ))}
 
       {pathPositions.length > 0 && (
-        <lineSegments geometry={pathGeometry} data-testid="waypoint-path-lines">
+        <lineSegments geometry={pathGeometry} name="waypoint-path-lines">
           <lineBasicMaterial color="#38bdf8" depthTest={false} transparent opacity={0.9} />
         </lineSegments>
       )}

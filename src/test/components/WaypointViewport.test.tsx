@@ -31,8 +31,8 @@ describe('WaypointViewport', () => {
 
   it('renders the overlay group with no spheres when there are no waypoints', () => {
     const { container } = render(<WaypointViewport navMesh={null} />)
-    expect(container.querySelector('[data-testid="waypoint-overlay"]')).not.toBeNull()
-    expect(container.querySelectorAll('[data-testid^="waypoint-sphere-"]').length).toBe(0)
+    expect(container.querySelector('[name="waypoint-overlay"]')).not.toBeNull()
+    expect(container.querySelectorAll('[name^="waypoint-sphere-"]').length).toBe(0)
   })
 
   it('renders one sphere per waypoint', () => {
@@ -43,9 +43,9 @@ describe('WaypointViewport', () => {
       ],
     })
     const { container } = render(<WaypointViewport navMesh={null} />)
-    expect(container.querySelectorAll('[data-testid^="waypoint-sphere-"]').length).toBe(2)
-    expect(container.querySelector('[data-testid="waypoint-sphere-a"]')).not.toBeNull()
-    expect(container.querySelector('[data-testid="waypoint-sphere-b"]')).not.toBeNull()
+    expect(container.querySelectorAll('[name^="waypoint-sphere-"]').length).toBe(2)
+    expect(container.querySelector('[name="waypoint-sphere-a"]')).not.toBeNull()
+    expect(container.querySelector('[name="waypoint-sphere-b"]')).not.toBeNull()
   })
 
   it('renders path lines for a patrol route with 2+ waypoints', () => {
@@ -59,7 +59,7 @@ describe('WaypointViewport', () => {
       ],
     })
     const { container } = render(<WaypointViewport navMesh={null} />)
-    expect(container.querySelector('[data-testid="waypoint-path-lines"]')).not.toBeNull()
+    expect(container.querySelector('[name="waypoint-path-lines"]')).not.toBeNull()
   })
 
   it('renders no path lines when there are no patrol routes', () => {
@@ -68,6 +68,6 @@ describe('WaypointViewport', () => {
       patrolRoutes: [],
     })
     const { container } = render(<WaypointViewport navMesh={null} />)
-    expect(container.querySelector('[data-testid="waypoint-path-lines"]')).toBeNull()
+    expect(container.querySelector('[name="waypoint-path-lines"]')).toBeNull()
   })
 })
