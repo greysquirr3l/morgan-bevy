@@ -5,6 +5,25 @@ use serde::{Serialize, Deserialize};
 use std::collections::HashMap;
 use crate::Transform3D;
 
+// T56: navigation mesh generation. Re-exported here so consumers
+// (main.rs, export/exporters.rs, and a future T57 A* pathing module)
+// can use `spatial::NavMesh` etc. without reaching into the
+// submodule path. `morgan-bevy` is a `bin` crate, so unused `pub
+// use` re-exports are flagged as dead by rustc even though they're
+// part of this module's intended public surface -- `NavMesh` is
+// used today (main.rs / exporters.rs); the rest are exported ahead
+// of T57 (A* pathing over `NavMesh.polygons`), which is the reason
+// this module exists in the first place.
+pub mod navmesh;
+#[expect(
+    unused_imports,
+    reason = "NavConnection/NavMeshError/NavObstacle/NavPolygon/Obstacle/ObstacleKind/OffMeshConnection/OffMeshConnectionKind/generate_navmesh are exported for T57 (A* pathing over NavMesh.polygons), not yet consumed outside spatial::navmesh itself; NavMesh is used today (main.rs / exporters.rs)"
+)]
+pub use navmesh::{
+    generate_navmesh, NavConnection, NavMesh, NavMeshError, NavObstacle, NavPolygon, Obstacle,
+    ObstacleKind, OffMeshConnection, OffMeshConnectionKind, WalkableSurface,
+};
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BoundingBox {
     pub min: [f32; 3],

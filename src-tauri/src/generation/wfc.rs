@@ -642,6 +642,9 @@ impl WFCGenerator {
                 min: [0.0, 0.0, 0.0],
                 max: [(self.width as f64) as f32, 1.0, (self.height as f64) as f32],
             },
+            // T56: navmesh is generated on demand via the
+            // `generate_navmesh` command, not by WFC generation.
+            navmesh: None,
         })
     }
 }

@@ -1,6 +1,7 @@
 import { useBoxSelection } from '@/hooks/useBoxSelection'
 import { useCameraControls } from '@/hooks/useCameraControls'
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts'
+import { useNavMesh } from '@/hooks/useNavMesh'
 import { PerformanceObject, usePerformanceManager } from '@/performance'
 import { useEditorStore } from '@/store/editorStore'
 import { Grid, Stats } from '@react-three/drei'
@@ -10,6 +11,7 @@ import TransformConstraintIndicator from '../TransformConstraintIndicator'
 import TransformGizmos from '../TransformGizmos'
 import BoxSelection, { BoxSelectionOverlay } from './BoxSelection'
 import CameraSystem from './CameraSystem'
+import NavMeshOverlay from './NavMeshOverlay'
 import OptimizedScene, { PerformanceOverlay } from './OptimizedScene'
 import Scene from './Scene'
 // Camera controls interface
@@ -80,6 +82,15 @@ export default forwardRef<CameraControlsRef, object>(function Viewport3D(_props,
   const [useOptimizedRendering, setUseOptimizedRendering] = useState(true)
   const { boxState } = useBoxSelection()
   useKeyboardShortcuts()
+
+  // T56: navmesh generation + viewport toggle. The navmesh is
+  // fetched once from Rust (not stored in Zustand — per-frame
+  // geometry doesn't belong in global state) and regenerated
+  // on-demand from the current scene objects.
+  const navMeshTool = useNavMesh()
+  const handleGenerateNavMesh = useCallback(() => {
+    void navMeshTool.regenerate(sceneObjects)
+  }, [navMeshTool, sceneObjects])
 
   // Performance state managed locally
   const [metrics, setMetrics] = useState({
@@ -281,6 +292,9 @@ export default forwardRef<CameraControlsRef, object>(function Viewport3D(_props,
         {/* Box Selection - needs to be inside Canvas for R3F hooks */}
         <BoxSelection />
 
+        {/* Navmesh overlay (T56) - needs to be inside Canvas for R3F hooks */}
+        <NavMeshOverlay navMesh={navMeshTool.navMesh} visible={navMeshTool.visible} />
+
         {/* Performance Stats */}
         {showStats && <Stats />}
       </Canvas>
@@ -305,6 +319,27 @@ export default forwardRef<CameraControlsRef, object>(function Viewport3D(_props,
           title="Toggle performance optimization"
         >
           {useOptimizedRendering ? '⚡ Optimized' : '🐌 Standard'}
+        </button>
+        <button
+          className={`px-2 py-1 text-xs rounded ${
+            navMeshTool.visible
+              ? 'bg-editor-accent text-white'
+              : 'bg-black bg-opacity-50 text-white hover:bg-opacity-75'
+          }`}
+          onClick={navMeshTool.toggleVisible}
+          title="Toggle navmesh overlay"
+          data-testid="navmesh-toggle"
+        >
+          Navmesh
+        </button>
+        <button
+          className="px-2 py-1 text-xs rounded bg-black bg-opacity-50 text-white hover:bg-opacity-75 disabled:opacity-50"
+          onClick={handleGenerateNavMesh}
+          disabled={navMeshTool.loading}
+          title="Generate navmesh from walkable scene objects"
+          data-testid="navmesh-generate"
+        >
+          {navMeshTool.loading ? 'Generating…' : 'Generate Navmesh'}
         </button>
       </div>
 

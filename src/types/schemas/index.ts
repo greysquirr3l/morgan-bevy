@@ -255,6 +255,85 @@ const VfxBillboardSchema = z
 export const VfxMarkerSchema = z.discriminatedUnion('kind', [VfxParticleSchema, VfxBillboardSchema])
 export type VfxMarkerInput = z.infer<typeof VfxMarkerSchema>
 
+// ─── Navigation mesh (T56) ──────────────────────────────────────────────────────
+//
+// Wire format mirrors `src-tauri/src/spatial/navmesh.rs`. Unlike the marker
+// enums above, `ObstacleKind` / `OffMeshConnectionKind` are plain
+// `#[serde(rename_all = "snake_case")]` unit enums (no `tag`), so they
+// serialize as bare strings (`"wall"`, `"free_standing"`) rather than
+// `{ kind: "..." }` objects — `z.enum(...)`, not `z.discriminatedUnion(...)`.
+
+export const NavWalkableSurfaceSchema = z
+  .object({
+    min: Vec2Schema,
+    max: Vec2Schema,
+    height: z.number(),
+  })
+  .strict()
+export type NavWalkableSurface = z.infer<typeof NavWalkableSurfaceSchema>
+
+export const NavObstacleKindSchema = z.enum(['wall', 'free_standing'])
+export type NavObstacleKind = z.infer<typeof NavObstacleKindSchema>
+
+export const NavObstacleInputSchema = z
+  .object({
+    min: Vec2Schema,
+    max: Vec2Schema,
+    kind: NavObstacleKindSchema,
+  })
+  .strict()
+export type NavObstacleInput = z.infer<typeof NavObstacleInputSchema>
+
+export const NavPolygonSchema = z
+  .object({
+    id: z.number().int().nonnegative(),
+    vertex_indices: z.array(z.number().int().nonnegative()),
+    triangle_indices: z.array(z.number().int().nonnegative()),
+  })
+  .strict()
+export type NavPolygon = z.infer<typeof NavPolygonSchema>
+
+export const NavObstacleSchema = z
+  .object({
+    min: Vec3Schema,
+    max: Vec3Schema,
+  })
+  .strict()
+export type NavObstacle = z.infer<typeof NavObstacleSchema>
+
+export const NavConnectionSchema = z
+  .object({
+    polygon_a: z.number().int().nonnegative(),
+    polygon_b: z.number().int().nonnegative(),
+    portal: z.tuple([Vec3Schema, Vec3Schema]),
+  })
+  .strict()
+export type NavConnection = z.infer<typeof NavConnectionSchema>
+
+export const OffMeshConnectionKindSchema = z.enum(['jump', 'ladder', 'teleport'])
+export type OffMeshConnectionKind = z.infer<typeof OffMeshConnectionKindSchema>
+
+export const OffMeshConnectionSchema = z
+  .object({
+    start: Vec3Schema,
+    end: Vec3Schema,
+    kind: OffMeshConnectionKindSchema,
+    bidirectional: z.boolean(),
+  })
+  .strict()
+export type OffMeshConnection = z.infer<typeof OffMeshConnectionSchema>
+
+export const NavMeshSchema = z
+  .object({
+    vertices: z.array(Vec3Schema),
+    polygons: z.array(NavPolygonSchema),
+    obstacles: z.array(NavObstacleSchema),
+    connections: z.array(NavConnectionSchema),
+    off_mesh_connections: z.array(OffMeshConnectionSchema),
+  })
+  .strict()
+export type NavMesh = z.infer<typeof NavMeshSchema>
+
 // ─── Validation helper ────────────────────────────────────────────────────────
 
 /**
