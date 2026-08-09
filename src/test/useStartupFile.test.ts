@@ -84,10 +84,11 @@ describe('useStartupFile hook', () => {
   it('does not throw when the listen call fails (web/dev environments)', async () => {
     mockListen.mockRejectedValue(new Error('no Tauri'))
     // Simulate a Tauri runtime so the hook actually attempts to
-    // subscribe. Without `window.__TAURI__` set, the hook's
-    // `isTauriRuntime()` guard returns early and `listen` is never
-    // called — that path is covered by the next test.
-    ;(window as unknown as { __TAURI__: unknown }).__TAURI__ = { invoke: vi.fn() }
+    // subscribe. The setup's default `__TAURI_INTERNALS__` mock
+    // already satisfies `isTauriRuntime()`, so listen IS called;
+    // we then make it reject to exercise the catch path.
+    const internals = (window as { __TAURI_INTERNALS__?: { invoke?: unknown } }).__TAURI_INTERNALS__
+    expect(internals).toBeDefined()
     const errorSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
 
     expect(() => renderHook(() => useStartupFile())).not.toThrow()
@@ -98,15 +99,17 @@ describe('useStartupFile hook', () => {
       )
     })
     errorSpy.mockRestore()
-    ;(window as unknown as { __TAURI__: unknown }).__TAURI__ = undefined
   })
 
   it('skips the listen call entirely when not running in a Tauri runtime', () => {
-    // No `window.__TAURI__` set in this test — simulates the Vite
-    // dev server / `npm run dev` path where the webview shell is
-    // absent.
-    const win = window as { __TAURI__?: unknown }
-    win.__TAURI__ = undefined
+    // No `window.__TAURI_INTERNALS__` set in this test — simulates
+    // the Vite dev server / `npm run dev` path where the webview
+    // shell is absent. `isTauriRuntime()` checks for
+    // `__TAURI_INTERNALS__.invoke` (not the legacy `__TAURI__`)
+    // because that's what `@tauri-apps/api/core` actually reads at
+    // call time.
+    const win = window as { __TAURI_INTERNALS__?: unknown }
+    win.__TAURI_INTERNALS__ = undefined
 
     expect(() => renderHook(() => useStartupFile())).not.toThrow()
     expect(mockListen).not.toHaveBeenCalled()

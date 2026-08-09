@@ -65,9 +65,25 @@ globalThis.mockTauri = {
   },
 }
 
-// Mock window.__TAURI__
+// Mock window.__TAURI__ (the legacy global, only set when
+// `withGlobalTauri: true` in `tauri.conf.json`).
 Object.defineProperty(window, '__TAURI__', {
   value: globalThis.mockTauri,
+  writable: true,
+})
+
+// Mock window.__TAURI_INTERNALS__ (the IPC bridge that
+// `@tauri-apps/api/core` `invoke()` reads at call time). The
+// `isTauriRuntime()` guard in `src/utils/tauriEnv.ts` checks for this
+// specifically — without `invoke` defined here, the guard would
+// return false even though `__TAURI__` is set, and components would
+// throw "Cannot read properties of undefined (reading 'invoke')"
+// instead of the friendly "feature unavailable in web preview" path.
+Object.defineProperty(window, '__TAURI_INTERNALS__', {
+  value: {
+    invoke: globalThis.mockTauri.invoke,
+    transformCallback: (cb: unknown) => cb,
+  },
   writable: true,
 })
 

@@ -1,5 +1,6 @@
 import { DatabaseStatsSchema, ScanResultSchema } from '@/types/schemas'
 import { invoke } from '@tauri-apps/api/core'
+import { isTauriRuntime } from '@/utils/tauriEnv'
 import {
   BarChart3,
   Box,
@@ -165,6 +166,16 @@ export default function AssetBrowser({ hideHeader = false }: AssetBrowserProps) 
       setIsLoading(true)
       setError(null)
 
+      // Guard: in non-Tauri builds (Vite dev / `npm run dev`) the
+      // IPC bridge isn't injected and every `invoke()` throws
+      // `Cannot read properties of undefined (reading 'invoke')`.
+      // Surface a friendly "feature unavailable" message instead.
+      if (!isTauriRuntime()) {
+        setError('Asset browser requires the Tauri runtime. Run `npm run tauri:dev` to use this feature.')
+        setIsLoading(false)
+        return
+      }
+
       // Initialize the database
       await invoke('initialize_asset_database')
 
@@ -189,6 +200,11 @@ export default function AssetBrowser({ hideHeader = false }: AssetBrowserProps) 
   const loadAssets = useCallback(async () => {
     try {
       setError(null)
+      // Same Tauri-runtime guard as `initializeDatabase` — only invoke
+      // when the IPC bridge is available. `loadAssets` is also called
+      // via `Promise.allSettled` from `initializeDatabase` so it can
+      // run after the runtime check has already passed.
+      if (!isTauriRuntime()) return
       const raw = await invoke('search_assets_database', {
         params: searchParams,
       })
@@ -230,6 +246,7 @@ export default function AssetBrowser({ hideHeader = false }: AssetBrowserProps) 
 
   const loadCollections = async () => {
     try {
+      if (!isTauriRuntime()) return
       const raw = await invoke('get_asset_collections')
       const parsed = CollectionArraySchema.safeParse(raw)
       if (!parsed.success) {
@@ -246,6 +263,7 @@ export default function AssetBrowser({ hideHeader = false }: AssetBrowserProps) 
 
   const loadStats = async () => {
     try {
+      if (!isTauriRuntime()) return
       const raw = await invoke('get_asset_database_stats')
       const parsed = DatabaseStatsSchema.safeParse(raw)
       if (!parsed.success) {
@@ -262,6 +280,10 @@ export default function AssetBrowser({ hideHeader = false }: AssetBrowserProps) 
 
   const scanAssets = async (signal?: AbortSignal) => {
     try {
+      if (!isTauriRuntime()) {
+        setError('Asset browser requires the Tauri runtime. Run `npm run tauri:dev` to use this feature.')
+        return
+      }
       setIsScanning(true)
       setError(null)
       setScanProgress(null)

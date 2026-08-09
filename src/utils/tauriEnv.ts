@@ -1,9 +1,17 @@
 /**
  * Tauri runtime detection — shared between components and hooks.
  *
- * `window.__TAURI__` is injected by the Tauri webview shell at
- * runtime. It is not part of the DOM lib types. We narrow here
- * instead of `as any` so the check stays a real (if minimal) type.
+ * `window.__TAURI_INTERNALS__` is the IPC bridge that the
+ * `@tauri-apps/api/core` `invoke()` function reads at call time
+ * (`window.__TAURI_INTERNALS__.invoke(cmd, args, options)`). It is
+ * always set by the Tauri 2.x webview regardless of the
+ * `withGlobalTauri` config — so it's the most reliable runtime
+ * signal. `window.__TAURI__` (the legacy global) is only set when
+ * `withGlobalTauri: true`, which is why earlier versions of this
+ * helper (which checked `__TAURI__`) returned `true` in tests but
+ * still got "Cannot read properties of undefined (reading 'invoke')"
+ * at call time: the test mock set `__TAURI__` but not
+ * `__TAURI_INTERNALS__.invoke`.
  *
  * Used by hooks that subscribe to Tauri events (e.g. `useStartupFile`)
  * and components that invoke Tauri commands (e.g. `AssetsPanel`).
@@ -12,10 +20,15 @@
  * `isTauriRuntime()` produces a friendly "feature unavailable in
  * web preview" message instead.
  */
-export interface TauriWindow extends Window {
-  __TAURI__?: unknown
+export interface TauriInternalsWindow extends Window {
+  __TAURI_INTERNALS__?: {
+    invoke?: (...args: unknown[]) => unknown
+    transformCallback?: (...args: unknown[]) => unknown
+  }
 }
 
 export function isTauriRuntime(): boolean {
-  return typeof window !== 'undefined' && Boolean((window as TauriWindow).__TAURI__)
+  if (typeof window === 'undefined') return false
+  const internals = (window as TauriInternalsWindow).__TAURI_INTERNALS__
+  return Boolean(internals && typeof internals.invoke === 'function')
 }
