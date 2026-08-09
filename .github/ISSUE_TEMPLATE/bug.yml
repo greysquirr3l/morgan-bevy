@@ -1,9 +1,9 @@
 name: Bug
 description: Report a defect — something the editor does wrong or unexpectedly.
-title: "[Bug]: "
+title: '[Bug]: '
 labels:
-  - "bug"
-  - "needs-triage"
+  - 'bug'
+  - 'needs-triage'
 body:
   - type: markdown
     attributes:
@@ -17,11 +17,11 @@ body:
       options:
         - label: "Blocker — can't use a major feature at all"
           value: blocker
-        - label: "Major — a feature misbehaves but a workaround exists"
+        - label: 'Major — a feature misbehaves but a workaround exists'
           value: major
         - label: "Minor — small visual / UX issue, doesn't block work"
           value: minor
-        - label: "Cosmetic — typo, alignment, etc."
+        - label: 'Cosmetic — typo, alignment, etc.'
           value: cosmetic
     validations:
       required: true
@@ -30,7 +30,7 @@ body:
     attributes:
       label: Version
       description: The version of Morgan-Bevy you saw this on (commit SHA, tag, or release).
-      placeholder: "v0.4.0 or commit ca5ee95"
+      placeholder: 'v0.4.0 or commit ca5ee95'
     validations:
       required: true
   - type: dropdown

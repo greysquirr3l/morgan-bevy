@@ -42,7 +42,10 @@ export function parseImportSettings(raw: unknown): ImportSettings {
   if (raw === null || raw === undefined) return defaultImportSettings()
   const parsed = ImportSettingsSchema.safeParse(raw)
   if (!parsed.success) {
-    console.warn('parseImportSettings: invalid settings, falling back to defaults:', parsed.error.message)
+    console.warn(
+      'parseImportSettings: invalid settings, falling back to defaults:',
+      parsed.error.message
+    )
     return defaultImportSettings()
   }
   return {
@@ -87,7 +90,10 @@ export interface ImportResult {
  * Inject import settings into a `ProjectData.metadata` field,
  * leaving every other key intact. Returns a new object.
  */
-export function withImportSettings(projectData: ProjectData, settings: ImportSettings): ProjectData {
+export function withImportSettings(
+  projectData: ProjectData,
+  settings: ImportSettings
+): ProjectData {
   const metadata = (projectData.metadata ?? {}) as Record<string, unknown>
   return {
     ...projectData,

@@ -90,8 +90,7 @@ pub struct ImportResult {
 /// match a known signature, `Err(_)` otherwise. `kind` is a
 /// short human label suitable for surfacing in the error path.
 pub fn detect_kind(path: &Path) -> Result<&'static str, String> {
-    let bytes = std::fs::read(path)
-        .map_err(|e| format!("read {}: {e}", path.display()))?;
+    let bytes = std::fs::read(path).map_err(|e| format!("read {}: {e}", path.display()))?;
     if bytes.len() < 12 {
         return Err(format!("file too short: {} bytes", bytes.len()));
     }
@@ -115,7 +114,10 @@ pub fn detect_kind(path: &Path) -> Result<&'static str, String> {
     if bytes.starts_with(b"; FBX") {
         return Ok("fbx");
     }
-    Err(format!("unrecognised magic bytes ({}...)", hex_prefix(&bytes)))
+    Err(format!(
+        "unrecognised magic bytes ({}...)",
+        hex_prefix(&bytes)
+    ))
 }
 
 fn hex_prefix(bytes: &[u8]) -> String {
@@ -148,7 +150,10 @@ where
 {
     if !cache_dir.exists() {
         if let Err(e) = std::fs::create_dir_all(cache_dir) {
-            warn!("import: failed to create cache dir {}: {e}", cache_dir.display());
+            warn!(
+                "import: failed to create cache dir {}: {e}",
+                cache_dir.display()
+            );
             return ImportResult {
                 entries: sources
                     .iter()
@@ -202,7 +207,10 @@ where
         };
         entries.push(entry);
     }
-    ImportResult { entries, transformed }
+    ImportResult {
+        entries,
+        transformed,
+    }
 }
 
 fn process_one(
@@ -257,8 +265,7 @@ fn process_one(
                     .and_then(|s| s.to_str())
                     .unwrap_or("imported")
             ));
-            std::fs::write(&dest, &bytes)
-                .map_err(|e| format!("write {}: {e}", dest.display()))?;
+            std::fs::write(&dest, &bytes).map_err(|e| format!("write {}: {e}", dest.display()))?;
 
             // Validate the produced file's magic byte to confirm
             // the WebP encoder produced a valid output. Belt and
@@ -403,7 +410,10 @@ mod tests {
 
         let settings = ImportSettings::default(); // max_size == 0
         let result = run_import(&[src.clone()], &settings, &cache, None::<fn(&str)>);
-        assert_eq!(result.transformed, 0, "no-resize path should not count as transformed");
+        assert_eq!(
+            result.transformed, 0,
+            "no-resize path should not count as transformed"
+        );
         assert!(result.entries[0].error.is_none());
         let decoded = image::open(&result.entries[0].destination).expect("decode");
         // Original 4K stays 4K.

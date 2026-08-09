@@ -1,18 +1,18 @@
-import { useState, useCallback, useEffect } from 'react'
 import { invoke } from '@tauri-apps/api/core'
-import BrokenLinksPanel from './BrokenLinksPanel'
 import {
-  Target,
-  Image,
-  Palette,
-  ChevronRight,
-  ChevronDown,
-  RotateCcw,
-  FolderOpen,
   AlertTriangle,
+  ChevronDown,
+  ChevronRight,
+  Folder,
+  FolderOpen,
+  Image,
   Loader,
-  Folder
+  Palette,
+  RotateCcw,
+  Target,
 } from 'lucide-react'
+import { useCallback, useEffect, useState } from 'react'
+import BrokenLinksPanel from './BrokenLinksPanel'
 
 interface AssetFile {
   id: string
@@ -43,30 +43,29 @@ export default function AssetsPanel() {
   const [draggedAsset, setDraggedAsset] = useState<AssetFile | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  
+
   // addObject will be used when implementing scene integration
 
   const loadLocalAssets = useCallback(async () => {
     try {
       setIsLoading(true)
       setError(null)
-      
+
       // Check if we're running in Tauri context
       if (!isTauriRuntime()) {
         throw new Error('Not running in Tauri context')
       }
-      
+
       // Use Tauri command to scan the local Assets folder
       const scannedAssets: AssetFile[] = await invoke('scan_assets')
       setAssets(scannedAssets)
       setCurrentFolder('Assets')
       console.log(`Found ${scannedAssets.length} assets in local Assets folder`)
-      
     } catch (error) {
       console.error('Failed to scan local assets:', error)
       const errorMessage = error instanceof Error ? error.message : String(error)
       setError(`Failed to scan assets: ${errorMessage}`)
-      
+
       // Fallback to mock data for development
       const mockAssets: AssetFile[] = [
         {
@@ -75,7 +74,7 @@ export default function AssetsPanel() {
           path: 'Assets/Models/cube.obj',
           asset_type: 'model',
           size: 1024,
-          last_modified: Date.now()
+          last_modified: Date.now(),
         },
         {
           id: 'mock_sphere',
@@ -83,8 +82,8 @@ export default function AssetsPanel() {
           path: 'Assets/Models/sphere.obj',
           asset_type: 'model',
           size: 2048,
-          last_modified: Date.now()
-        }
+          last_modified: Date.now(),
+        },
       ]
       setAssets(mockAssets)
       setCurrentFolder('Assets (Mock Data)')
@@ -97,24 +96,23 @@ export default function AssetsPanel() {
     try {
       setIsLoading(true)
       setError(null)
-      
+
       // Check if we're running in Tauri context
       if (!isTauriRuntime()) {
         throw new Error('Folder browsing only available in Tauri desktop app')
       }
-      
+
       // Use Tauri command to browse for folder
       const folderPath: string = await invoke('browse_assets_folder')
       setCurrentFolder(folderPath)
-      
+
       // Scan the selected folder for assets
-      const scannedAssets: AssetFile[] = await invoke('scan_assets_folder', { 
-        folderPath 
+      const scannedAssets: AssetFile[] = await invoke('scan_assets_folder', {
+        folderPath,
       })
-      
+
       setAssets(scannedAssets)
       console.log(`Found ${scannedAssets.length} assets in ${folderPath}`)
-      
     } catch (error) {
       console.error('Failed to browse folder:', error)
       const errorMessage = error instanceof Error ? error.message : String(error)
@@ -132,7 +130,7 @@ export default function AssetsPanel() {
 
   const handleDragStart = useCallback((asset: AssetFile, event: React.DragEvent) => {
     setDraggedAsset(asset)
-    
+
     // Store comprehensive asset data for the drop target
     const dragData = {
       id: asset.id,
@@ -143,9 +141,9 @@ export default function AssetsPanel() {
       // Additional metadata for 3D object creation
       isAsset: true,
       meshPath: asset.path,
-      defaultMaterial: 'default'
+      defaultMaterial: 'default',
     }
-    
+
     event.dataTransfer.setData('application/json', JSON.stringify(dragData))
     event.dataTransfer.effectAllowed = 'copy'
   }, [])
@@ -156,11 +154,16 @@ export default function AssetsPanel() {
 
   const getFileIcon = (type: string) => {
     switch (type) {
-      case 'model': return <Target className="w-4 h-4" />
-      case 'texture': return <Image className="w-4 h-4" />
-      case 'material': return <Palette className="w-4 h-4" />
-      case 'audio': return <Folder className="w-4 h-4" />
-      default: return <Folder className="w-4 h-4" />
+      case 'model':
+        return <Target className="w-4 h-4" />
+      case 'texture':
+        return <Image className="w-4 h-4" />
+      case 'material':
+        return <Palette className="w-4 h-4" />
+      case 'audio':
+        return <Folder className="w-4 h-4" />
+      default:
+        return <Folder className="w-4 h-4" />
     }
   }
 
@@ -168,12 +171,12 @@ export default function AssetsPanel() {
     const units = ['B', 'KB', 'MB', 'GB']
     let size = bytes
     let unitIndex = 0
-    
+
     while (size >= 1024 && unitIndex < units.length - 1) {
       size /= 1024
       unitIndex++
     }
-    
+
     return `${size.toFixed(1)} ${units[unitIndex]}`
   }
 
@@ -187,9 +190,15 @@ export default function AssetsPanel() {
             className="text-editor-text hover:text-editor-accent transition-colors"
             title={isCollapsed ? 'Expand Assets' : 'Collapse Assets'}
           >
-            {isCollapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+            {isCollapsed ? (
+              <ChevronRight className="w-4 h-4" />
+            ) : (
+              <ChevronDown className="w-4 h-4" />
+            )}
           </button>
-          <h3 className="text-sm font-semibold text-editor-accent border-b border-editor-border/30 pb-1 mb-2">Assets</h3>
+          <h3 className="text-sm font-semibold text-editor-accent border-b border-editor-border/30 pb-1 mb-2">
+            Assets
+          </h3>
         </div>
         <div className="flex space-x-1">
           <button
@@ -262,14 +271,14 @@ export default function AssetsPanel() {
               </div>
             ) : (
               <div className="grid grid-cols-2 gap-2">
-                {assets.map((asset) => (
+                {assets.map(asset => (
                   <div
                     key={asset.id}
                     draggable
-                    onDragStart={(e) => handleDragStart(asset, e)}
+                    onDragStart={e => handleDragStart(asset, e)}
                     onDragEnd={handleDragEnd}
                     className={`
-                      p-2 rounded border border-editor-border bg-editor-bg 
+                      p-2 rounded border border-editor-border bg-editor-bg
                       hover:bg-editor-hover cursor-grab active:cursor-grabbing
                       transition-all duration-150 flex flex-col items-center text-center
                       ${draggedAsset?.id === asset.id ? 'opacity-50 scale-95 border-editor-accent' : 'hover:scale-105'}
@@ -278,15 +287,11 @@ export default function AssetsPanel() {
                     title={`${asset.name}\nSize: ${formatFileSize(asset.size)}\nType: ${asset.asset_type}`}
                   >
                     {/* File Icon */}
-                    <div className="text-2xl mb-1">
-                      {getFileIcon(asset.asset_type)}
-                    </div>
-                    
+                    <div className="text-2xl mb-1">{getFileIcon(asset.asset_type)}</div>
+
                     {/* File Name */}
-                    <div className="text-xs text-editor-text truncate w-full">
-                      {asset.name}
-                    </div>
-                    
+                    <div className="text-xs text-editor-text truncate w-full">{asset.name}</div>
+
                     {/* File Size */}
                     <div className="text-xs text-editor-textMuted">
                       {formatFileSize(asset.size)}
@@ -301,8 +306,7 @@ export default function AssetsPanel() {
           {assets.length > 0 && (
             <div className="px-4 py-2 bg-editor-bg border-t border-editor-border">
               <div className="text-xs text-editor-textMuted">
-                {assets.length} asset{assets.length !== 1 ? 's' : ''} • 
-                Drag into viewport to add
+                {assets.length} asset{assets.length !== 1 ? 's' : ''} • Drag into viewport to add
               </div>
             </div>
           )}

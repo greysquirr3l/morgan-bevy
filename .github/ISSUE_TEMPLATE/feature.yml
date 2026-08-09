@@ -1,9 +1,9 @@
 name: Feature
 description: Propose a new feature or a change to existing behaviour.
-title: "[Feature]: "
+title: '[Feature]: '
 labels:
-  - "enhancement"
-  - "needs-triage"
+  - 'enhancement'
+  - 'needs-triage'
 body:
   - type: markdown
     attributes:
@@ -48,11 +48,11 @@ body:
     attributes:
       label: Scope
       options:
-        - "Frontend only (src/)"
-        - "Backend only (src-tauri/)"
-        - "Companion crate (crates/bevy-morgan-integration/)"
-        - "Cross-cutting (frontend + backend + companion)"
-        - "Docs only"
+        - 'Frontend only (src/)'
+        - 'Backend only (src-tauri/)'
+        - 'Companion crate (crates/bevy-morgan-integration/)'
+        - 'Cross-cutting (frontend + backend + companion)'
+        - 'Docs only'
     validations:
       required: true
   - type: dropdown
@@ -61,9 +61,9 @@ body:
       label: Estimated size
       description: Roughly. The maintainer will adjust.
       options:
-        - "Small — one file, one test"
-        - "Medium — 3-5 files, several tests"
-        - "Large — substantial work across modules"
+        - 'Small — one file, one test'
+        - 'Medium — 3-5 files, several tests'
+        - 'Large — substantial work across modules'
     validations:
       required: true
   - type: checkboxes

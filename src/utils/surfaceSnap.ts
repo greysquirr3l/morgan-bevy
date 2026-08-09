@@ -16,12 +16,9 @@
 //      best we can (the component of the current world-Y that
 //      lies in the surface plane is preserved).
 
-import type { ObjectId } from '@/types/brand'
 import type { SceneObject } from '@/store/editorStore'
-import {
-  computeSnapCandidates,
-  type SnapCandidate,
-} from '@/utils/snapPoints'
+import type { ObjectId } from '@/types/brand'
+import { computeSnapCandidates, type SnapCandidate } from '@/utils/snapPoints'
 
 // ─── 3D vector helpers (treating tuples as 3-vectors) ─────────────────────
 
@@ -51,11 +48,7 @@ function dot(a: Vec3, b: Vec3): number {
 
 /** Cross product. */
 function cross(a: Vec3, b: Vec3): Vec3 {
-  return [
-    a[1] * b[2] - a[2] * b[1],
-    a[2] * b[0] - a[0] * b[2],
-    a[0] * b[1] - a[1] * b[0],
-  ]
+  return [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]]
 }
 
 /** Euclidean length. */
@@ -181,10 +174,7 @@ export function surfaceSnapTarget(
     currentRot[5] as number,
     currentRot[8] as number,
   ]
-  const forwardProjection = sub(
-    currentForward,
-    scale(hit.normal, dot(currentForward, hit.normal))
-  )
+  const forwardProjection = sub(currentForward, scale(hit.normal, dot(currentForward, hit.normal)))
   const projectedLength = length(forwardProjection)
 
   // Choose a reference forward axis. If the current forward is
@@ -192,9 +182,7 @@ export function surfaceSnapTarget(
   // to preserve — pick a stable forward (world Z) as the
   // reference.
   const hasYaw = projectedLength > 1e-3
-  const referenceForward: Vec3 = hasYaw
-    ? normalize(forwardProjection)
-    : [0, 0, 1]
+  const referenceForward: Vec3 = hasYaw ? normalize(forwardProjection) : [0, 0, 1]
 
   // Build the new rotation matrix. The basis vectors are the
   // COLUMNS of the matrix, so we build:
@@ -207,9 +195,15 @@ export function surfaceSnapTarget(
   const newZ2 = cross(newX, newY) // re-orthogonalise
 
   const newRot = [
-    newX[0], newY[0], newZ2[0],
-    newX[1], newY[1], newZ2[1],
-    newX[2], newY[2], newZ2[2],
+    newX[0],
+    newY[0],
+    newZ2[0],
+    newX[1],
+    newY[1],
+    newZ2[1],
+    newX[2],
+    newY[2],
+    newZ2[2],
   ]
 
   // Convert back to Euler XYZ. The matrix `newRot` is built with
@@ -310,11 +304,7 @@ export function resolveDragTarget(
 
   // 2. No object snap — try surface snap.
   if (options.surfaceHit) {
-    const target = surfaceSnapTarget(
-      options.surfaceHit,
-      options.currentWorldRotation,
-      localOffset
-    )
+    const target = surfaceSnapTarget(options.surfaceHit, options.currentWorldRotation, localOffset)
     return {
       position: target.position,
       rotation: target.rotation,

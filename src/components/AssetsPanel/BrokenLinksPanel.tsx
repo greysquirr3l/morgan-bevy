@@ -38,11 +38,8 @@ export default function BrokenLinksPanel(props: BrokenLinksPanelProps) {
 
   const missing = props.missingRefs ?? storeMissing
   const dismiss = (ref: AssetId) =>
-    props.onDismiss
-      ? props.onDismiss(ref)
-      : storeDismiss(missing.filter(r => r !== ref))
-  const dismissAll = () =>
-    props.onDismissAll ? props.onDismissAll() : storeDismiss([])
+    props.onDismiss ? props.onDismiss(ref) : storeDismiss(missing.filter(r => r !== ref))
+  const dismissAll = () => (props.onDismissAll ? props.onDismissAll() : storeDismiss([]))
 
   if (missing.length === 0) return null
 

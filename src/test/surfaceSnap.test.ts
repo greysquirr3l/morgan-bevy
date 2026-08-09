@@ -16,12 +16,8 @@ import { describe, expect, it } from 'vitest'
 
 import type { SceneObject } from '@/store/editorStore'
 import { LayerId, ObjectId } from '@/types/brand'
-import {
-  resolveDragTarget,
-  surfaceSnapTarget,
-  type SurfaceHit,
-} from '@/utils/surfaceSnap'
 import { mintSnapPointId, type SnapPoint } from '@/types/snapPoints'
+import { resolveDragTarget, surfaceSnapTarget, type SurfaceHit } from '@/utils/surfaceSnap'
 
 type Vec3 = readonly [number, number, number]
 
@@ -137,16 +133,20 @@ describe('T52 resolveDragTarget', () => {
   it('uses an object snap point when one is within radius', () => {
     // Host object with a snap point at world (5, 0, 0). Cursor
     // is at (4.9, 0, 0) — well within 1m.
-    const [id1, o1] = makeObject('a', [5, 0, 0], [
-      {
-        id: mintSnapPointId(),
-        objectId: 'a',
-        localPosition: [0, 0, 0],
-        localRotation: [0, 0, 0, 1],
-        label: 'frame',
-        category: 'structural',
-      },
-    ])
+    const [id1, o1] = makeObject(
+      'a',
+      [5, 0, 0],
+      [
+        {
+          id: mintSnapPointId(),
+          objectId: 'a',
+          localPosition: [0, 0, 0],
+          localRotation: [0, 0, 0, 1],
+          label: 'frame',
+          category: 'structural',
+        },
+      ]
+    )
     const [id2, o2] = makeObject('b', [10, 0, 0])
     const map = new Map([
       [id1, o1],
@@ -200,16 +200,20 @@ describe('T52 resolveDragTarget', () => {
   it('object snap takes precedence over surface snap within radius', () => {
     // Object snap at (5, 0, 0) — within 1m of cursor. Surface
     // hit at (3, 0, 0). Object snap should win.
-    const [id1, o1] = makeObject('a', [5, 0, 0], [
-      {
-        id: mintSnapPointId(),
-        objectId: 'a',
-        localPosition: [0, 0, 0],
-        localRotation: [0, 0, 0, 1],
-        label: 'frame',
-        category: 'structural',
-      },
-    ])
+    const [id1, o1] = makeObject(
+      'a',
+      [5, 0, 0],
+      [
+        {
+          id: mintSnapPointId(),
+          objectId: 'a',
+          localPosition: [0, 0, 0],
+          localRotation: [0, 0, 0, 1],
+          label: 'frame',
+          category: 'structural',
+        },
+      ]
+    )
     const [id2, o2] = makeObject('b', [10, 0, 0])
     const map = new Map([
       [id1, o1],

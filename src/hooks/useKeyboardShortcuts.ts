@@ -16,14 +16,11 @@
 // compile error.
 
 import { useCameraContext } from '@/contexts/CameraContext'
+import { type ShortcutAction, type ShortcutBinding } from '@/shortcuts/defaults'
 import { useEditorStore } from '@/store/editorStore'
 import { serializeMap } from '@/store/mapSerialization'
 import { LayerId } from '@/types/brand'
 import { clipboard, copySelectedObjects } from '@/utils/clipboard'
-import {
-  type ShortcutBinding,
-  type ShortcutAction,
-} from '@/shortcuts/defaults'
 import {
   DeleteObjectCommand,
   DuplicateCommand,
@@ -85,16 +82,11 @@ export function useKeyboardShortcuts() {
     // on each call so we don't pre-compute at module scope — the
     // table can change at runtime via the rebind UI.
     const bindings = getEffectiveBindings()
-    const lookup = new Map<string, ShortcutBinding>(
-      bindings.map(b => [shortcutKeyOf(b), b])
-    )
+    const lookup = new Map<string, ShortcutBinding>(bindings.map(b => [shortcutKeyOf(b), b]))
 
     const handleKeyDown = (event: KeyboardEvent) => {
       // Ignore shortcuts when typing in inputs.
-      if (
-        event.target instanceof HTMLInputElement ||
-        event.target instanceof HTMLTextAreaElement
-      ) {
+      if (event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement) {
         return
       }
 

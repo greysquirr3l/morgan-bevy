@@ -87,7 +87,11 @@ describe('T35 withImportSettings / readImportSettings round-trip', () => {
   it('preserves existing metadata fields when injecting settings', () => {
     const project = { ...baseProject, metadata: { name: 'MyProject', assetRefs: ['a.png'] } }
     const withSettings = withImportSettings(project, defaultImportSettings())
-    const metadata = withSettings.metadata as { name?: string; assetRefs?: string[]; importSettings?: unknown }
+    const metadata = withSettings.metadata as {
+      name?: string
+      assetRefs?: string[]
+      importSettings?: unknown
+    }
     expect(metadata.name).toBe('MyProject')
     expect(metadata.assetRefs).toEqual(['a.png'])
     expect(metadata.importSettings).toEqual(defaultImportSettings())

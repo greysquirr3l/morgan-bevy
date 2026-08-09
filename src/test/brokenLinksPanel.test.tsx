@@ -7,7 +7,7 @@
  * panel doesn't show a permanent banner.
  */
 import { fireEvent, render, screen } from '@testing-library/react'
-import { describe, expect, it, beforeEach, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import BrokenLinksPanel from '@/components/AssetsPanel/BrokenLinksPanel'
 import { useEditorStore } from '@/store/editorStore'
@@ -52,9 +52,7 @@ describe('T34 BrokenLinksPanel', () => {
       .filter(b => b.getAttribute('aria-label')?.startsWith('Dismiss '))
     expect(rowButtons).toHaveLength(2)
     fireEvent.click(rowButtons[0])
-    expect(useEditorStore.getState().missingAssetRefs).toEqual([
-      AssetId('floor.png'),
-    ])
+    expect(useEditorStore.getState().missingAssetRefs).toEqual([AssetId('floor.png')])
   })
 
   it('dismissing all clears the list', () => {
