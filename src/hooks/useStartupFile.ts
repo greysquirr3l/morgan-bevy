@@ -2,6 +2,7 @@ import { useEditorStore } from '@/store/editorStore'
 import { ProjectDataSchema, type ProjectData } from '@/types/schemas'
 import { LoadCommand, type Command } from '@/utils/commands'
 import { addRecentProject } from '@/utils/recentProjects'
+import { isTauriRuntime } from '@/utils/tauriEnv'
 import { invoke } from '@tauri-apps/api/core'
 import { listen } from '@tauri-apps/api/event'
 import { useEffect } from 'react'
@@ -18,6 +19,15 @@ export function useStartupFile(): void {
   const executeCommand = useEditorStore(s => s.executeCommand)
 
   useEffect(() => {
+    // Non-Tauri builds (Vite dev server, `npm run dev`) don't have
+    // the webview's event bus. Skip the subscription entirely rather
+    // than letting `listen()` throw a cryptic
+    // `window.__TAURI_INTERNALS__.transformCallback is not a function`
+    // on Tauri 2.x — which doesn't break the app, but pollutes the
+    // console with a warning on every launch.
+    if (!isTauriRuntime()) {
+      return
+    }
     let unlisten: (() => void) | null = null
     let cancelled = false
 

@@ -1,3 +1,4 @@
+import { isTauriRuntime } from '@/utils/tauriEnv'
 import { invoke } from '@tauri-apps/api/core'
 import {
   AlertTriangle,
@@ -21,19 +22,6 @@ interface AssetFile {
   asset_type: 'model' | 'texture' | 'material' | 'audio' | 'other'
   size: number
   last_modified: number
-}
-
-/**
- * `window.__TAURI__` is injected by the Tauri webview shell at
- * runtime; it isn't part of the DOM lib types. Narrowed here instead
- * of `as any` so the check stays a real (if minimal) type.
- */
-interface TauriWindow extends Window {
-  __TAURI__?: unknown
-}
-
-function isTauriRuntime(): boolean {
-  return typeof window !== 'undefined' && Boolean((window as TauriWindow).__TAURI__)
 }
 
 export default function AssetsPanel() {
