@@ -70,12 +70,13 @@ pub struct AssetDatabase {
 }
 
 impl AssetDatabase {
-    /// Test-only accessor for the underlying SQLite connection.
+    /// Test-only accessor for the underlying `SQLite` connection.
     /// Used by `#[cfg(test)]` modules (the thumbnail pipeline
-    /// tests seed fixtures via the bare connection). Stripped from
-    /// production builds.
+    /// Test-only access to the underlying `Connection` (production
+    /// code goes through the typed methods; tests seed fixtures
+    /// via the bare connection). Stripped from production builds.
     #[cfg(test)]
-    pub fn _test_connection(&self) -> &Connection {
+    pub const fn test_connection(&self) -> &Connection {
         &self.connection
     }
 
@@ -571,7 +572,7 @@ impl AssetDatabase {
                 thumbnail_size = excluded.thumbnail_size,
                 source_mtime = excluded.source_mtime,
                 generated_at = CURRENT_TIMESTAMP",
-            params![asset_id, thumbnail_path, size as i64, source_mtime],
+            params![asset_id, thumbnail_path, i64::from(size), source_mtime],
         )?;
         Ok(())
     }
@@ -596,7 +597,7 @@ impl AssetDatabase {
                 OR COALESCE(t.thumbnail_size, 0) != ?1
                 OR COALESCE(t.source_mtime, 0) < CAST(strftime('%s', a.updated_at) AS INTEGER)",
         )?;
-        let rows = stmt.query_map([target_size as i64], |row| {
+        let rows = stmt.query_map([i64::from(target_size)], |row| {
             Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?))
         })?;
         let mut out = Vec::new();

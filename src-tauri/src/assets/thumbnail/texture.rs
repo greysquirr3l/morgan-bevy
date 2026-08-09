@@ -22,9 +22,23 @@ use super::THUMBNAIL_SIZE;
 pub fn render_texture(source: &Path) -> Result<DynamicImage, image::ImageError> {
     let img = image::open(source)?;
     let (w, h) = img.dimensions();
-    let scale = THUMBNAIL_SIZE as f32 / w.max(h) as f32;
-    let target_w = (w as f32 * scale).round().max(1.0) as u32;
-    let target_h = (h as f32 * scale).round().max(1.0) as u32;
+    // Integer-math scale: target = max(1, round(w * THUMBNAIL_SIZE / max(w,h))).
+    // Widening to u64 keeps the multiplication from overflowing even for
+    // 32-bit-dimension source images; the final u32 conversion uses
+    // `try_from` and propagates a `Result`-shaped error.
+    let max_dim = u64::from(w.max(h));
+    let target_w = u32::try_from((u64::from(w) * u64::from(THUMBNAIL_SIZE) / max_dim).max(1))
+        .map_err(|_| {
+            image::ImageError::Parameter(image::error::ParameterError::from_kind(
+                image::error::ParameterErrorKind::DimensionMismatch,
+            ))
+        })?;
+    let target_h = u32::try_from((u64::from(h) * u64::from(THUMBNAIL_SIZE) / max_dim).max(1))
+        .map_err(|_| {
+            image::ImageError::Parameter(image::error::ParameterError::from_kind(
+                image::error::ParameterErrorKind::DimensionMismatch,
+            ))
+        })?;
     let resized = img.resize_exact(target_w, target_h, FilterType::Triangle);
     Ok(flatten_alpha(resized))
 }
@@ -44,15 +58,33 @@ fn flatten_alpha(img: DynamicImage) -> DynamicImage {
 }
 
 fn flatten_rgba_against_black(rgba: &RgbaImage) -> image::RgbImage {
-    let (w, h) = rgba.dimensions();
-    let mut out = image::RgbImage::new(w, h);
-    for (x, y, pixel) in rgba.enumerate_pixels() {
-        let [r, g, b, a] = pixel.0;
-        let alpha = a as f32 / 255.0;
-        let r = (r as f32 * alpha).round() as u8;
-        let g = (g as f32 * alpha).round() as u8;
-        let b = (b as f32 * alpha).round() as u8;
-        out.put_pixel(x, y, image::Rgb([r, g, b]));
+    let (width_px, height_px) = rgba.dimensions();
+    let mut out = image::RgbImage::new(width_px, height_px);
+    for (col, row, pixel) in rgba.enumerate_pixels() {
+        let [red, green, blue, alpha] = pixel.0;
+        // Alpha-blend each channel against black using integer math:
+        // round(channel * alpha / 255). The `* 255 + 127) / 255 / 255`
+        // idiom rounds without going through f32 — `u32::from(u8)` is
+        // lossless. The trailing `as u8` is the genuinely-unavoidable
+        // integer-narrowing cast (the input is u32 in [0, 65025]).
+        let blend_channel = |channel: u8, alpha: u8| -> u8 {
+            #[expect(
+                clippy::cast_possible_truncation,
+                reason = "channel is u8 0..=255 and alpha is u8 0..=255; the numerator fits in u32 (≤65,025), the divisor is 65,025; result is u8 by construction"
+            )]
+            let result: u8 =
+                ((u32::from(channel) * u32::from(alpha) * 255 + 127) / 255 / 255) as u8;
+            result
+        };
+        out.put_pixel(
+            col,
+            row,
+            image::Rgb([
+                blend_channel(red, alpha),
+                blend_channel(green, alpha),
+                blend_channel(blue, alpha),
+            ]),
+        );
     }
     out
 }

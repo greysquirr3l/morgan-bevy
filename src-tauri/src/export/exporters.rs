@@ -155,22 +155,17 @@ pub enum VfxMarker {
 /// The editor records the chosen mode in the generated header so
 /// re-exports preserve it; `parse_systems_mode_from_header` reads
 /// the comment back out.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum SystemsMode {
     /// Reference the companion crate's `systems` module. Bug fixes
     /// flow through automatically on `cargo update`.
+    #[default]
     CompanionReference,
     /// Embed the system bodies verbatim. Hermetic build; the
     /// generated file has no runtime dep on
     /// `bevy_morgan_integration::systems`. Reserved for T90 v2;
     /// the editor currently emits `CompanionReference`.
     Inline,
-}
-
-impl Default for SystemsMode {
-    fn default() -> Self {
-        Self::CompanionReference
-    }
 }
 
 /// Compute the `MarkerSet` for a level by inspecting every object's
@@ -344,13 +339,13 @@ impl LevelExporter {
         let previous_mode = fs::read_to_string(file_path)
             .ok()
             .and_then(|src| parse_systems_mode_from_header(&src));
-        let rust_code = match previous_mode {
-            Some(SystemsMode::CompanionReference) | None => Self::generate_rust_code(level_data)?,
-            // Inline mode is reserved for T90 v2; until then, fall
-            // back to CompanionReference so the consumer's
-            // `bevy-morgan-integration` runtime is always present.
-            Some(SystemsMode::Inline) => Self::generate_rust_code(level_data)?,
-        };
+        // Both `CompanionReference` and `Inline` modes currently
+        // route through `generate_rust_code`. Inline mode is
+        // reserved for T90 v2; until then, fall back to
+        // CompanionReference so the consumer's
+        // `bevy-morgan-integration` runtime is always present.
+        let _ = previous_mode;
+        let rust_code = Self::generate_rust_code(level_data)?;
         fs::write(file_path, rust_code)?;
         Ok(())
     }

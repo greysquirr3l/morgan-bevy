@@ -77,8 +77,8 @@ impl ThumbnailQueue {
 
     /// Convenience: enqueue every asset the scanner just upserted.
     /// Uses `list_assets_needing_thumbnails` to decide what's
-    /// pending — covers both "no row yet" and "row's source_mtime
-    /// is older than the asset's updated_at" cases.
+    /// pending — covers both "no row yet" and "row's `source_mtime`
+    /// is older than the asset's `updated_at`" cases.
     pub fn enqueue_all_pending(&self, db: &AssetDatabase) -> Result<usize, String> {
         let pending = db
             .list_assets_needing_thumbnails(THUMBNAIL_SIZE)
@@ -88,12 +88,15 @@ impl ThumbnailQueue {
             // Compute the source's mtime on the enqueue side so the
             // worker doesn't need to stat the file. Falls back to
             // the asset's `updated_at` (unix seconds) if stat fails.
+            #[expect(
+                clippy::cast_possible_wrap,
+                reason = "file mtime as seconds-since-epoch; pre-1970 timestamps are not representable but are also not real for any asset we'd scan"
+            )]
             let mtime = std::fs::metadata(&path)
                 .and_then(|m| m.modified())
                 .ok()
                 .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
-                .map(|d| d.as_secs() as i64)
-                .unwrap_or(0);
+                .map_or(0, |d| d.as_secs() as i64);
             let job = ThumbnailJob {
                 asset_id: id,
                 asset_type,
@@ -117,7 +120,7 @@ impl ThumbnailQueue {
 
 /// Drain the receiver until the channel closes. Each job is rendered
 /// + written + DB-recorded on a blocking thread because the image
-/// decoder is sync and can take ~100-500ms per texture.
+///   decoder is sync and can take ~100-500ms per texture.
 async fn worker_loop(
     db: Arc<Mutex<AssetDatabase>>,
     thumbnails_dir: Arc<PathBuf>,
@@ -127,7 +130,13 @@ async fn worker_loop(
     while let Some(job) = rx.recv().await {
         let db = Arc::clone(&db);
         let dir = Arc::clone(&thumbnails_dir);
-        let result = tokio::task::spawn_blocking(move || process_job(&db, &dir, job)).await;
+        let result = tokio::task::spawn_blocking(move || {
+            // The job is read-only after `recv`, so pass a reference
+            // to avoid the needless pass-by-value clippy lint.
+            let job_ref = &job;
+            process_job(&db, &dir, job_ref)
+        })
+        .await;
         match result {
             Ok(Ok(())) => {}
             Ok(Err(e)) => warn!("ThumbnailWorker: job failed: {e}"),
@@ -140,11 +149,7 @@ async fn worker_loop(
 /// Pure-ish job step: render + write + DB upsert. Pulled out of
 /// `worker_loop` so the unit tests can call it directly without
 /// spinning up a tokio runtime.
-fn process_job(
-    db: &Mutex<AssetDatabase>,
-    thumbnails_dir: &Path,
-    job: ThumbnailJob,
-) -> Result<(), String> {
+fn process_job(db: &Mutex<AssetDatabase>, thumbnails_dir: &Path, job: &ThumbnailJob) -> Result<(), String> {
     let out_path = thumbnail_path(thumbnails_dir, job.asset_id);
 
     // 1. Render. Pure function — no I/O.
@@ -153,8 +158,7 @@ fn process_job(
 
     // 2. Encode WebP. The quality constant lives in the parent
     // module so tests can read the same value.
-    let bytes = encode_webp(&rgb, super::WEBP_QUALITY)
-        .map_err(|e| format!("webp encode: {e:?}"))?;
+    let bytes = encode_webp(&rgb, super::WEBP_QUALITY);
 
     // 3. Write atomically: write to a sibling `.tmp` then rename,
     // so a partial write never leaves a half-encoded file at
@@ -166,10 +170,20 @@ fn process_job(
 
     // 4. DB upsert. Idempotent — a re-queue hit on the same asset
     // just refreshes the row. Held under the inner mutex; the lock
-    // covers only the SQLite write, not the render.
-    let db = db.lock().map_err(|e| format!("db mutex poisoned: {e}"))?;
-    db.upsert_thumbnail(job.asset_id, &path_to_string(&out_path), THUMBNAIL_SIZE, job.source_mtime)
-        .map_err(|e| format!("upsert: {e}"))?;
+    // covers only the SQLite write, not the render. Scope the guard
+    // tightly so the MutexGuard (significant Drop) doesn't outlive
+    // the `process_job` call (clippy significant_drop_tightening).
+    {
+        let db_guard = db.lock().map_err(|e| format!("db mutex poisoned: {e}"))?;
+        db_guard
+            .upsert_thumbnail(
+                job.asset_id,
+                &path_to_string(&out_path),
+                THUMBNAIL_SIZE,
+                job.source_mtime,
+            )
+            .map_err(|e| format!("upsert: {e}"))?;
+    }
 
     debug!(
         "ThumbnailWorker: asset {} -> {}",

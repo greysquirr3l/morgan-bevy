@@ -146,7 +146,7 @@ pub struct GameObject {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub animation: Option<AnimationMarker>,
     /// Optional audio marker (T91). When set, the exporter emits
-    /// an `Audio` component (Ambient / OneShot) referencing the
+    /// an `Audio` component (Ambient / `OneShot`) referencing the
     /// given asset path.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub audio: Option<AudioMarker>,

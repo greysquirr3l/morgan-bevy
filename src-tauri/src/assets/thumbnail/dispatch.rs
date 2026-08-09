@@ -20,10 +20,10 @@ use super::THUMBNAIL_SIZE;
 /// fallback paths always succeed.
 pub fn render_for_asset(asset_type: &str, source: &Path) -> Result<RgbImage, image::ImageError> {
     let rgb: RgbImage = match asset_type {
-        "Texture" => match render_texture(source) {
-            Ok(img) => img.into_rgb8(),
-            Err(e) => return Err(e),
-        },
+        "Texture" => {
+            let img = render_texture(source)?;
+            img.into_rgb8()
+        }
         "Audio" => match render_audio(source) {
             AudioRenderResult::Waveform(img) => img,
             AudioRenderResult::UnsupportedFormat => render_audio_or_placeholder(source),
@@ -51,26 +51,26 @@ fn label_for(source: &Path) -> String {
     source
         .extension()
         .and_then(|e| e.to_str())
-        .map(|e| e.to_ascii_uppercase())
-        .unwrap_or_else(|| "?".to_string())
+        .map_or_else(|| "?".to_string(), str::to_ascii_uppercase)
 }
 
-/// Encode an `RgbImage` as `THUMBNAIL_SIZE`-square WebP at the given
-/// quality (0..100). Thin wrapper over the `webp` crate — the
-/// encode error type is `WebPEncodingError`, re-exported from the
-/// underlying libwebp FFI.
-pub fn encode_webp(img: &RgbImage, quality: u8) -> Result<Vec<u8>, webp::WebPEncodingError> {
+/// Encode an `RgbImage` as a WebP at the given quality (0..100).
+/// The underlying `webp` crate's `encode` is infallible (it always
+/// succeeds for valid RGB input — the libwebp FFI returns a
+/// `MemoryWriter`, never a `Result`), so this wrapper doesn't need
+/// to thread an error type either.
+pub fn encode_webp(img: &RgbImage, quality: u8) -> Vec<u8> {
     let (w, h) = (img.width(), img.height());
     let raw = img.as_raw();
     let encoder = webp::Encoder::from_rgb(raw, w, h);
-    let memory = encoder.encode(quality as f32);
-    Ok(memory.to_vec())
+    let memory = encoder.encode(f32::from(quality));
+    memory.to_vec()
 }
 
 /// Build the wrapped `DynamicImage` for callers that want the
 /// higher-level `image` type rather than `RgbImage`. Useful for
 /// tests that need to call `DynamicImage::save`.
 #[allow(dead_code)]
-pub fn as_dynamic(rgb: RgbImage) -> DynamicImage {
+pub const fn as_dynamic(rgb: RgbImage) -> DynamicImage {
     DynamicImage::ImageRgb8(rgb)
 }

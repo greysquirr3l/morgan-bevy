@@ -49,7 +49,7 @@ pub struct ImportSettings {
     pub skip_invalid: bool,
 }
 
-fn default_texture_quality() -> u8 {
+const fn default_texture_quality() -> u8 {
     80
 }
 
@@ -103,7 +103,7 @@ pub fn detect_kind(path: &Path) -> Result<&'static str, String> {
         return Ok("jpeg");
     }
     // WebP: RIFF .... WEBP
-    if bytes.starts_with(b"RIFF") && &bytes[8..12] == b"WEBP" {
+    if bytes.starts_with(b"RIFF") && bytes.get(8..12) == Some(b"WEBP") {
         return Ok("webp");
     }
     // FBX binary: "Kaydara FBX Binary  \x00\x1a\x00"
@@ -188,14 +188,14 @@ where
             }
             Err(e) => {
                 if settings.skip_invalid {
-                    warn!("import: skipping invalid source {}: {e}", source_str);
+                    warn!("import: skipping invalid source {source_str}: {e}");
                     ImportEntry {
                         source: source_str,
                         destination: String::new(),
                         error: Some(e),
                     }
                 } else {
-                    info!("import: failing on invalid source {}: {e}", source_str);
+                    info!("import: failing on invalid source {source_str}: {e}");
                     entries.push(ImportEntry {
                         source: source_str,
                         destination: String::new(),
@@ -224,12 +224,17 @@ fn process_one(
             // Texture path: read, optionally resize, encode as WebP.
             let img = image::open(src).map_err(|e| format!("decode {kind}: {e}"))?;
             let (w, h) = img.dimensions();
-            let max = settings.texture_max_size.max(1) as u32;
+            let max = settings.texture_max_size.max(1);
             let needs_resize = settings.texture_max_size > 0 && (w > max || h > max);
+            // Integer-math resize: target = max(1, round(w * max / max(w,h))).
+            // u64 widening avoids the u32 overflow clippy was flagging for
+            // large source images, and the division is well-defined.
             let resized = if needs_resize {
-                let scale = max as f32 / w.max(h) as f32;
-                let target_w = ((w as f32 * scale).round().max(1.0)) as u32;
-                let target_h = ((h as f32 * scale).round().max(1.0)) as u32;
+                let max_dim = u64::from(w.max(h));
+                let target_w = u32::try_from((u64::from(w) * u64::from(max) / max_dim).max(1))
+                    .map_err(|e| format!("target_w overflow: {e}"))?;
+                let target_h = u32::try_from((u64::from(h) * u64::from(max) / max_dim).max(1))
+                    .map_err(|e| format!("target_h overflow: {e}"))?;
                 img.resize_exact(target_w, target_h, FilterType::Triangle)
             } else {
                 img
@@ -238,15 +243,21 @@ fn process_one(
                 let rgba = resized.to_rgba8();
                 let mut flat = image::RgbImage::new(rgba.width(), rgba.height());
                 for (x, y, p) in rgba.enumerate_pixels() {
-                    let a = p.0[3] as f32 / 255.0;
+                    // Alpha-blend each channel against black using integer
+                    // math: round(channel * alpha / 255). The
+                    // `* 255 + 127) / 255 / 255` pattern rounds without
+                    // going through f32 — u32::from(u8) is lossless.
+                    let a = u32::from(p.0[3]);
+                    #[expect(
+                        clippy::cast_possible_truncation,
+                        reason = "channel is u8 0..=255 and alpha is u8 0..=255; the numerator (channel * alpha * 255) ≤ 16,581,375, dividing by 65,025 yields a u8 result by construction"
+                    )]
+                    let blend =
+                        |c: u8| -> u8 { ((u32::from(c) * a * 255 + 127) / 255 / 255) as u8 };
                     flat.put_pixel(
                         x,
                         y,
-                        image::Rgb([
-                            (p.0[0] as f32 * a).round() as u8,
-                            (p.0[1] as f32 * a).round() as u8,
-                            (p.0[2] as f32 * a).round() as u8,
-                        ]),
+                        image::Rgb([blend(p.0[0]), blend(p.0[1]), blend(p.0[2])]),
                     );
                 }
                 flat
@@ -256,7 +267,7 @@ fn process_one(
             let (out_w, out_h) = (rgb.width(), rgb.height());
             let raw = rgb.as_raw();
             let encoder = webp::Encoder::from_rgb(raw, out_w, out_h);
-            let memory = encoder.encode(settings.texture_quality as f32);
+            let memory = encoder.encode(f32::from(settings.texture_quality));
             let bytes = memory.to_vec();
 
             let dest = cache_dir.join(format!(
@@ -273,7 +284,7 @@ fn process_one(
             // caller hands us a malformed source that decode
             // somehow accepts, this catches it.
             let check = std::fs::read(&dest).map_err(|e| format!("re-read: {e}"))?;
-            if !(check.starts_with(b"RIFF") && &check[8..12] == b"WEBP") {
+            if !(check.starts_with(b"RIFF") && check.get(8..12) == Some(b"WEBP")) {
                 return Err("produced file failed magic-byte re-check".to_string());
             }
             Ok((dest, needs_resize))
@@ -321,8 +332,20 @@ mod tests {
     /// WebP" drives this helper.
     fn make_test_png_4k(path: &Path) {
         let img = ImageBuffer::from_fn(4096u32, 4096u32, |x, y| {
+            #[expect(
+                clippy::cast_possible_truncation,
+                reason = "(x|y) % 256 is in [0, 256); truncation to u8 is intentional for the test pattern"
+            )]
             let r = ((x % 256) as u8).wrapping_add(64);
+            #[expect(
+                clippy::cast_possible_truncation,
+                reason = "y % 256 is in [0, 256); truncation to u8 is intentional for the test pattern"
+            )]
             let g = ((y % 256) as u8).wrapping_add(32);
+            #[expect(
+                clippy::cast_possible_truncation,
+                reason = "(x + y) % 256 is in [0, 256); truncation to u8 is intentional for the test pattern"
+            )]
             let b = (((x.wrapping_add(y)) % 256) as u8).wrapping_add(16);
             Rgb([r, g, b])
         });
@@ -330,7 +353,13 @@ mod tests {
     }
 
     fn make_test_jpeg(path: &Path) {
-        let img = ImageBuffer::from_fn(64u32, 64u32, |x, _| Rgb([x as u8, 128, 200]));
+        let img = ImageBuffer::from_fn(64u32, 64u32, |x, _| {
+            #[expect(
+                clippy::cast_possible_truncation,
+                reason = "x is in [0, 64); truncation to u8 is intentional for the test pattern"
+            )]
+            Rgb([x as u8, 128, 200])
+        });
         img.save(path).expect("save jpeg");
     }
 
@@ -382,7 +411,12 @@ mod tests {
             texture_max_size: 1024,
             ..Default::default()
         };
-        let result = run_import(&[src.clone()], &settings, &cache, None::<fn(&str)>);
+        let result = run_import(
+            std::slice::from_ref(&src),
+            &settings,
+            &cache,
+            None::<fn(&str)>,
+        );
         assert_eq!(result.entries.len(), 1);
         assert!(result.entries[0].error.is_none());
 
@@ -409,7 +443,12 @@ mod tests {
         make_test_png_4k(&src);
 
         let settings = ImportSettings::default(); // max_size == 0
-        let result = run_import(&[src.clone()], &settings, &cache, None::<fn(&str)>);
+        let result = run_import(
+            std::slice::from_ref(&src),
+            &settings,
+            &cache,
+            None::<fn(&str)>,
+        );
         assert_eq!(
             result.transformed, 0,
             "no-resize path should not count as transformed"
@@ -434,12 +473,7 @@ mod tests {
             skip_invalid: true,
             ..Default::default()
         };
-        let result = run_import(
-            &[good.clone(), bad.clone()],
-            &settings,
-            &cache,
-            None::<fn(&str)>,
-        );
+        let result = run_import(&[good, bad], &settings, &cache, None::<fn(&str)>);
         assert_eq!(result.entries.len(), 2);
         assert!(result.entries[0].error.is_none());
         assert!(result.entries[1].error.is_some());
@@ -455,12 +489,7 @@ mod tests {
         make_test_png_4k(&next);
 
         let settings = ImportSettings::default(); // skip_invalid == false
-        let result = run_import(
-            &[bad.clone(), next.clone()],
-            &settings,
-            &cache,
-            None::<fn(&str)>,
-        );
+        let result = run_import(&[bad, next], &settings, &cache, None::<fn(&str)>);
         // The corrupt entry is recorded with an error; the batch
         // is then aborted, so the valid `next` entry is NOT in the
         // result.
@@ -479,7 +508,7 @@ mod tests {
         let counter_cb = Arc::clone(&counter);
         let settings = ImportSettings::default();
         run_import(
-            &[src.clone()],
+            std::slice::from_ref(&src),
             &settings,
             &cache,
             Some(move |_: &str| {

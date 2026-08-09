@@ -59,6 +59,13 @@ fn draw_text(img: &mut RgbImage, text: &str, cx: u32, cy: u32, scale: u32, color
     let chars: Vec<char> = text.to_ascii_uppercase().chars().collect();
     let glyph_w = 5 * scale + scale; // 5 columns + 1 column spacing
     let glyph_h = 7 * scale;
+    // `usize → u32` narrowing is intentional here: chars.len(), i, row
+    // are all bounded by the number of glyphs (≤ ~12) × 5 cols / 7 rows,
+    // so they fit comfortably in u32 on any platform.
+    #[expect(
+        clippy::cast_possible_truncation,
+        reason = "chars.len() is the label length (typically <32); the usize→u32 cast is safe"
+    )]
     let total_w = chars.len() as u32 * glyph_w;
     let start_x = cx.saturating_sub(total_w / 2);
     let start_y = cy.saturating_sub(glyph_h / 2);
@@ -66,12 +73,22 @@ fn draw_text(img: &mut RgbImage, text: &str, cx: u32, cy: u32, scale: u32, color
     for (i, ch) in chars.iter().enumerate() {
         let bitmap = glyph(*ch);
         for (row, &bits) in bitmap.iter().enumerate() {
-            for col in 0..5 {
-                if (bits >> (4 - col)) & 1 == 1 {
+            for col_us in 0_usize..5 {
+                if (bits >> (4 - col_us)) & 1 == 1 {
                     for dy in 0..scale {
                         for dx in 0..scale {
-                            let x = start_x + i as u32 * glyph_w + col * scale + dx;
-                            let y = start_y + row as u32 * scale + dy;
+                            #[expect(
+                                clippy::cast_possible_truncation,
+                                reason = "i, col_us are bounded by glyph count (≤ 12) and bitmap cols (5); the usize→u32 narrowing is safe"
+                            )]
+                            let x_offset = i as u32 * glyph_w + col_us as u32 * scale + dx;
+                            #[expect(
+                                clippy::cast_possible_truncation,
+                                reason = "row is in [0, 7) and dy is in [0, scale) where scale ≤ 16; the usize→u32 sum fits in u32"
+                            )]
+                            let y_offset = row as u32 * scale + dy;
+                            let x = start_x + x_offset;
+                            let y = start_y + y_offset;
                             if x < THUMBNAIL_SIZE && y < THUMBNAIL_SIZE {
                                 img.put_pixel(x, y, color);
                             }
@@ -83,7 +100,7 @@ fn draw_text(img: &mut RgbImage, text: &str, cx: u32, cy: u32, scale: u32, color
     }
 }
 
-fn glyph(ch: char) -> [u8; 7] {
+const fn glyph(ch: char) -> [u8; 7] {
     match ch {
         'A' => [
             0b01110, 0b10001, 0b10001, 0b11111, 0b10001, 0b10001, 0b10001,

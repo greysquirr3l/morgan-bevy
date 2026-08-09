@@ -164,17 +164,13 @@ pub async fn scan_assets_database(app_handle: tauri::AppHandle) -> Result<ScanRe
         // separate connection so we don't share the lock with the
         // worker (which holds its own Arc<Mutex<AssetDatabase>>).
         if let Ok(db) = AssetDatabase::new(
-            &app_handle
+            app_handle
                 .path()
-                .app_data_dir()
-                .map(|p| p.join(".morgana").join("assets.db"))
-                .unwrap_or_else(|_| PathBuf::from("assets.db")),
+                .app_data_dir().map_or_else(|_| PathBuf::from("assets.db"), |p| p.join(".morgana").join("assets.db")),
         ) {
             let app_data_dir = app_handle
                 .path()
-                .app_data_dir()
-                .map(|p| p.join(".morgana").join("thumbnails"))
-                .unwrap_or_else(|_| PathBuf::from("thumbnails"));
+                .app_data_dir().map_or_else(|_| PathBuf::from("thumbnails"), |p| p.join(".morgana").join("thumbnails"));
             if let Err(e) = thumbnail::cleanup::cleanup_orphans(&db, &app_data_dir) {
                 log::warn!("T33 cleanup_orphans failed: {e}");
             }
@@ -191,11 +187,9 @@ pub async fn scan_assets_database(app_handle: tauri::AppHandle) -> Result<ScanRe
             // truth for staleness; build a fresh `AssetDatabase`
             // handle here for the read.
             if let Ok(db) = AssetDatabase::new(
-                &app_handle
+                app_handle
                     .path()
-                    .app_data_dir()
-                    .map(|p| p.join(".morgana").join("assets.db"))
-                    .unwrap_or_else(|_| PathBuf::from("assets.db")),
+                    .app_data_dir().map_or_else(|_| PathBuf::from("assets.db"), |p| p.join(".morgana").join("assets.db")),
             ) {
                 if let Err(e) = queue.enqueue_all_pending(&db) {
                     log::warn!("T33 enqueue_all_pending failed: {e}");
@@ -605,26 +599,36 @@ fn create_asset_from_file(path: &Path) -> Result<Option<AssetFile>, String> {
 /// front-end to force-rebuild every thumbnail.
 #[tauri::command]
 pub async fn generate_thumbnails(app_handle: tauri::AppHandle) -> Result<usize, String> {
-    let state: tauri::State<AssetDatabaseState> = app_handle.state();
-    let __lock_result = state.thumbnail_queue.lock();
-    let mut queue_guard = match __lock_result {
-        Ok(g) => g,
-        Err(e) => e.into_inner(),
+    // Lock the thumbnail queue inside an inner scope so the
+    // MutexGuard (which holds the queue's worker state — a
+    // significant Drop) is released as early as possible
+    // (clippy `significant_drop_tightening`).
+    let db_path = app_handle.path().app_data_dir().map_or_else(
+        |_| PathBuf::from("assets.db"),
+        |p| p.join(".morgana").join("assets.db"),
+    );
+    let db = AssetDatabase::new(db_path).map_err(|e| format!("Failed to open DB: {e}"))?;
+    let submitted = {
+        let state: tauri::State<AssetDatabaseState> = app_handle.state();
+        let mut queue_guard = match state.thumbnail_queue.lock() {
+            Ok(g) => g,
+            Err(poisoned) => poisoned.into_inner(),
+        };
+        let result = {
+            let queue = queue_guard
+                .as_mut()
+                .ok_or("Thumbnail queue not initialized")?;
+            queue
+                .enqueue_all_pending(&db)
+                .map_err(|e| format!("enqueue_all_pending: {e}"))?
+        };
+        // Drop the MutexGuard early (clippy `significant_drop_tightening`):
+        // the guard wraps the queue's worker state, a significant Drop, and
+        // we no longer need it after `enqueue_all_pending` returns.
+        drop(queue_guard);
+        result
     };
-    let queue = queue_guard
-        .as_mut()
-        .ok_or("Thumbnail queue not initialized")?;
-    let db = AssetDatabase::new(
-        &app_handle
-            .path()
-            .app_data_dir()
-            .map(|p| p.join(".morgana").join("assets.db"))
-            .unwrap_or_else(|_| PathBuf::from("assets.db")),
-    )
-    .map_err(|e| format!("Failed to open DB: {e}"))?;
-    queue
-        .enqueue_all_pending(&db)
-        .map_err(|e| format!("enqueue_all_pending: {e}"))
+    Ok(submitted)
 }
 
 /// T33: orphan cleanup. Unlinks files on disk that no longer have a
@@ -637,7 +641,7 @@ pub async fn cleanup_thumbnails(app_handle: tauri::AppHandle) -> Result<usize, S
         .map(|p| p.join(".morgana"))
         .map_err(|e| format!("Failed to get app data directory: {e}"))?;
     let thumbnails_dir = app_data_dir.join("thumbnails");
-    let db = AssetDatabase::new(&app_data_dir.join("assets.db"))
+    let db = AssetDatabase::new(app_data_dir.join("assets.db"))
         .map_err(|e| format!("Failed to open DB: {e}"))?;
     thumbnail::cleanup::cleanup_orphans(&db, &thumbnails_dir)
 }

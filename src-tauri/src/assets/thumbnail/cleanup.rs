@@ -32,19 +32,18 @@ pub fn cleanup_orphans(db: &AssetDatabase, thumbnails_dir: &Path) -> Result<usiz
 
     // 1. Disk files with no DB row.
     for path in &on_disk {
-        if !recorded.contains(path) {
-            if std::fs::remove_file(path).is_ok() {
+        if !recorded.contains(path)
+            && std::fs::remove_file(path).is_ok() {
                 removed += 1;
                 debug_log_removed(path);
             }
-        }
     }
 
     // 2. DB rows whose file no longer exists on disk.
     for path in &recorded {
         if !on_disk.contains(path) {
             db.delete_thumbnail_by_path(path)
-                .map_err(|e| format!("delete thumbnail row {}: {e}", path))?;
+                .map_err(|e| format!("delete thumbnail row {path}: {e}"))?;
             debug_log_row_removed(path);
         }
     }

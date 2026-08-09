@@ -69,8 +69,20 @@ mod tests {
     /// accepts what we hand it.
     fn make_test_png(path: &std::path::Path) {
         let img = ImageBuffer::from_fn(1024u32, 1024u32, |x, y| {
+            #[expect(
+                clippy::cast_possible_truncation,
+                reason = "x, y are in [0, 1024); (x % 256) is in [0, 256); truncation to u8 is intentional for the test pattern"
+            )]
             let r = ((x % 256) as u8).wrapping_add(64);
+            #[expect(
+                clippy::cast_possible_truncation,
+                reason = "y is in [0, 1024); (y % 256) is in [0, 256); truncation to u8 is intentional for the test pattern"
+            )]
             let g = ((y % 256) as u8).wrapping_add(32);
+            #[expect(
+                clippy::cast_possible_truncation,
+                reason = "(x + y) is in [0, 2048); ((x + y) % 256) is in [0, 256); truncation to u8 is intentional for the test pattern"
+            )]
             let b = (((x + y) % 256) as u8).wrapping_add(16);
             Rgb([r, g, b])
         });
@@ -87,7 +99,13 @@ mod tests {
         };
         let mut writer = hound::WavWriter::create(path, spec).expect("wav writer");
         for n in 0..8000 {
-            let sample = ((n as f32 / 8000.0 * std::f32::consts::TAU * 440.0).sin() * i16::MAX as f32) as i16;
+            #[expect(
+                clippy::cast_precision_loss,
+                clippy::cast_possible_truncation,
+                reason = "test fixture: n is small (0..8000); the n→f32 widening is lossless in this range, and the f32→i16 truncation is the tone generator's design (it saturates at i16::MAX)"
+            )]
+            let sample = ((n as f32 / 8000.0 * std::f32::consts::TAU * 440.0).sin()
+                * f32::from(i16::MAX)) as i16;
             writer.write_sample(sample).expect("write sample");
         }
         writer.finalize().expect("finalize wav");
@@ -118,7 +136,7 @@ mod tests {
         make_test_png(&src);
 
         let rgb = render_for_asset("Texture", &src).expect("render");
-        let bytes = dispatch::encode_webp(&rgb, WEBP_QUALITY).expect("webp encode");
+        let bytes = dispatch::encode_webp(&rgb, WEBP_QUALITY);
         assert!(!bytes.is_empty());
         // RIFF / WEBP magic header check.
         assert_eq!(&bytes[0..4], b"RIFF");
@@ -177,19 +195,24 @@ mod tests {
         ));
         let asset_id = {
             let g = db.lock().unwrap();
-            let conn = g._test_connection();
-            conn.execute(
-                "INSERT INTO collections (name, description) VALUES ('default', 'fixture')",
-                [],
-            )
-            .unwrap();
-            conn.execute(
-                "INSERT INTO assets (name, file_path, asset_type, collection, file_size, checksum)
-                 VALUES ('big.png', ?1, 'Texture', 'default', 1, 'sha256:demo')",
-                params![src.to_string_lossy()],
-            )
-            .unwrap();
-            conn.last_insert_rowid()
+            let last_rowid = {
+                let conn = g.test_connection();
+                conn.execute(
+                    "INSERT INTO collections (name, description) VALUES ('default', 'fixture')",
+                    [],
+                )
+                .unwrap();
+                conn.execute(
+                    "INSERT INTO assets (name, file_path, asset_type, collection, file_size, checksum)
+                     VALUES ('big.png', ?1, 'Texture', 'default', 1, 'sha256:demo')",
+                    params![src.to_string_lossy()],
+                )
+                .unwrap();
+                conn.last_insert_rowid()
+            };
+            // Drop the MutexGuard early (clippy `significant_drop_tightening`).
+            drop(g);
+            last_rowid
         };
 
         // Spawn the worker + submit one job.
@@ -197,25 +220,37 @@ mod tests {
             .enable_all()
             .build()
             .unwrap();
-        let queue = ThumbnailQueue::spawn(
-            Arc::clone(&db),
-            thumbs_dir.clone(),
-            &runtime.handle(),
-        );
         let mtime = std::fs::metadata(&src)
             .and_then(|m| m.modified())
             .expect("mtime")
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap()
-            .as_secs() as i64;
-        queue
-            .submit(ThumbnailJob {
-                asset_id,
-                asset_type: "Texture".to_string(),
-                source_path: src.clone(),
-                source_mtime: mtime,
-            })
-            .expect("submit");
+            .as_secs();
+        #[expect(
+            clippy::cast_possible_wrap,
+            reason = "test fixture: file mtime as unix seconds; pre-1970 is not realistic for any test asset"
+        )]
+        let mtime = mtime as i64;
+        // Scope the queue submission tightly so the `ThumbnailQueue`
+        // (which holds the async worker task handle — a significant
+        // Drop) is released before we drive the runtime below.
+        // Without this scope clippy `significant_drop_tightening`
+        // flags the binding as outliving the `runtime.block_on` call.
+        {
+            let queue = ThumbnailQueue::spawn(
+                Arc::clone(&db),
+                thumbs_dir.clone(),
+                runtime.handle(),
+            );
+            queue
+                .submit(ThumbnailJob {
+                    asset_id,
+                    asset_type: "Texture".to_string(),
+                    source_path: src,
+                    source_mtime: mtime,
+                })
+                .expect("submit");
+        }
 
         // The worker is async — drive the runtime until the
         // channel drains. We use a short timeout so the test
@@ -256,7 +291,7 @@ mod tests {
     #[test]
     fn list_assets_needing_thumbnails_detects_stale_mtime() {
         let db = AssetDatabase::new_in_memory().expect("in-memory db");
-        let conn = db._test_connection();
+        let conn = db.test_connection();
         conn.execute(
             "INSERT INTO collections (name, description) VALUES ('default', 'fixture')",
             [],
@@ -333,7 +368,7 @@ mod tests {
         std::fs::create_dir(&thumbs_dir).expect("create");
 
         let db = AssetDatabase::new_in_memory().expect("in-memory db");
-        let conn = db._test_connection();
+        let conn = db.test_connection();
         conn.execute(
             "INSERT INTO collections (name, description) VALUES ('default', 'fixture')",
             [],
