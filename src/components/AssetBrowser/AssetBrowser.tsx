@@ -1,3 +1,4 @@
+import { DatabaseStatsSchema, ScanResultSchema } from '@/types/schemas'
 import { invoke } from '@tauri-apps/api/core'
 import {
   BarChart3,
@@ -16,6 +17,7 @@ import {
   Volume2,
 } from 'lucide-react'
 import React, { useCallback, useEffect, useRef, useState } from 'react'
+import { z } from 'zod'
 
 // Types based on Rust backend structures
 interface AssetRecord {
@@ -80,6 +82,36 @@ interface AssetSearchParams {
   collection?: string
   limit?: number
 }
+
+// IPC-boundary schemas. These mirror the local interfaces above
+// (`AssetSearchResult`, `Collection`, `DatabaseStats`); validating
+// at the IPC boundary catches malformed backend responses early
+// instead of crashing inside `[...results].sort(...)` with a
+// cryptic `results is not iterable` TypeError.
+const AssetSearchResultArraySchema = z
+  .array(z.unknown())
+  .transform(items =>
+    items.filter(
+      (item): item is AssetSearchResult =>
+        typeof item === 'object' &&
+        item !== null &&
+        'asset' in item &&
+        typeof (item as { asset: unknown }).asset === 'object' &&
+        (item as { asset: { name?: unknown } }).asset !== null &&
+        typeof (item as { asset: { name?: unknown } }).asset.name === 'string'
+    )
+  )
+const CollectionArraySchema = z
+  .array(z.unknown())
+  .transform(items =>
+    items.filter(
+      (item): item is Collection =>
+        typeof item === 'object' &&
+        item !== null &&
+        typeof (item as { id?: unknown }).id === 'number' &&
+        typeof (item as { name?: unknown }).name === 'string'
+    )
+  )
 
 type SortMode = 'name' | 'type' | 'size' | 'date'
 
@@ -157,9 +189,21 @@ export default function AssetBrowser({ hideHeader = false }: AssetBrowserProps) 
   const loadAssets = useCallback(async () => {
     try {
       setError(null)
-      const results: AssetSearchResult[] = await invoke('search_assets_database', {
+      const raw = await invoke('search_assets_database', {
         params: searchParams,
       })
+      // Validate the response shape at the IPC boundary (AGENTS.md:
+      // "Treat Tauri IPC as an untrusted network"). If the backend
+      // returns an unexpected shape — undefined, null, a single object
+      // instead of an array — surface a clear error to the user rather
+      // than crashing in `[...results].sort(...)` further down.
+      const parsed = AssetSearchResultArraySchema.safeParse(raw)
+      if (!parsed.success) {
+        throw new Error(
+          `Tauri command "search_assets_database" returned an unexpected shape: ${parsed.error.message}`
+        )
+      }
+      const results = parsed.data
 
       // Sort results
       const sortedResults = [...results].sort((a, b) => {
@@ -186,19 +230,33 @@ export default function AssetBrowser({ hideHeader = false }: AssetBrowserProps) 
 
   const loadCollections = async () => {
     try {
-      const collections: Collection[] = await invoke('get_asset_collections')
-      setCollections(collections)
+      const raw = await invoke('get_asset_collections')
+      const parsed = CollectionArraySchema.safeParse(raw)
+      if (!parsed.success) {
+        throw new Error(
+          `Tauri command "get_asset_collections" returned an unexpected shape: ${parsed.error.message}`
+        )
+      }
+      setCollections(parsed.data)
     } catch (error) {
       console.error('Failed to load collections:', error)
+      setError(error instanceof Error ? error.message : 'Failed to load collections')
     }
   }
 
   const loadStats = async () => {
     try {
-      const stats: DatabaseStats = await invoke('get_asset_database_stats')
-      setStats(stats)
+      const raw = await invoke('get_asset_database_stats')
+      const parsed = DatabaseStatsSchema.safeParse(raw)
+      if (!parsed.success) {
+        throw new Error(
+          `Tauri command "get_asset_database_stats" returned an unexpected shape: ${parsed.error.message}`
+        )
+      }
+      setStats(parsed.data)
     } catch (error) {
       console.error('Failed to load stats:', error)
+      setError(error instanceof Error ? error.message : 'Failed to load stats')
     }
   }
 
@@ -211,7 +269,14 @@ export default function AssetBrowser({ hideHeader = false }: AssetBrowserProps) 
       // Listen for progress updates
       // In a real implementation, you'd set up event listeners for scan progress
 
-      const result: ScanResult = await invoke('scan_assets_database')
+      const rawScan = await invoke('scan_assets_database')
+      const parsedScan = ScanResultSchema.safeParse(rawScan)
+      if (!parsedScan.success) {
+        throw new Error(
+          `Tauri command "scan_assets_database" returned an unexpected shape: ${parsedScan.error.message}`
+        )
+      }
+      const result: ScanResult = parsedScan.data
 
       // Refresh data after scan in parallel; allSettled so a failing
       // load doesn't sink the others.
