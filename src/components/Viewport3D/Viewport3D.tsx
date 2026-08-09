@@ -7,6 +7,7 @@ import { useEditorStore } from '@/store/editorStore'
 import { Grid, Stats } from '@react-three/drei'
 import { Canvas } from '@react-three/fiber'
 import React, { forwardRef, useCallback, useImperativeHandle, useMemo, useState } from 'react'
+import * as THREE from 'three'
 import { PaintSettingsPanel, PaintToolViewport } from '../PaintTool'
 import TransformConstraintIndicator from '../TransformConstraintIndicator'
 import TransformGizmos from '../TransformGizmos'
@@ -238,8 +239,15 @@ export default forwardRef<CameraControlsRef, object>(function Viewport3D(_props,
           preserveDrawingBuffer: true,
         }}
         shadows
-        onCreated={({ gl }) => {
+        onCreated={({ gl, scene }) => {
           gl.setSize(window.innerWidth, window.innerHeight)
+          // Use a slightly tinted dark background so the viewport reads as
+          // "an empty 3D scene" rather than "a black hole". Without this,
+          // the canvas defaults to opaque black and a fresh launch looks
+          // like a blank screen even though the panels are rendering.
+          gl.setClearColor('#1e2536', 1)
+          // Render a default fog so far-away grid edges fade out gracefully
+          scene.fog = new THREE.Fog('#1e2536', 30, 80)
         }}
       >
         {/* Performance context to handle R3F hooks */}
