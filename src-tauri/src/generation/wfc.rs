@@ -645,6 +645,10 @@ impl WFCGenerator {
             // T56: navmesh is generated on demand via the
             // `generate_navmesh` command, not by WFC generation.
             navmesh: None,
+            // T57: waypoints/patrol routes are hand-authored in the
+            // editor, not produced by WFC generation.
+            waypoints: Vec::new(),
+            patrol_routes: Vec::new(),
         })
     }
 }

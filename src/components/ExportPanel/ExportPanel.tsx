@@ -30,7 +30,7 @@ interface ExportResult {
 }
 
 export default function ExportPanel() {
-  const { sceneObjects } = useEditorStore()
+  const { sceneObjects, waypoints, patrolRoutes } = useEditorStore()
   const [isExporting, setIsExporting] = useState(false)
   const [outputPath, setOutputPath] = useState('')
   const [lastExportResult, setLastExportResult] = useState<ExportResult | null>(null)
@@ -119,7 +119,9 @@ export default function ExportPanel() {
       // T91d: payload built by the pure utility — markers ride
       // along via spread-when-present so absent markers omit the
       // key entirely (matches Rust `skip_serializing_if`).
-      const levelData = buildLevelExportPayload(sceneObjects.values())
+      // T57: waypoints / patrol routes ride along as level-level
+      // arrays alongside the per-object markers.
+      const levelData = buildLevelExportPayload(sceneObjects.values(), { waypoints, patrolRoutes })
 
       const result: ExportResult = await invoke('export_level', {
         levelData,

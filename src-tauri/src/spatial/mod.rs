@@ -6,23 +6,41 @@ use std::collections::HashMap;
 use crate::Transform3D;
 
 // T56: navigation mesh generation. Re-exported here so consumers
-// (main.rs, export/exporters.rs, and a future T57 A* pathing module)
-// can use `spatial::NavMesh` etc. without reaching into the
-// submodule path. `morgan-bevy` is a `bin` crate, so unused `pub
-// use` re-exports are flagged as dead by rustc even though they're
-// part of this module's intended public surface -- `NavMesh` is
-// used today (main.rs / exporters.rs); the rest are exported ahead
-// of T57 (A* pathing over `NavMesh.polygons`), which is the reason
-// this module exists in the first place.
+// (main.rs, export/exporters.rs) can use `spatial::NavMesh` etc.
+// without reaching into the submodule path. `morgan-bevy` is a `bin`
+// crate, so unused `pub use` re-exports are flagged as dead by rustc
+// even though they're part of this module's intended public surface.
+//
+// T57 note: A* pathing over `NavMesh.polygons` is implemented in
+// pure TypeScript (`src/utils/navPathfinding.ts`), not here -- the
+// `NavMesh` is already client-side via `useNavMesh()`, so there's no
+// need for a Rust round trip. The re-exports below that aren't
+// consumed elsewhere in this crate exist for the public surface /
+// potential future Rust-side consumers (e.g. a headless CLI
+// exporter), not for T57 specifically.
 pub mod navmesh;
 #[expect(
     unused_imports,
-    reason = "NavConnection/NavMeshError/NavObstacle/NavPolygon/Obstacle/ObstacleKind/OffMeshConnection/OffMeshConnectionKind/generate_navmesh are exported for T57 (A* pathing over NavMesh.polygons), not yet consumed outside spatial::navmesh itself; NavMesh is used today (main.rs / exporters.rs)"
+    reason = "NavConnection/NavMeshError/NavObstacle/NavPolygon/Obstacle/ObstacleKind/OffMeshConnection/OffMeshConnectionKind/generate_navmesh are part of this module's public surface, not yet consumed outside spatial::navmesh itself; NavMesh is used today (main.rs / exporters.rs)"
 )]
 pub use navmesh::{
     generate_navmesh, NavConnection, NavMesh, NavMeshError, NavObstacle, NavPolygon, Obstacle,
     ObstacleKind, OffMeshConnection, OffMeshConnectionKind, WalkableSurface,
 };
+
+// T57: waypoint + patrol route data model (export-pipeline plumbing
+// only -- see `waypoints` module doc for why no pathing logic lives
+// here). `Waypoint` / `PatrolRoute` are used outside this module in
+// both test and non-test code (main.rs's `LevelData`,
+// export/exporters.rs's `BevyLevelData` + its tests), so re-exporting
+// them here is unconditionally justified. `PatrolMode` is used only
+// by tests, and only via `crate::spatial::waypoints::PatrolMode`
+// (the submodule path directly) rather than through a top-level
+// re-export -- avoids the `#[expect(unused_imports)]` foot-gun the
+// navmesh re-exports below hit if a re-exported symbol's "used"
+// status differs between the test and non-test compilation targets.
+pub mod waypoints;
+pub use waypoints::{PatrolRoute, Waypoint};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BoundingBox {

@@ -123,6 +123,38 @@ the current scene. The generated mesh (vertices, polygons,
 obstacles, connections) rides along in every export format — see
 [export-formats.md](export-formats.md#navigation-mesh-t56).
 
+## AI waypoints and patrol routes (T57)
+
+Click **Place Waypoint** in the viewport toolbar, then click
+anywhere in the 3D view to drop a small green sphere waypoint
+(raycasts against scene geometry, falling back to the y=0 ground
+plane so waypoints can be placed before any floor mesh exists). Each
+waypoint can carry an optional dwell time (seconds to pause there)
+and an optional link to a single "next" waypoint.
+
+The waypoint panel's route builder lets you click waypoints in order
+to select them, choose a traversal mode, and **Create Route**:
+
+- **loop** — `A → B → C → A → …`, wraps back to the start.
+- **ping-pong** — `A → B → C → B → A → …`, bounces at either end.
+- **random** — jumps to a random *other* waypoint in the route each
+  step.
+
+Every patrol route's path renders as a cyan polyline in the
+viewport, automatically routed across the current navmesh (T56) via
+A* over the navmesh's polygon connectivity graph — the path detours
+through doorway connections rather than cutting through walls. If no
+navmesh has been generated yet (or a route's waypoints fall on
+disconnected navmesh regions), the path falls back to a straight
+line between waypoints so it's never silently missing.
+
+The A* search and patrol traversal stepping are pure TypeScript
+(`src/utils/navPathfinding.ts`, `src/utils/patrolTraversal.ts`) —
+the navmesh is already client-side via `useNavMesh()`, so there's no
+Rust round trip for pathing. Waypoints and patrol routes ride along
+in every export format — see
+[export-formats.md](export-formats.md#ai-waypoints-and-patrol-routes-t57).
+
 ## Export
 
 | Format          | Toolchain                           | Where to start                              |

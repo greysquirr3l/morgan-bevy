@@ -10,6 +10,7 @@ import React, { forwardRef, useCallback, useImperativeHandle, useMemo, useState 
 import { PaintSettingsPanel, PaintToolViewport } from '../PaintTool'
 import TransformConstraintIndicator from '../TransformConstraintIndicator'
 import TransformGizmos from '../TransformGizmos'
+import { WaypointSettingsPanel, WaypointViewport } from '../Waypoints'
 import BoxSelection, { BoxSelectionOverlay } from './BoxSelection'
 import CameraSystem from './CameraSystem'
 import NavMeshOverlay from './NavMeshOverlay'
@@ -299,12 +300,18 @@ export default forwardRef<CameraControlsRef, object>(function Viewport3D(_props,
         {/* Navmesh overlay (T56) - needs to be inside Canvas for R3F hooks */}
         <NavMeshOverlay navMesh={navMeshTool.navMesh} visible={navMeshTool.visible} />
 
+        {/* Waypoint spheres + patrol route paths (T57) - needs to be inside Canvas for R3F hooks */}
+        <WaypointViewport navMesh={navMeshTool.navMesh} />
+
         {/* Performance Stats */}
         {showStats && <Stats />}
       </Canvas>
 
       {/* Paint Tool settings overlay (T54) */}
       <PaintSettingsPanel />
+
+      {/* Waypoint / patrol route settings overlay (T57) */}
+      <WaypointSettingsPanel />
 
       {/* Viewport UI Overlay */}
       <div className="absolute top-2 left-2 bg-black bg-opacity-50 text-white text-xs p-2 rounded">

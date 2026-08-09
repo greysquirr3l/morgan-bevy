@@ -30,7 +30,7 @@ use generation::bsp::BSPGenerator;
 use generation::wfc::{WFCGenerationParams, WFCGenerator};
 use rfd::FileDialog;
 use spatial::navmesh::{NavMesh, Obstacle, WalkableSurface};
-use spatial::{BoundingBox, SpatialIndex};
+use spatial::{BoundingBox, PatrolRoute, SpatialIndex, Waypoint};
 use std::path::PathBuf;
 
 use generation::themes::{Theme, ThemeLibrary};
@@ -184,6 +184,16 @@ pub struct LevelData {
     /// Rust source) once set.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub navmesh: Option<NavMesh>,
+    /// Editor-authored waypoints (T57). Independent of any
+    /// particular navmesh generation -- hand-placed by the level
+    /// designer, not derived. Present in every export format (JSON /
+    /// RON / Rust source) once non-empty.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub waypoints: Vec<Waypoint>,
+    /// Editor-authored patrol routes referencing `waypoints` above
+    /// (T57).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub patrol_routes: Vec<PatrolRoute>,
 }
 
 /// Project data for saving and loading complete editor sessions.

@@ -1,6 +1,7 @@
 import { deserializeMap, serializeMap } from '@/store/mapSerialization'
 import { AssetId, isObjectId, LayerId, MaterialId, ObjectId, PrefabId } from '@/types/brand'
 import type { AnimationMarker, AudioMarker, LightMarker, VfxMarker } from '@/types/markers'
+import type { PatrolRoute, Waypoint } from '@/types/waypoints'
 import type { Command } from '@/utils/commands'
 import { DEFAULT_BRUSH_FALLOFF, DEFAULT_BRUSH_RADIUS, type BrushFalloff } from '@/utils/paintTool'
 import type { UVTransform } from '@/utils/uvTransform'
@@ -226,6 +227,16 @@ export interface EditorState {
     name?: string
   }>
 
+  // T57: AI waypoints + patrol routes. Editor-authored, independent
+  // of any particular navmesh generation — same "array of records +
+  // add/remove/update actions" shape as `lights` above. Per-frame
+  // interaction state (is the placement tool active) lives alongside
+  // as a plain boolean, mirroring `paintToolActive`.
+  waypoints: Waypoint[]
+  patrolRoutes: PatrolRoute[]
+  waypointPlacementActive: boolean
+  waypointDefaultDwellTime: number
+
   // Undo/Redo system
   undoHistory: Command[]
   redoHistory: Command[]
@@ -299,6 +310,18 @@ export interface EditorState {
       name: string
     }>
   ) => void
+
+  // T57: waypoints. Mirrors the lighting actions above exactly.
+  addWaypoint: (waypoint: Waypoint) => void
+  removeWaypoint: (id: Waypoint['id']) => void
+  updateWaypoint: (id: Waypoint['id'], patch: Partial<Omit<Waypoint, 'id'>>) => void
+  setWaypointPlacementActive: (active: boolean) => void
+  setWaypointDefaultDwellTime: (seconds: number) => void
+
+  // T57: patrol routes.
+  addPatrolRoute: (route: PatrolRoute) => void
+  removePatrolRoute: (id: PatrolRoute['id']) => void
+  updatePatrolRoute: (id: PatrolRoute['id'], patch: Partial<Omit<PatrolRoute, 'id'>>) => void
 
   // Object management
   addObject: (type: 'cube' | 'sphere' | 'pyramid', position?: [number, number, number]) => ObjectId
@@ -422,6 +445,13 @@ export const useEditorStore = create<EditorState>()(
       shadowQuality: 'off' | 'hard' | 'soft' | 'ultra'
       name?: string
     }>,
+
+    // T57: waypoints + patrol routes. Empty until the user places
+    // waypoints via the click-to-place tool or the settings panel.
+    waypoints: [] as Waypoint[],
+    patrolRoutes: [] as PatrolRoute[],
+    waypointPlacementActive: false,
+    waypointDefaultDwellTime: 0,
 
     // Undo/Redo system
     undoHistory: [] as Command[],
@@ -614,6 +644,74 @@ export const useEditorStore = create<EditorState>()(
         const idx = state.lights.findIndex(l => l.id === id)
         if (idx === -1) return
         state.lights[idx] = { ...state.lights[idx], ...patch }
+      }),
+
+    // T57: waypoint actions — mirrors the lighting actions above.
+    addWaypoint: waypoint =>
+      set(state => {
+        state.waypoints.push(waypoint)
+      }),
+
+    removeWaypoint: id =>
+      set(state => {
+        state.waypoints = state.waypoints.filter(w => w.id !== id)
+        // Drop the waypoint from every patrol route that referenced
+        // it, and from any `nextWaypointId` link — a dangling
+        // reference to a deleted waypoint would break traversal and
+        // path rendering silently.
+        for (const route of state.patrolRoutes) {
+          route.waypointIds = route.waypointIds.filter(wid => wid !== id)
+        }
+        for (const w of state.waypoints) {
+          if (w.nextWaypointId === id) delete w.nextWaypointId
+        }
+      }),
+
+    updateWaypoint: (id, patch) =>
+      set(state => {
+        const idx = state.waypoints.findIndex(w => w.id === id)
+        const current = state.waypoints[idx]
+        if (idx === -1 || !current) return
+        const merged: Waypoint = { ...current, ...patch }
+        // A patch field explicitly set to `undefined` (the settings
+        // panel's "clear dwell time" affordance) means "remove this
+        // optional field", not "set it to the literal value
+        // undefined" — mirrors `updateObjectLight`'s `delete o.light`
+        // convention above: an absent key, not an `undefined`-valued
+        // one, is what keeps a round-trip through JSON clean.
+        if ('dwellTime' in patch && patch.dwellTime === undefined) delete merged.dwellTime
+        if ('nextWaypointId' in patch && patch.nextWaypointId === undefined) {
+          delete merged.nextWaypointId
+        }
+        state.waypoints[idx] = merged
+      }),
+
+    setWaypointPlacementActive: active =>
+      set(state => {
+        state.waypointPlacementActive = active
+      }),
+
+    setWaypointDefaultDwellTime: seconds =>
+      set(state => {
+        state.waypointDefaultDwellTime = seconds >= 0 ? seconds : state.waypointDefaultDwellTime
+      }),
+
+    // T57: patrol route actions.
+    addPatrolRoute: route =>
+      set(state => {
+        state.patrolRoutes.push(route)
+      }),
+
+    removePatrolRoute: id =>
+      set(state => {
+        state.patrolRoutes = state.patrolRoutes.filter(r => r.id !== id)
+      }),
+
+    updatePatrolRoute: (id, patch) =>
+      set(state => {
+        const idx = state.patrolRoutes.findIndex(r => r.id === id)
+        if (idx === -1) return
+        state.patrolRoutes[idx] = { ...state.patrolRoutes[idx], ...patch }
       }),
 
     // Object management

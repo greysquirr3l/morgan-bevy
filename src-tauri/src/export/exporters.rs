@@ -1,5 +1,5 @@
 use crate::export::ExportFormat;
-use crate::spatial::{BoundingBox, NavMesh};
+use crate::spatial::{BoundingBox, NavMesh, PatrolRoute, Waypoint};
 use crate::{CollisionShape, GameObject, LevelData, SpawnPoint, Transform3D, TriggerVolume};
 use anyhow::Result;
 use chrono::{DateTime, Utc};
@@ -557,6 +557,11 @@ impl LevelExporter {
             // export when present. Absent (`None`) levels simply
             // omit the field via `skip_serializing_if`.
             navmesh: level_data.navmesh.clone(),
+            // T57: carry waypoints/patrol routes through to the
+            // Bevy-facing RON export. Empty levels simply omit the
+            // fields via `skip_serializing_if`.
+            waypoints: level_data.waypoints.clone(),
+            patrol_routes: level_data.patrol_routes.clone(),
         }
     }
 
@@ -682,6 +687,13 @@ impl LevelExporter {
                 Self::escape_rust_string(&navmesh_json)
             )?;
         }
+
+        // T57: waypoints/patrol routes, same JSON-string-constant
+        // rationale as `NAVMESH_JSON` above. Factored into a helper
+        // (rather than inlined here like the navmesh block) to keep
+        // `generate_rust_code` under clippy's `too_many_lines`
+        // budget now that there are three such blocks.
+        Self::emit_waypoint_json_constants(&mut code, level_data)?;
 
         let fn_name = Self::fn_safe_name(&level_data.name);
 
@@ -844,6 +856,39 @@ impl LevelExporter {
         }
 
         Ok(code)
+    }
+
+    /// T57: append `WAYPOINTS_JSON` / `PATROL_ROUTES_JSON` string
+    /// constants to `code` when `level_data` carries any waypoints /
+    /// patrol routes. Extracted out of `generate_rust_code` (which
+    /// inlines the equivalent `NAVMESH_JSON` block) purely to keep
+    /// that function under clippy's `too_many_lines` budget --
+    /// same rationale, same "JSON string constant, not a generated
+    /// Rust literal" approach as `NAVMESH_JSON`.
+    fn emit_waypoint_json_constants(code: &mut String, level_data: &LevelData) -> Result<()> {
+        if !level_data.waypoints.is_empty() {
+            let waypoints_json = serde_json::to_string(&level_data.waypoints)?;
+            writeln!(
+                code,
+                "/// Waypoint data (T57), serialized as JSON. Deserialize with\n\
+                 /// `serde_json::from_str` into a type matching the shape\n\
+                 /// documented in `spatial::waypoints::Waypoint`.\n\
+                 pub const WAYPOINTS_JSON: &str = \"{}\";\n",
+                Self::escape_rust_string(&waypoints_json)
+            )?;
+        }
+        if !level_data.patrol_routes.is_empty() {
+            let patrol_routes_json = serde_json::to_string(&level_data.patrol_routes)?;
+            writeln!(
+                code,
+                "/// Patrol route data (T57), serialized as JSON. Deserialize\n\
+                 /// with `serde_json::from_str` into a type matching the shape\n\
+                 /// documented in `spatial::waypoints::PatrolRoute`.\n\
+                 pub const PATROL_ROUTES_JSON: &str = \"{}\";\n",
+                Self::escape_rust_string(&patrol_routes_json)
+            )?;
+        }
+        Ok(())
     }
 
     /// Convert a level name to a Rust identifier-safe `snake_case` token.
@@ -1142,6 +1187,11 @@ struct BevyLevelData {
     // T56: optional navmesh, carried through from `LevelData`.
     #[serde(skip_serializing_if = "Option::is_none")]
     navmesh: Option<NavMesh>,
+    // T57: waypoints/patrol routes, carried through from `LevelData`.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    waypoints: Vec<Waypoint>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    patrol_routes: Vec<PatrolRoute>,
 }
 
 #[derive(serde::Serialize)]
@@ -1314,6 +1364,8 @@ mod tests {
                 max: [10.0, 5.0, 10.0],
             },
             navmesh: None,
+            waypoints: Vec::new(),
+            patrol_routes: Vec::new(),
         }
     }
 
@@ -1444,6 +1496,82 @@ mod tests {
         // spawn calls inside it.
         assert!(code.contains("pub fn spawn_level_office_level_01("));
         assert!(code.contains("pub fn get_level_office_level_01_bounds()"));
+    }
+
+    // ─── T57: waypoints / patrol routes export ──────────────────────────
+
+    fn level_with_waypoints() -> LevelData {
+        use crate::spatial::waypoints::PatrolMode;
+        let mut lvl = sample_level();
+        lvl.waypoints = vec![
+            Waypoint {
+                id: "wp1".to_string(),
+                position: [0.0, 0.0, 0.0],
+                dwell_time: Some(1.5),
+                next_waypoint_id: None,
+            },
+            Waypoint {
+                id: "wp2".to_string(),
+                position: [5.0, 0.0, 0.0],
+                dwell_time: None,
+                next_waypoint_id: None,
+            },
+        ];
+        lvl.patrol_routes = vec![PatrolRoute {
+            id: "route1".to_string(),
+            waypoint_ids: vec!["wp1".to_string(), "wp2".to_string()],
+            mode: PatrolMode::Loop,
+        }];
+        lvl
+    }
+
+    #[test]
+    fn level_without_waypoints_omits_waypoint_fields_from_json() {
+        let json = serde_json::to_string(&sample_level()).expect("should serialize");
+        assert!(!json.contains("\"waypoints\""));
+        assert!(!json.contains("\"patrol_routes\""));
+    }
+
+    #[test]
+    fn level_with_waypoints_round_trips_through_json() {
+        let lvl = level_with_waypoints();
+        let json = serde_json::to_string(&lvl).expect("should serialize");
+        assert!(json.contains("\"waypoints\""));
+        assert!(json.contains("\"patrol_routes\""));
+        assert!(json.contains("\"wp1\""));
+        assert!(json.contains("\"loop\""));
+        let back: LevelData = serde_json::from_str(&json).expect("should deserialize");
+        assert_eq!(back.waypoints, lvl.waypoints);
+        assert_eq!(back.patrol_routes, lvl.patrol_routes);
+    }
+
+    #[test]
+    fn bevy_ron_export_carries_waypoints_and_patrol_routes_through() {
+        let lvl = level_with_waypoints();
+        let bevy = LevelExporter::convert_to_bevy_format(&lvl);
+        assert_eq!(bevy.waypoints, lvl.waypoints);
+        assert_eq!(bevy.patrol_routes, lvl.patrol_routes);
+        let ron_data = ron::ser::to_string_pretty(&bevy, ron::ser::PrettyConfig::default())
+            .expect("should serialize to RON");
+        assert!(ron_data.contains("wp1"));
+        assert!(ron_data.contains("route1"));
+    }
+
+    #[test]
+    fn rust_source_export_emits_waypoints_and_patrol_routes_json_constants() {
+        let lvl = level_with_waypoints();
+        let code = LevelExporter::generate_rust_code(&lvl).expect("should succeed");
+        assert!(code.contains("pub const WAYPOINTS_JSON: &str ="));
+        assert!(code.contains("pub const PATROL_ROUTES_JSON: &str ="));
+        assert!(code.contains("wp1"));
+        assert!(code.contains("route1"));
+    }
+
+    #[test]
+    fn rust_source_export_omits_waypoint_constants_when_none_present() {
+        let code = LevelExporter::generate_rust_code(&sample_level()).expect("should succeed");
+        assert!(!code.contains("WAYPOINTS_JSON"));
+        assert!(!code.contains("PATROL_ROUTES_JSON"));
     }
 
     // ─── T41: real binary FBX 7.7.0 ─────────────────────────────────────

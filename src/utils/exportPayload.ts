@@ -22,6 +22,7 @@
 // never reach for the store / Tauri themselves.
 
 import type { SceneObject } from '@/store/editorStore'
+import type { PatrolRoute, Waypoint } from '@/types/waypoints'
 
 // The `Layer` type isn't exported from the store (it's defined
 // inline on the `EditorState.layers` field). The shape used by
@@ -55,6 +56,48 @@ function spreadIfPresent<T extends SceneObject, K extends 'light' | 'animation' 
   return { [field]: value } as never
 }
 
+// ─── T57: waypoints / patrol routes wire-format conversion ───────────────────
+//
+// The Rust `Waypoint` / `PatrolRoute` structs
+// (`src-tauri/src/spatial/waypoints.rs`) use snake_case field names
+// (no `#[serde(rename_all)]` on `LevelData` itself, matching
+// `generation_seed` / `collision_shape` elsewhere in this file) — so
+// the TS -> wire conversion here just renames `dwellTime` ->
+// `dwell_time`, `nextWaypointId` -> `next_waypoint_id`, `waypointIds`
+// -> `waypoint_ids`. `PatrolMode` values (`'loop' | 'ping-pong' |
+// 'random'`) are sent verbatim; the Rust enum mirrors those exact
+// strings (see that module's doc comment).
+
+export interface WaypointExport {
+  id: string
+  position: [number, number, number]
+  dwell_time?: number
+  next_waypoint_id?: string
+}
+
+export interface PatrolRouteExport {
+  id: string
+  waypoint_ids: string[]
+  mode: string
+}
+
+function toWaypointExport(wp: Waypoint): WaypointExport {
+  return {
+    id: wp.id,
+    position: wp.position,
+    ...(wp.dwellTime !== undefined ? { dwell_time: wp.dwellTime } : {}),
+    ...(wp.nextWaypointId !== undefined ? { next_waypoint_id: wp.nextWaypointId } : {}),
+  }
+}
+
+function toPatrolRouteExport(route: PatrolRoute): PatrolRouteExport {
+  return {
+    id: route.id,
+    waypoint_ids: route.waypointIds,
+    mode: route.mode,
+  }
+}
+
 // ─── Tauri export_level payload (ExportPanel.tsx) ────────────────────────────
 
 export interface LevelExportPayload {
@@ -65,22 +108,33 @@ export interface LevelExportPayload {
   generation_seed: number | null
   generation_params: unknown | null
   bounds: { min: [number, number, number]; max: [number, number, number] }
+  waypoints: WaypointExport[]
+  patrol_routes: PatrolRouteExport[]
 }
 
 /**
  * Build the `levelData` payload for the `export_level` Tauri command
  * (ExportPanel.tsx). The four marker fields are spread-conditionally
- * so absent markers omit the key entirely.
+ * so absent markers omit the key entirely. `waypoints` / `routes`
+ * (T57) are level-level, not per-object, so they ride along as
+ * top-level arrays alongside `objects`.
  */
 export function buildLevelExportPayload(
   sceneObjects: Iterable<SceneObject>,
-  options: { id?: string; name?: string } = {}
+  options: {
+    id?: string
+    name?: string
+    waypoints?: readonly Waypoint[]
+    patrolRoutes?: readonly PatrolRoute[]
+  } = {}
 ): LevelExportPayload {
   const id = options.id ?? `level-${Date.now()}`
   const name = options.name ?? 'Morgan-Bevy Level'
   return {
     id,
     name,
+    waypoints: (options.waypoints ?? []).map(toWaypointExport),
+    patrol_routes: (options.patrolRoutes ?? []).map(toPatrolRouteExport),
     objects: Array.from(sceneObjects).map(obj => ({
       id: obj.id,
       name: obj.name,
@@ -120,6 +174,8 @@ export interface FileMenuLevelExportPayload {
   objects: Array<Record<string, unknown>>
   layers: string[]
   bounds: { min: [number, number, number]; max: [number, number, number] }
+  waypoints: WaypointExport[]
+  patrol_routes: PatrolRouteExport[]
 }
 
 /**
@@ -127,17 +183,25 @@ export interface FileMenuLevelExportPayload {
  * command (FileMenu.tsx handleLevelExport). Slightly different shape
  * than `export_level` — material is a full object, not a string id,
  * and metadata is per-object visibility / lock / collision / walkable.
- * Markers ride along here too.
+ * Markers ride along here too; `waypoints` / `patrol_routes` (T57)
+ * ride along as level-level top-level arrays, same as above.
  */
 export function buildFileMenuLevelExportPayload(
   sceneObjects: Iterable<SceneObject>,
-  options: { id?: string; name?: string } = {}
+  options: {
+    id?: string
+    name?: string
+    waypoints?: readonly Waypoint[]
+    patrolRoutes?: readonly PatrolRoute[]
+  } = {}
 ): FileMenuLevelExportPayload {
   const id = options.id ?? `level_${Date.now()}`
   const name = options.name ?? 'Morgan-Bevy Level'
   return {
     id,
     name,
+    waypoints: (options.waypoints ?? []).map(toWaypointExport),
+    patrol_routes: (options.patrolRoutes ?? []).map(toPatrolRouteExport),
     objects: Array.from(sceneObjects).map(obj => ({
       id: obj.id,
       name: obj.name,
@@ -223,4 +287,22 @@ export function buildBevyEntitiesExport(
     ...(obj.audio ? { audio: obj.audio } : {}),
     ...(obj.vfx ? { vfx: obj.vfx } : {}),
   }))
+}
+
+// ─── T57: waypoints / patrol routes for the JSON scene export ────────────────
+//
+// FileMenu.tsx's `handleExport` builds its `exportData.scene` object
+// inline rather than through a `buildXExportPayload` function (that
+// export is a direct-download JSON blob, not a Tauri `LevelData`
+// round trip) — these two exported wrappers give it the same
+// snake_case wire shape as `buildLevelExportPayload` /
+// `buildFileMenuLevelExportPayload` for `exportData.scene.waypoints`
+// / `exportData.scene.patrolRoutes`.
+
+export function buildWaypointsExport(waypoints: Iterable<Waypoint>): WaypointExport[] {
+  return Array.from(waypoints).map(toWaypointExport)
+}
+
+export function buildPatrolRoutesExport(routes: Iterable<PatrolRoute>): PatrolRouteExport[] {
+  return Array.from(routes).map(toPatrolRouteExport)
 }

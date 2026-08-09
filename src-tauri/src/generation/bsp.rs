@@ -170,6 +170,10 @@ impl BSPGenerator {
             // T56: navmesh is generated on demand via the
             // `generate_navmesh` command, not by BSP generation.
             navmesh: None,
+            // T57: waypoints/patrol routes are hand-authored in the
+            // editor, not produced by BSP generation.
+            waypoints: Vec::new(),
+            patrol_routes: Vec::new(),
         };
 
         info!(
