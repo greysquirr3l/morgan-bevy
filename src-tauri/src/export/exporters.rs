@@ -1,5 +1,5 @@
 use crate::export::ExportFormat;
-use crate::spatial::BoundingBox;
+use crate::spatial::{BoundingBox, NavMesh};
 use crate::{CollisionShape, GameObject, LevelData, SpawnPoint, Transform3D, TriggerVolume};
 use anyhow::Result;
 use chrono::{DateTime, Utc};
@@ -553,6 +553,10 @@ impl LevelExporter {
                 generator: "BSP".to_string(),
                 version: "0.1.0".to_string(),
             },
+            // T56: carry the navmesh through to the Bevy-facing RON
+            // export when present. Absent (`None`) levels simply
+            // omit the field via `skip_serializing_if`.
+            navmesh: level_data.navmesh.clone(),
         }
     }
 
@@ -654,6 +658,30 @@ impl LevelExporter {
              \x20\x20\x20\x20Polygon { points: Vec<Vec3>, event: String },\n\
              }\n\n",
         );
+
+        // T56: emit the navmesh (if generated) as a JSON string
+        // constant. The `NavMesh` shape (plain vertex / triangle /
+        // connection data, see `spatial::navmesh` module docs) is
+        // intentionally decoupled from any specific navmesh crate's
+        // internal types, so consumers deserialize it with
+        // `serde_json::from_str` into their own equivalent type
+        // (or Rapier3D `TriMesh` / `bevy_navigation` inputs built
+        // from `vertices` + `triangle_indices` / `polygons` +
+        // `connections`) rather than a generated Rust literal.
+        if let Some(ref navmesh) = level_data.navmesh {
+            let navmesh_json = serde_json::to_string(navmesh)?;
+            writeln!(
+                code,
+                "/// Navigation mesh data (T56), serialized as JSON. Deserialize\n\
+                 /// with `serde_json::from_str` into a type matching the shape\n\
+                 /// documented in `spatial::navmesh::NavMesh` (plain vertex /\n\
+                 /// triangle / connection data -- Rapier3D- and\n\
+                 /// bevy_navigation-compatible without a hard dependency on\n\
+                 /// either crate).\n\
+                 pub const NAVMESH_JSON: &str = \"{}\";\n",
+                Self::escape_rust_string(&navmesh_json)
+            )?;
+        }
 
         let fn_name = Self::fn_safe_name(&level_data.name);
 
@@ -1111,6 +1139,9 @@ struct BevyLevelData {
     entities: Vec<BevyEntity>,
     bounds: BoundingBox,
     metadata: BevyMetadata,
+    // T56: optional navmesh, carried through from `LevelData`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    navmesh: Option<NavMesh>,
 }
 
 #[derive(serde::Serialize)]
@@ -1282,6 +1313,7 @@ mod tests {
                 min: [-10.0, 0.0, -10.0],
                 max: [10.0, 5.0, 10.0],
             },
+            navmesh: None,
         }
     }
 
@@ -1899,5 +1931,76 @@ mod tests {
             parse_systems_mode_from_header(&code),
             Some(SystemsMode::CompanionReference)
         );
+    }
+
+    // ----- T56: navmesh export round-trip (JSON / RON / Rust) -----
+
+    fn sample_navmesh() -> NavMesh {
+        use crate::spatial::navmesh::{generate_navmesh, Obstacle, ObstacleKind, WalkableSurface};
+        let floor = WalkableSurface {
+            min: [0.0, 0.0],
+            max: [10.0, 10.0],
+            height: 0.0,
+        };
+        let wall = Obstacle {
+            min: [0.0, 4.5],
+            max: [8.0, 5.5],
+            kind: ObstacleKind::Wall,
+        };
+        generate_navmesh(&[floor], &[wall]).expect("sample navmesh should generate")
+    }
+
+    #[test]
+    fn json_exporter_includes_navmesh_when_present() {
+        let mut lvl = sample_level();
+        lvl.navmesh = Some(sample_navmesh());
+        let serialized = serde_json::to_string(&lvl).unwrap();
+        assert!(serialized.contains("\"navmesh\""));
+        assert!(serialized.contains("\"polygons\""));
+        assert!(serialized.contains("\"connections\""));
+
+        let back: LevelData = serde_json::from_str(&serialized).unwrap();
+        assert_eq!(back.navmesh, lvl.navmesh);
+    }
+
+    #[test]
+    fn json_exporter_omits_navmesh_when_absent() {
+        let lvl = sample_level();
+        let serialized = serde_json::to_string(&lvl).unwrap();
+        assert!(!serialized.contains("\"navmesh\""));
+    }
+
+    #[test]
+    fn ron_exporter_includes_navmesh_when_present() {
+        let mut lvl = sample_level();
+        lvl.navmesh = Some(sample_navmesh());
+        let bevy = LevelExporter::convert_to_bevy_format(&lvl);
+        let ron = ron::ser::to_string_pretty(&bevy, ron::ser::PrettyConfig::default()).unwrap();
+        assert!(ron.contains("navmesh"));
+        assert!(ron.contains("polygons"));
+    }
+
+    #[test]
+    fn ron_exporter_omits_navmesh_when_absent() {
+        let lvl = sample_level();
+        let bevy = LevelExporter::convert_to_bevy_format(&lvl);
+        let ron = ron::ser::to_string_pretty(&bevy, ron::ser::PrettyConfig::default()).unwrap();
+        assert!(!ron.contains("navmesh"));
+    }
+
+    #[test]
+    fn rust_exporter_emits_navmesh_json_constant_when_present() {
+        let mut lvl = sample_level();
+        lvl.navmesh = Some(sample_navmesh());
+        let code = LevelExporter::generate_rust_code(&lvl).unwrap();
+        assert!(code.contains("pub const NAVMESH_JSON: &str ="), "{code}");
+        assert!(code.contains("\\\"polygons\\\""), "{code}");
+    }
+
+    #[test]
+    fn rust_exporter_omits_navmesh_json_constant_when_absent() {
+        let lvl = sample_level();
+        let code = LevelExporter::generate_rust_code(&lvl).unwrap();
+        assert!(!code.contains("NAVMESH_JSON"), "{code}");
     }
 }

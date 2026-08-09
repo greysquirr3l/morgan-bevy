@@ -29,6 +29,7 @@ use export::{ExportFormat, LevelExporter};
 use generation::bsp::BSPGenerator;
 use generation::wfc::{WFCGenerationParams, WFCGenerator};
 use rfd::FileDialog;
+use spatial::navmesh::{NavMesh, Obstacle, WalkableSurface};
 use spatial::{BoundingBox, SpatialIndex};
 use std::path::PathBuf;
 
@@ -176,6 +177,13 @@ pub struct LevelData {
     pub generation_params: Option<serde_json::Value>,
     /// 3D bounding box defining the level's spatial extent
     pub bounds: BoundingBox,
+    /// Optional navigation mesh (T56). Generated on demand via the
+    /// `generate_navmesh` Tauri command from the level's walkable
+    /// surfaces + obstacles; BSP/WFC generation does not populate
+    /// this itself. Present in every export format (JSON / RON /
+    /// Rust source) once set.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub navmesh: Option<NavMesh>,
 }
 
 /// Project data for saving and loading complete editor sessions.
@@ -385,6 +393,25 @@ async fn export_level(
             Err(e.to_string())
         }
     }
+}
+
+/// T56: generate a navigation mesh from the caller-supplied walkable
+/// surfaces and obstacles. A thin adapter over the pure
+/// `spatial::navmesh::generate_navmesh` — the frontend derives
+/// `surfaces` / `obstacles` from its scene objects (see
+/// `src/types/navmesh.ts`) and this command just forwards them and
+/// maps the typed error to a string for the IPC boundary.
+#[tauri::command]
+async fn generate_navmesh(
+    surfaces: Vec<WalkableSurface>,
+    obstacles: Vec<Obstacle>,
+) -> Result<NavMesh, String> {
+    info!(
+        "Generating navmesh from {} surface(s) and {} obstacle(s)",
+        surfaces.len(),
+        obstacles.len()
+    );
+    spatial::navmesh::generate_navmesh(&surfaces, &obstacles).map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -772,6 +799,8 @@ fn main() {
             // Spatial Queries
             query_objects_in_bounds,
             update_object_transform,
+            // Navigation mesh (T56)
+            generate_navmesh,
             get_current_level,
             save_level_to_file,
             load_level_from_file,

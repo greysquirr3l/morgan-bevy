@@ -107,6 +107,22 @@ component and observer system.
 Full reference including wire format and Bevy-side breakdown:
 [markers.md](markers.md).
 
+## Navigation mesh (T56)
+
+Generate a navmesh from the scene's walkable objects (mark an
+object `walkable` in the Inspector) and obstacles (`collision` +
+optionally tagged `wall`). Uses a 2D rectangle-partitioning
+algorithm: walls split the room they cross into two polygons, and
+any gap in the wall becomes a doorway connection between them —
+simpler than voxel-based recast decomposition, and deterministic.
+
+Toggle the `Navmesh` button in the viewport to show/hide the
+overlay (cyan wireframe = walkable polygons, amber = doorway
+connections, red = obstacles); `Generate Navmesh` re-derives it from
+the current scene. The generated mesh (vertices, polygons,
+obstacles, connections) rides along in every export format — see
+[export-formats.md](export-formats.md#navigation-mesh-t56).
+
 ## Export
 
 | Format          | Toolchain                           | Where to start                              |

@@ -167,6 +167,9 @@ impl BSPGenerator {
                     f64::from(params.height) as f32,
                 ],
             },
+            // T56: navmesh is generated on demand via the
+            // `generate_navmesh` command, not by BSP generation.
+            navmesh: None,
         };
 
         info!(

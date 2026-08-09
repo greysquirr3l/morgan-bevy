@@ -216,6 +216,58 @@ The editor emits binary FBX 7.x via a hand-written encoder
 length-prefixed records with a magic header. Same caveats as
 GLTF: collision / lighting / markers are not preserved.
 
+## Navigation mesh (T56)
+
+Generated on demand via the `generate_navmesh` Tauri command from
+the level's walkable surfaces (`SceneObject.walkable === true`) and
+obstacles (`SceneObject.collision === true`; tagged `"wall"` →
+`ObstacleKind::Wall`, everything else → `ObstacleKind::FreeStanding`).
+Not produced by BSP/WFC generation itself — regenerate from the
+viewport toggle (`Navmesh` / `Generate Navmesh` buttons) after
+placing walkable/collision objects.
+
+Algorithm: 2D rectangle partitioning, not voxel-based recast-style
+decomposition — see the module doc comment in
+`src-tauri/src/spatial/navmesh.rs` for the full rationale and the
+documented "Deferred scope" limitations (disjoint floor islands,
+multi-gap walls, off-mesh connections). The output shape is plain
+vertex/triangle/edge data with no dependency on a specific navmesh
+crate's internal types, so it's consumable by Rapier3D
+(`vertices` + `triangle_indices`) or `bevy_navigation`
+(`polygons` + `connections`) alike.
+
+When present, `LevelData.navmesh` rides along in every export
+format:
+
+```json
+"navmesh": {
+  "vertices": [[0.0, 0.0, 0.0], [10.0, 0.0, 0.0], [10.0, 0.0, 10.0], [0.0, 0.0, 10.0]],
+  "polygons": [
+    { "id": 0, "vertex_indices": [0, 1, 2, 3], "triangle_indices": [0, 1, 2, 0, 2, 3] }
+  ],
+  "obstacles": [],
+  "connections": [
+    { "polygon_a": 0, "polygon_b": 1, "portal": [[8.0, 0.0, 5.0], [10.0, 0.0, 5.0]] }
+  ],
+  "off_mesh_connections": []
+}
+```
+
+RON carries the same shape under the `navmesh` field of the
+Bevy-facing export. The Rust source exporter embeds it as a
+`pub const NAVMESH_JSON: &str = "...";` string constant (JSON-encoded)
+rather than generated Rust literals — deserialize with
+`serde_json::from_str` into a type matching the shape above.
+
+`off_mesh_connections` (jumps, ladders, teleports) is always empty
+in v1 — the type exists and is exported for forward compatibility
+with T57 (A* pathing over `NavMesh.polygons`), but there is no
+authoring input for jump/ladder markers yet.
+
+Absent (`None`) when no navmesh has been generated — same
+`skip_serializing_if = "Option::is_none"` rule as the other optional
+level-wide fields.
+
 ## Round-tripping
 
 Every format round-trips: export then re-import reproduces the
