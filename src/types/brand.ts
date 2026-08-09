@@ -25,6 +25,12 @@ export type PrefabId = Brand<string, 'PrefabId'>
 export type LayerId = Brand<string, 'LayerId'>
 export type ThemeId = Brand<string, 'ThemeId'>
 export type Seed = Brand<number, 'Seed'>
+// T57: waypoints and patrol routes are distinct editor-authored entity
+// kinds (like layers/materials/prefabs), not scene objects — a
+// dedicated brand (rather than reusing `ObjectId`) stops a waypoint id
+// from being passed where an `ObjectId` is expected, and vice versa.
+export type WaypointId = Brand<string, 'WaypointId'>
+export type PatrolRouteId = Brand<string, 'PatrolRouteId'>
 
 // Constructor functions — used at boundaries (Tauri invoke returns,
 // URL params, clipboard payloads) to brand raw strings/numbers. Inside
@@ -50,6 +56,12 @@ export function ThemeId(raw: string): ThemeId {
 }
 export function Seed(raw: number): Seed {
   return raw as Seed
+}
+export function WaypointId(raw: string): WaypointId {
+  return raw as WaypointId
+}
+export function PatrolRouteId(raw: string): PatrolRouteId {
+  return raw as PatrolRouteId
 }
 
 // ---------------------------------------------------------------------------
@@ -145,6 +157,20 @@ export function parseSeed(raw: unknown): Seed {
   return raw as Seed
 }
 
+export function parseWaypointId(raw: unknown): WaypointId {
+  if (!isValidIdString(raw)) {
+    throw new Error(`Invalid WaypointId: ${JSON.stringify(raw)}`)
+  }
+  return raw as WaypointId
+}
+
+export function parsePatrolRouteId(raw: unknown): PatrolRouteId {
+  if (!isValidIdString(raw)) {
+    throw new Error(`Invalid PatrolRouteId: ${JSON.stringify(raw)}`)
+  }
+  return raw as PatrolRouteId
+}
+
 /**
  * Type guards for branded IDs — `unknown`-narrowing helpers used at
  * boundaries that yield `unknown` (e.g. JSON parse of clipboard data,
@@ -158,6 +184,8 @@ export const isLayerId = (value: unknown): value is LayerId => isValidIdString(v
 export const isThemeId = (value: unknown): value is ThemeId => isValidIdString(value)
 export const isSeed = (value: unknown): value is Seed =>
   typeof value === 'number' && Number.isFinite(value) && Number.isInteger(value)
+export const isWaypointId = (value: unknown): value is WaypointId => isValidIdString(value)
+export const isPatrolRouteId = (value: unknown): value is PatrolRouteId => isValidIdString(value)
 
 /**
  * Iterate a Map as `[id, value]` pairs in insertion order. Equivalent to

@@ -260,13 +260,55 @@ rather than generated Rust literals — deserialize with
 `serde_json::from_str` into a type matching the shape above.
 
 `off_mesh_connections` (jumps, ladders, teleports) is always empty
-in v1 — the type exists and is exported for forward compatibility
-with T57 (A* pathing over `NavMesh.polygons`), but there is no
-authoring input for jump/ladder markers yet.
+— the type exists and is exported for forward compatibility with a
+future authoring input (jump/ladder markers), but neither
+`generate_navmesh` nor T57's A* pathing populate or consume it; T57
+paths exclusively across `NavMesh.connections` (the doorway graph).
 
 Absent (`None`) when no navmesh has been generated — same
 `skip_serializing_if = "Option::is_none"` rule as the other optional
 level-wide fields.
+
+## AI waypoints and patrol routes (T57)
+
+Editor-authored, independent of any particular navmesh generation —
+hand-placed via the viewport's **Place Waypoint** tool, not derived
+from scene geometry. `LevelData.waypoints` and
+`LevelData.patrol_routes` ride along in every export format when
+non-empty (`skip_serializing_if = "Vec::is_empty"`, same convention
+as the other optional level-wide fields):
+
+```json
+"waypoints": [
+  { "id": "waypoint_1700000000000_1", "position": [0.0, 0.0, 0.0], "dwell_time": 1.5 },
+  { "id": "waypoint_1700000000100_2", "position": [5.0, 0.0, 0.0] }
+],
+"patrol_routes": [
+  { "id": "route_1700000000200", "waypoint_ids": ["waypoint_1700000000000_1", "waypoint_1700000000100_2"], "mode": "loop" }
+]
+```
+
+`mode` is one of `"loop"`, `"ping-pong"`, or `"random"` — the exact
+strings the TS `PatrolMode` union and the Rust `PatrolMode` enum
+both use (`PatrolMode::PingPong` carries an explicit
+`#[serde(rename = "ping-pong")]` since Rust identifiers can't
+contain a hyphen). `dwell_time` and `next_waypoint_id` are omitted
+from the wire format entirely when absent, never serialized as
+`null` — matching the marker-field convention documented above.
+
+RON carries the same shape under the `waypoints` / `patrol_routes`
+fields of the Bevy-facing export. The Rust source exporter embeds
+each as a JSON string constant (`pub const WAYPOINTS_JSON: &str =
+"...";` / `pub const PATROL_ROUTES_JSON: &str = "...";`), same
+approach as `NAVMESH_JSON` above — only emitted when non-empty.
+
+Pathing between waypoints (A* across the navmesh's polygon
+connectivity graph) is computed client-side in TypeScript
+(`src/utils/navPathfinding.ts`) for viewport rendering; the exported
+data is the waypoint/route *definitions* only — a runtime consuming
+this export computes its own paths (or re-derives them with the same
+algorithm) rather than deserializing a precomputed path, since paths
+depend on a navmesh that may differ at runtime.
 
 ## Round-tripping
 

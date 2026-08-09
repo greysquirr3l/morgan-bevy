@@ -4,7 +4,12 @@ import { AssetId, LayerId } from '@/types/brand'
 import { ProjectDataSchema, type ProjectData } from '@/types/schemas'
 import { LoadCommand, SaveCommand } from '@/utils/commands'
 import { loadExampleLevels } from '@/utils/exampleLevels'
-import { buildBevyEntitiesExport, buildFileMenuLevelExportPayload } from '@/utils/exportPayload'
+import {
+  buildBevyEntitiesExport,
+  buildFileMenuLevelExportPayload,
+  buildPatrolRoutesExport,
+  buildWaypointsExport,
+} from '@/utils/exportPayload'
 import { collectAssetRefs, missingRefs, readAssetRefs, withAssetRefs } from '@/utils/projectAssets'
 import {
   addRecentProject,
@@ -26,7 +31,8 @@ interface FileMenuProps {
 }
 
 export default function FileMenu({ isOpen, onClose, position, onManualSave }: FileMenuProps) {
-  const { executeCommand, sceneObjects, layers, currentProjectPath } = useEditorStore()
+  const { executeCommand, sceneObjects, layers, currentProjectPath, waypoints, patrolRoutes } =
+    useEditorStore()
   const [isExporting, setIsExporting] = useState(false)
   const [showExportModal, setShowExportModal] = useState(false)
   const [recentProjects, setRecentProjects] = useState<RecentProject[]>([])
@@ -196,6 +202,10 @@ export default function FileMenu({ isOpen, onClose, position, onManualSave }: Fi
             gridSize: useEditorStore.getState().gridSize,
             snapToGrid: useEditorStore.getState().snapToGrid,
           },
+          // T57: waypoints / patrol routes, level-level (not tied to
+          // any single object).
+          waypoints: buildWaypointsExport(waypoints),
+          patrol_routes: buildPatrolRoutesExport(patrolRoutes),
         },
         // Bevy-compatible format
         bevy: {
@@ -342,7 +352,12 @@ export default function FileMenu({ isOpen, onClose, position, onManualSave }: Fi
       // T91d: payload built by the pure utility — markers ride
       // along via spread-when-present so absent markers omit the
       // key entirely (matches Rust `skip_serializing_if`).
-      const levelData = buildFileMenuLevelExportPayload(sceneObjects.values())
+      // T57: waypoints / patrol routes ride along as level-level
+      // arrays alongside the per-object markers.
+      const levelData = buildFileMenuLevelExportPayload(sceneObjects.values(), {
+        waypoints,
+        patrolRoutes,
+      })
 
       // Export via Tauri command
       await invoke('export_level_simple', {
