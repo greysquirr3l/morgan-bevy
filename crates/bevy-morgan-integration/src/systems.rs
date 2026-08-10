@@ -84,8 +84,9 @@ impl EntityId {
     ///
     /// Note: Bevy 0.19 does not expose `Entity::from_raw_u32` as a
     /// `const fn`. This method panics if the encoded entity is
-    /// invalid; callers should handle `None` via `from_entity_infallible`
-    /// or skip the round-trip when liveness isn't required.
+    /// invalid; callers should verify liveness with
+    /// `world.get_entity(entity)` (returns `None` if the entity has
+    /// been despawned) before relying on the handle.
     ///
     /// # Panics
     /// Panics if the encoded entity index is invalid (out of range).
@@ -93,7 +94,20 @@ impl EntityId {
     pub const fn to_entity(self) -> Entity {
         match Entity::from_raw_u32(self.index) {
             Some(entity) => entity,
-            None => panic!("EntityId carries an invalid raw index"),
+            // Panic is the documented contract — `Entity::from_raw_u32`
+            // returns `None` only if the index exceeds Bevy's reserved
+            // range, which `from_entity` cannot produce. Callers
+            // round-tripping an entity they themselves encoded will
+            // never hit this branch.
+            None => {
+                #[expect(
+                    clippy::panic,
+                    reason = "`Entity::from_raw_u32` returns None only on out-of-range index, which `from_entity` cannot produce; the docstring documents the panic contract for invalid round-trips"
+                )]
+                {
+                    panic!("EntityId carries an invalid raw index")
+                }
+            }
         }
     }
 }
@@ -512,6 +526,12 @@ pub fn vfx_observer(add: On<Add, Vfx>, vfxes: Query<&Vfx>, mut resources: ResMut
 
 #[cfg(test)]
 mod tests {
+    #![allow(
+        clippy::unwrap_used,
+        clippy::expect_used,
+        clippy::indexing_slicing,
+        reason = "test code is allowed to use unwrap/expect for concise assertions"
+    )]
     use super::*;
     use bevy_ecs::world::World;
 

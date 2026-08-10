@@ -51,6 +51,11 @@ impl Plugin for MorganLevelPlugin {
 
 #[cfg(test)]
 mod tests {
+    #![allow(
+        clippy::unwrap_used,
+        clippy::expect_used,
+        reason = "test code is allowed to use unwrap/expect for concise assertions"
+    )]
     use super::*;
 
     #[test]

@@ -289,6 +289,12 @@ impl HandleId {
 
 #[cfg(test)]
 mod tests {
+    #![allow(
+        clippy::unwrap_used,
+        clippy::expect_used,
+        clippy::indexing_slicing,
+        reason = "test code is allowed to use unwrap/expect for concise assertions"
+    )]
     use super::*;
     use crate::{BoundingBox, ExportedLevel};
 
@@ -383,7 +389,8 @@ mod tests {
                     light: None,
                     animation: None,
                     audio: None,
-                    vfx: None,                },
+                    vfx: None,
+                },
             ],
             layers: vec!["default".to_string()],
             generation_seed: Some(42),

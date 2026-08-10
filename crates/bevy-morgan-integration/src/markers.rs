@@ -188,6 +188,12 @@ impl Default for Vfx {
 
 #[cfg(test)]
 mod tests {
+    #![allow(
+        clippy::unwrap_used,
+        clippy::expect_used,
+        clippy::panic,
+        reason = "test code is allowed to use unwrap/expect/panic for concise assertions"
+    )]
     use super::*;
 
     #[test]

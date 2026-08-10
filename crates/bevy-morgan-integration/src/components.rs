@@ -192,6 +192,12 @@ const fn default_cost() -> f32 {
 
 #[cfg(test)]
 mod tests {
+    #![allow(
+        clippy::unwrap_used,
+        clippy::expect_used,
+        clippy::indexing_slicing,
+        reason = "test code is allowed to use unwrap/expect for concise assertions"
+    )]
     use super::*;
 
     #[test]
