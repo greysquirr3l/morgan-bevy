@@ -70,6 +70,9 @@ glam = "0.24"
 #   image: texture decode + downscale + waveform PNG encode.
 #   webp: 256x256 WebP output for texture thumbnails.
 #   hound: WAV decode for audio waveform rendering.
+#   symphonia: pure-Rust MP3 / OGG Vorbis / FLAC decode for audio
+#     waveforms. Chosen over `minimp3`/`lewton` (per-format) because
+#     a single pure-Rust decoder handles all three without a C dep.
 # The placeholder renderer (placeholder.rs) uses a hand-authored
 # 5x7 bitmap font rather than a font crate, keeping the dep graph
 # at minimum and avoiding the unmaintained `ttf-parser` advisory
@@ -77,6 +80,7 @@ glam = "0.24"
 image = { version = "0.25", default-features = false, features = ["png", "jpeg", "webp"] }
 webp = "0.3"
 hound = "3.5"
+symphonia = { version = "0.6", default-features = false, features = ["mp3", "vorbis", "flac", "pcm"] }
 
 [dev-dependencies]
 tokio-test = "0.4"

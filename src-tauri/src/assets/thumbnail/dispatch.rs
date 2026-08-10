@@ -1,4 +1,4 @@
-// T33 — per-asset-type renderer dispatch.
+// T33 + T93 — per-asset-type renderer dispatch.
 //
 // `render_for_asset` picks the right render function based on the
 // asset type the scanner assigned. The result is an `RgbImage` ready
@@ -9,6 +9,10 @@ use image::{DynamicImage, RgbImage};
 use std::path::Path;
 
 use super::audio::{render_audio, render_audio_or_placeholder, AudioRenderResult};
+use super::fbx::render_fbx;
+use super::glb::render_glb;
+use super::mat::render_mat;
+use super::obj::render_obj;
 use super::placeholder::render_placeholder;
 use super::texture::render_texture;
 use super::THUMBNAIL_SIZE;
@@ -16,8 +20,8 @@ use super::THUMBNAIL_SIZE;
 /// Render the given asset into a `THUMBNAIL_SIZE` square RGB image.
 /// The dispatcher does not perform I/O — the caller has already
 /// resolved the source path. Returns `Err` only if the texture
-/// decoder reports a hard failure; placeholder + audio-format-
-/// fallback paths always succeed.
+/// decoder reports a hard failure; every other path either
+/// succeeds (real render) or falls back to a labelled placeholder.
 pub fn render_for_asset(asset_type: &str, source: &Path) -> Result<RgbImage, image::ImageError> {
     let rgb: RgbImage = match asset_type {
         "Texture" => {
@@ -28,22 +32,39 @@ pub fn render_for_asset(asset_type: &str, source: &Path) -> Result<RgbImage, ima
             AudioRenderResult::Waveform(img) => img,
             AudioRenderResult::UnsupportedFormat => render_audio_or_placeholder(source),
         },
-        // Models and materials get a labelled placeholder. The spec
-        // accepts "Three.js headless WebGL OR a Rust crate like
-        // image" — we picked the Rust side to keep the pipeline
-        // zero-dep on Node.
-        "Model" => render_placeholder(&label_for(source), "model"),
-        "Material" => render_placeholder("MAT", "material"),
+        // T93: every Model subtype now produces a real bbox
+        // preview. The fallback to a labelled placeholder kicks in
+        // only when the model file is unreadable / malformed —
+        // never by default.
+        "Model" => match model_renderer(source) {
+            Some(img) => img,
+            None => render_placeholder(&label_for(source), "model"),
+        },
+        // T93: `.mat` files render a labelled preview that
+        // surfaces the asset's identifier. Falls back to a generic
+        // "MAT" label if the file is unreadable.
+        "Material" => render_mat(source),
         // Anything unknown gets a placeholder with its extension
         // surfaced — better than nothing, surfaces bugs.
         _ => render_placeholder(&label_for(source), "asset"),
     };
-    // `RgbImage` always returns a valid `DynamicImage::ImageRgb8`
-    // for `THUMBNAIL_SIZE x THUMBNAIL_SIZE`. The size assertion
-    // catches a future refactor that forgets the resize step.
     debug_assert_eq!(rgb.width(), THUMBNAIL_SIZE);
     debug_assert_eq!(rgb.height(), THUMBNAIL_SIZE);
     Ok(rgb)
+}
+
+/// Pick the model renderer by file extension. Returns `None` on
+/// parse failure so the dispatcher can fall back to a placeholder.
+fn model_renderer(source: &Path) -> Option<RgbImage> {
+    let ext = source.extension().and_then(|e| e.to_str())?;
+    match ext.to_ascii_lowercase().as_str() {
+        "glb" => render_glb(source),
+        "obj" => render_obj(source),
+        "fbx" => render_fbx(source),
+        // Unknown model extension: no renderer, let the dispatcher
+        // label it.
+        _ => None,
+    }
 }
 
 /// The file extension (uppercased) for the placeholder label.

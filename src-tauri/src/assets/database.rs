@@ -370,9 +370,13 @@ impl AssetDatabase {
 
     pub fn determine_asset_type(file_path: &Path) -> String {
         match file_path.extension().and_then(|ext| ext.to_str()) {
-            Some("fbx" | "FBX") => "Model",
-            Some("png" | "PNG" | "jpg" | "JPG" | "jpeg" | "JPEG") => "Texture",
-            Some("wav" | "WAV" | "mp3" | "MP3" | "ogg" | "OGG") => "Audio",
+            // T93: GLB and OBJ added to the Model bucket — both
+            // have real (bbox) thumbnails now. FBX was already here.
+            Some("fbx" | "FBX" | "glb" | "GLB" | "obj" | "OBJ") => "Model",
+            // T93: FLAC added to the Audio bucket (symphonia
+            // decode).
+            Some("wav" | "WAV" | "mp3" | "MP3" | "ogg" | "OGG" | "flac" | "FLAC") => "Audio",
+            Some("png" | "PNG" | "jpg" | "JPG" | "jpeg" | "JPEG" | "webp" | "WEBP") => "Texture",
             Some("mat" | "MAT") => "Material",
             _ => "Unknown",
         }

@@ -55,7 +55,10 @@ fn draw_border(img: &mut RgbImage, thickness: u32, color: Rgb<u8>) {
 /// font crate to keep the placeholder pipeline zero-dep.
 /// Each glyph is a 5-wide x 7-tall bitmap; rows are stored as 5-bit
 /// numbers, LSB-left.
-fn draw_text(img: &mut RgbImage, text: &str, cx: u32, cy: u32, scale: u32, color: Rgb<u8>) {
+///
+/// `pub` so sibling renderers (e.g. `mat.rs`) can reuse the
+/// font while applying a category-specific background colour.
+pub fn draw_text(img: &mut RgbImage, text: &str, cx: u32, cy: u32, scale: u32, color: Rgb<u8>) {
     let chars: Vec<char> = text.to_ascii_uppercase().chars().collect();
     let glyph_w = 5 * scale + scale; // 5 columns + 1 column spacing
     let glyph_h = 7 * scale;

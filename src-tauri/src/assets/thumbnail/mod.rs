@@ -1,11 +1,17 @@
-// T33 — headless thumbnail pipeline.
+// T33 + T93 — headless thumbnail pipeline.
 //
 // Submodules:
 //
 //   - texture.rs      — image::open + downscale to 256x256 → WebP
-//   - audio.rs        — hound WAV decode → waveform PNG
-//   - placeholder.rs  — labelled PNG for formats we can't decode
-//                       (mp3/ogg audio, FBX models, MAT materials)
+//   - audio.rs        — hound (WAV) + symphonia (MP3/OGG/FLAC)
+//                       decode → waveform PNG
+//   - waveform.rs     — shared peak-vs-time render used by audio.rs
+//   - placeholder.rs  — labelled PNG for fallback paths
+//   - glb.rs          — binary glTF 2.0 → orthographic bbox PNG
+//   - obj.rs          — Wavefront OBJ → bbox PNG
+//   - fbx.rs          — binary FBX 7.4 / 7.5+ + ASCII FBX → bbox PNG
+//   - mat.rs          — Bevy `.mat` (RON-style text) → labelled PNG
+//                       with extracted asset name
 //   - dispatch.rs     — per-asset-type renderer dispatch
 //   - queue.rs        — tokio mpsc channel + worker task
 //   - cleanup.rs      — orphan file sweep
@@ -15,13 +21,22 @@
 // schema (T33: `thumbnail_size`, `source_mtime`) was added in
 // `database.rs` via the same in-place migration pattern as T32's
 // `is_favorite`.
+//
+// T93 extends the renderer coverage: every asset type now produces
+// a real thumbnail (no labelled placeholders except as a last-resort
+// fallback when the source file is unreadable / malformed).
 
 pub mod audio;
 pub mod cleanup;
 pub mod dispatch;
+pub mod fbx;
+pub mod glb;
+pub mod mat;
+pub mod obj;
 pub mod placeholder;
 pub mod queue;
 pub mod texture;
+pub mod waveform;
 
 #[allow(unused_imports)]
 pub use dispatch::render_for_asset;

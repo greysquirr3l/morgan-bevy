@@ -1,40 +1,55 @@
-// T33 — audio waveform thumbnail render.
+// T33 + T93 — audio thumbnail rendering.
 //
-// WAV-only. The `hound` crate decodes standard PCM WAV files; mp3
-// and ogg require a Rust decoder (e.g. `minimp3` / `lewton`) which
-// we deliberately do not pull in for v1 — those formats get a
-// labelled placeholder image from `placeholder.rs` instead, signed
-// via `render_audio_placeholder`.
+// T33 shipped WAV-only via the `hound` crate. T93 extends coverage
+// to MP3, OGG Vorbis, and FLAC via `symphonia` (pure Rust) and
+// routes every audio format through the shared waveform renderer
+// in `waveform.rs`. The peak-vs-time plot is byte-identical
+// regardless of source format — what changes is the decoder.
 //
-// The waveform is a centered peak-vs-time plot: every sample's
-// amplitude is the height of a vertical bar, drawn bilaterally
-// around the vertical midline. Background is dark grey; the bars
-// are a saturated teal so an empty section of the asset browser
-// still reads as "audio".
+// Decode failure for any format falls back to the labelled
+// placeholder (so an unreadable MP3 doesn't sink the queue).
 
 use std::path::Path;
 
+use symphonia::core::audio::conv::ConvertibleSample;
+use symphonia::core::codecs::audio::AudioDecoderOptions;
+use symphonia::core::formats::probe::Hint;
+use symphonia::core::formats::{FormatOptions, TrackType};
+use symphonia::core::io::MediaSourceStream;
+use symphonia::core::meta::MetadataOptions;
+
 use super::placeholder::render_placeholder;
-use super::THUMBNAIL_SIZE;
+use super::waveform::render_waveform_from_samples;
 
 pub enum AudioRenderResult {
     /// Real waveform PNG ready to encode.
     Waveform(image::RgbImage),
-    /// Format unsupported (mp3 / ogg) — caller should fall back to
-    /// `render_placeholder` with a label that names the format.
+    /// Format unsupported or decode failed — caller should fall
+    /// back to `render_placeholder` with a label that names the
+    /// format.
     UnsupportedFormat,
 }
 
-/// Render a WAV file's waveform. Returns `UnsupportedFormat` for any
-/// non-WAV extension so the queue can fall back to a placeholder.
+/// Render an audio file's waveform.
+///
+/// - WAV: `hound` decode (i16 PCM), downmix to mono, normalise to
+///   f32, render.
+/// - MP3 / OGG / FLAC: `symphonia` decode (any sample format the
+///   decoder supports), downmix to mono, normalise, render.
+/// - Anything else: `UnsupportedFormat` so the queue can label it.
 pub fn render_audio(source: &Path) -> AudioRenderResult {
     let Some(ext) = source.extension().and_then(|e| e.to_str()) else {
         return AudioRenderResult::UnsupportedFormat;
     };
-    if !ext.eq_ignore_ascii_case("wav") {
-        return AudioRenderResult::UnsupportedFormat;
+    match ext.to_ascii_lowercase().as_str() {
+        "wav" => render_wav(source),
+        "mp3" | "ogg" | "flac" => render_via_symphonia(source),
+        _ => AudioRenderResult::UnsupportedFormat,
     }
+}
 
+/// Render a WAV file's waveform via `hound`.
+fn render_wav(source: &Path) -> AudioRenderResult {
     let Ok(mut reader) = hound::WavReader::open(source) else {
         return AudioRenderResult::UnsupportedFormat;
     };
@@ -42,11 +57,6 @@ pub fn render_audio(source: &Path) -> AudioRenderResult {
     let spec = reader.spec();
     let channels = spec.channels.max(1) as usize;
     let bits_raw = i32::from(spec.bits_per_sample);
-    // WAV sample values are signed i16 with the magnitude scale 2^(bits-1);
-    // we clamp bits to a sane upper bound (i16 range) before shifting so a
-    // malformed header claiming 256 bits cannot shift UB. Anything outside
-    // [1, 16] is rejected as an unsupported format rather than silently
-    // producing a mis-scaled waveform.
     let safe_bits = if (1..=16).contains(&bits_raw) {
         bits_raw
     } else {
@@ -66,100 +76,130 @@ pub fn render_audio(source: &Path) -> AudioRenderResult {
         return AudioRenderResult::UnsupportedFormat;
     }
 
-    let samples = if channels > 1 {
-        // Downmix to mono by averaging the channels. i32 arithmetic
-        // guards against i16 overflow on summation; the result is
-        // truncated back to i16 by the per-channel count divisor.
+    let mono: Vec<f32> = if channels > 1 {
         samples
             .chunks(channels)
             .map(|c| {
                 let sum: i32 = c.iter().map(|s| i32::from(*s)).sum();
                 #[expect(
                     clippy::cast_possible_truncation,
-                    clippy::cast_possible_wrap,
-                    reason = "channels is spec.channels (typically ≤ 8 for stereo WAV); the usize→i32 narrowing is safe on 32+ bit targets"
+                    reason = "channels is spec.channels (typically ≤ 8); the usize→i32 narrowing is safe"
                 )]
                 let count = c.len() as i32;
-                let avg = sum / count;
                 #[expect(
-                    clippy::cast_possible_truncation,
-                    reason = "avg is the mean of i16 samples divided by their count, so it fits in i16 by construction"
+                    clippy::cast_precision_loss,
+                    reason = "sum is the integer sum of i16 samples divided by channel count; f32 mantissa is fine"
                 )]
-                let result = avg as i16;
-                result
+                let avg = (sum as f32 / count as f32) / max;
+                avg.clamp(-1.0, 1.0)
             })
             .collect()
     } else {
         samples
+            .iter()
+            .map(|s| {
+                #[expect(
+                    clippy::cast_precision_loss,
+                    reason = "s is i16 in [-32768, 32767] and max is 2^(bits-1); f32 divides exactly"
+                )]
+                let v = (f32::from(*s)) / max;
+                v.clamp(-1.0, 1.0)
+            })
+            .collect()
     };
 
-    let img_width = THUMBNAIL_SIZE;
-    let img_height = THUMBNAIL_SIZE;
-    let samples_per_pixel = (samples.len() / img_width as usize).max(1);
-    #[expect(
-        clippy::cast_possible_wrap,
-        reason = "img_height is THUMBNAIL_SIZE (small u32, e.g. 256); the u32→i32 down-cast is lossless for values ≤ i32::MAX"
-    )]
-    let mid = (img_height / 2) as i32;
-    #[expect(
-        clippy::cast_possible_wrap,
-        reason = "img_height is THUMBNAIL_SIZE (small u32, e.g. 256); the u32→i32 down-cast is lossless for values ≤ i32::MAX"
-    )]
-    let height_i32 = img_height as i32;
+    AudioRenderResult::Waveform(render_waveform_from_samples(&mono))
+}
 
-    let mut img = image::RgbImage::new(img_width, img_height);
-    let bg = image::Rgb([33, 33, 33]);
-    let bar = image::Rgb([0, 200, 200]);
+/// Decode MP3 / OGG / FLAC via `symphonia` and render a waveform.
+///
+/// Symphonia 0.6: `Probe::probe` returns `Result<Box<dyn
+/// FormatReader>>` directly (no `ProbeResult` enum). `next_packet`
+/// returns `Result<Option<Packet>>` — `Ok(None)` is the EOF
+/// signal. `decoder.decode` returns
+/// `Result<GenericAudioBufferRef<'_>>`; `copy_to_slice_interleaved`
+/// pulls the samples out in interleaved f32 order, handling the
+/// sample-format conversion (F32/S16/S24/etc. all → f32).
+fn render_via_symphonia(source: &Path) -> AudioRenderResult {
+    let Ok(file) = std::fs::File::open(source) else {
+        return AudioRenderResult::UnsupportedFormat;
+    };
+    let mss = MediaSourceStream::new(Box::new(file), Default::default());
+    let mut hint = Hint::new();
+    if let Some(ext) = source.extension().and_then(|e| e.to_str()) {
+        hint.with_extension(ext);
+    }
+    let mut probed = match symphonia::default::get_probe().probe(
+        &hint,
+        mss,
+        FormatOptions::default(),
+        MetadataOptions::default(),
+    ) {
+        Ok(p) => p,
+        Err(_) => return AudioRenderResult::UnsupportedFormat,
+    };
+    let format: &mut Box<dyn symphonia::core::formats::FormatReader> = &mut probed;
 
-    for x in 0..img_width as usize {
-        #[expect(
-            clippy::cast_possible_truncation,
-            reason = "x is in [0, img_width) where img_width ≤ THUMBNAIL_SIZE (small); the usize→u32 narrowing is safe on 32+ bit targets"
-        )]
-        let x_u = x as u32;
-        let start = x * samples_per_pixel;
-        let end = ((x + 1) * samples_per_pixel).min(samples.len());
-        if start >= end {
+    let track = match format.default_track(TrackType::Audio) {
+        Some(t) => t,
+        None => return AudioRenderResult::UnsupportedFormat,
+    };
+    let audio_params = match track.codec_params.as_ref().and_then(|p| p.audio()) {
+        Some(p) => p,
+        None => return AudioRenderResult::UnsupportedFormat,
+    };
+
+    let mut decoder = match symphonia::default::get_codecs()
+        .make_audio_decoder(audio_params, &AudioDecoderOptions::default())
+    {
+        Ok(d) => d,
+        Err(_) => return AudioRenderResult::UnsupportedFormat,
+    };
+
+    let track_id = track.id;
+
+    let mut mono: Vec<f32> = Vec::new();
+    loop {
+        let packet = match format.next_packet() {
+            Ok(Some(p)) => p,
+            Ok(None) => break,
+            Err(_) => return AudioRenderResult::UnsupportedFormat,
+        };
+        if packet.track_id != track_id {
             continue;
         }
-        let mut peak = 0f32;
-        let window = samples.get(start..end).unwrap_or(&[]);
-        for s in window {
-            let v = f32::from(*s) / max;
-            if v.abs() > peak.abs() {
-                peak = v;
-            }
+        let decoded = match decoder.decode(&packet) {
+            Ok(d) => d,
+            Err(_) => return AudioRenderResult::UnsupportedFormat,
+        };
+        let frames = decoded.frames();
+        if frames == 0 {
+            continue;
         }
-        // mid ≤ 32 and peak is a normalised amplitude in [-1, 1];
-        // the truncated i32 is the integer y-offset for the waveform.
-        #[expect(
-            clippy::cast_possible_truncation,
-            clippy::cast_precision_loss,
-            reason = "mid ≤ 32 and peak.abs() ≤ 1.0; the i32→f32 widening is lossless at this range, and the f32→i32 round-trip is intentional (pixel offset)"
-        )]
-        let h = (peak.abs() * (mid as f32 - 1.0)).round() as i32;
-        for dy in -h..=h {
-            let y = mid + dy;
-            if y >= 0 && y < height_i32 {
-                #[expect(
-                    clippy::cast_sign_loss,
-                    reason = "y is bounded to [0, height_i32) by the if-check above; the i32→u32 cast is the range conversion"
-                )]
-                let y_u32 = y as u32;
-                img.put_pixel(x_u, y_u32, bar);
+        let channels = decoded.spec().channels().count();
+        let total = frames * channels;
+        let mut interleaved: Vec<f32> = vec![0.0_f32; total];
+        // `copy_to_slice_interleaved<Sout, Dst>` requires Sout:
+        // ConvertibleSample and Dst: AsMut<[Sout]>.
+        decoded.copy_to_slice_interleaved::<f32, _>(&mut interleaved[..]);
+        // Downmix to mono by averaging channels.
+        for frame in interleaved.chunks(channels) {
+            let mut sum = 0.0_f32;
+            for s in frame {
+                sum += *s;
             }
-        }
-    }
-    // Background fill — drawn after the waveform so every pixel is
-    // defined, which the WebP encoder prefers.
-    for y in 0..img_height {
-        for x in 0..img_width {
-            if img.get_pixel(x, y) == &image::Rgb([0, 0, 0]) {
-                img.put_pixel(x, y, bg);
-            }
+            #[expect(
+                clippy::cast_precision_loss,
+                reason = "channels is small (≤ 8); f32 mantissa handles the division exactly"
+            )]
+            let avg = sum / channels as f32;
+            mono.push(avg.clamp(-1.0, 1.0));
         }
     }
-    AudioRenderResult::Waveform(img)
+    if mono.is_empty() {
+        return AudioRenderResult::UnsupportedFormat;
+    }
+    AudioRenderResult::Waveform(render_waveform_from_samples(&mono))
 }
 
 /// Convenience for the dispatch layer: render or fall back to a
@@ -176,3 +216,9 @@ pub fn render_audio_or_placeholder(source: &Path) -> image::RgbImage {
         }
     }
 }
+
+// `ConvertibleSample` is re-exported through `audio::conv` for the
+// `copy_to_slice_interleaved::<f32, _>(...)` call above. The import
+// keeps it visible to `cargo doc` + the wiring audit.
+#[allow(unused_imports)]
+use ConvertibleSample as _;
