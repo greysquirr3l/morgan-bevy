@@ -15,7 +15,7 @@ use symphonia::core::audio::conv::ConvertibleSample;
 use symphonia::core::codecs::audio::AudioDecoderOptions;
 use symphonia::core::formats::probe::Hint;
 use symphonia::core::formats::{FormatOptions, TrackType};
-use symphonia::core::io::MediaSourceStream;
+use symphonia::core::io::{MediaSourceStream, MediaSourceStreamOptions};
 use symphonia::core::meta::MetadataOptions;
 
 use super::placeholder::render_placeholder;
@@ -81,9 +81,19 @@ fn render_wav(source: &Path) -> AudioRenderResult {
             .chunks(channels)
             .map(|c| {
                 let sum: i32 = c.iter().map(|s| i32::from(*s)).sum();
+                // `channels is spec.channels (typically ≤ 8)`; the
+                // usize→i32 narrowing is exact on every realistic
+                // WAV file. `cast_possible_truncation` covers
+                // 64-bit-pointer targets; `cast_possible_wrap`
+                // covers 32-bit-pointer targets. Both are safe at
+                // the channel counts a WAV can hold.
                 #[expect(
                     clippy::cast_possible_truncation,
                     reason = "channels is spec.channels (typically ≤ 8); the usize→i32 narrowing is safe"
+                )]
+                #[expect(
+                    clippy::cast_possible_wrap,
+                    reason = "channels is spec.channels (typically ≤ 8); the usize→i32 narrowing is safe on 32-bit targets"
                 )]
                 let count = c.len() as i32;
                 #[expect(
@@ -98,11 +108,10 @@ fn render_wav(source: &Path) -> AudioRenderResult {
         samples
             .iter()
             .map(|s| {
-                #[expect(
-                    clippy::cast_precision_loss,
-                    reason = "s is i16 in [-32768, 32767] and max is 2^(bits-1); f32 divides exactly"
-                )]
-                let v = (f32::from(*s)) / max;
+                // `f32::from(i16) / max` is exact — both are ≤ 2^15
+                // and f32's mantissa covers that range; the
+                // `cast_precision_loss` lint doesn't fire here.
+                let v = f32::from(*s) / max;
                 v.clamp(-1.0, 1.0)
             })
             .collect()
@@ -124,64 +133,58 @@ fn render_via_symphonia(source: &Path) -> AudioRenderResult {
     let Ok(file) = std::fs::File::open(source) else {
         return AudioRenderResult::UnsupportedFormat;
     };
-    let mss = MediaSourceStream::new(Box::new(file), Default::default());
+    let mss = MediaSourceStream::new(Box::new(file), MediaSourceStreamOptions::default());
     let mut hint = Hint::new();
     if let Some(ext) = source.extension().and_then(|e| e.to_str()) {
         hint.with_extension(ext);
     }
-    let mut probed = match symphonia::default::get_probe().probe(
+    let Ok(mut probed) = symphonia::default::get_probe().probe(
         &hint,
         mss,
         FormatOptions::default(),
         MetadataOptions::default(),
-    ) {
-        Ok(p) => p,
-        Err(_) => return AudioRenderResult::UnsupportedFormat,
+    ) else {
+        return AudioRenderResult::UnsupportedFormat;
     };
     let format: &mut Box<dyn symphonia::core::formats::FormatReader> = &mut probed;
 
-    let track = match format.default_track(TrackType::Audio) {
-        Some(t) => t,
-        None => return AudioRenderResult::UnsupportedFormat,
+    let Some(track) = format.default_track(TrackType::Audio) else {
+        return AudioRenderResult::UnsupportedFormat;
     };
-    let audio_params = match track.codec_params.as_ref().and_then(|p| p.audio()) {
-        Some(p) => p,
-        None => return AudioRenderResult::UnsupportedFormat,
+    let Some(audio_params) = track.codec_params.as_ref().and_then(|p| p.audio()) else {
+        return AudioRenderResult::UnsupportedFormat;
     };
 
-    let mut decoder = match symphonia::default::get_codecs()
+    let Ok(mut decoder) = symphonia::default::get_codecs()
         .make_audio_decoder(audio_params, &AudioDecoderOptions::default())
-    {
-        Ok(d) => d,
-        Err(_) => return AudioRenderResult::UnsupportedFormat,
+    else {
+        return AudioRenderResult::UnsupportedFormat;
     };
 
     let track_id = track.id;
 
     let mut mono: Vec<f32> = Vec::new();
     loop {
-        let packet = match format.next_packet() {
-            Ok(Some(p)) => p,
-            Ok(None) => break,
-            Err(_) => return AudioRenderResult::UnsupportedFormat,
+        let Ok(packet_opt) = format.next_packet() else {
+            return AudioRenderResult::UnsupportedFormat;
         };
+        let Some(packet) = packet_opt else { break };
         if packet.track_id != track_id {
             continue;
         }
-        let decoded = match decoder.decode(&packet) {
-            Ok(d) => d,
-            Err(_) => return AudioRenderResult::UnsupportedFormat,
+        let Ok(decoded_buf) = decoder.decode(&packet) else {
+            return AudioRenderResult::UnsupportedFormat;
         };
-        let frames = decoded.frames();
+        let frames = decoded_buf.frames();
         if frames == 0 {
             continue;
         }
-        let channels = decoded.spec().channels().count();
+        let channels = decoded_buf.spec().channels().count();
         let total = frames * channels;
         let mut interleaved: Vec<f32> = vec![0.0_f32; total];
         // `copy_to_slice_interleaved<Sout, Dst>` requires Sout:
         // ConvertibleSample and Dst: AsMut<[Sout]>.
-        decoded.copy_to_slice_interleaved::<f32, _>(&mut interleaved[..]);
+        decoded_buf.copy_to_slice_interleaved::<f32, _>(&mut interleaved[..]);
         // Downmix to mono by averaging channels.
         for frame in interleaved.chunks(channels) {
             let mut sum = 0.0_f32;

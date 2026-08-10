@@ -35,19 +35,16 @@ pub fn render_obj(source: &Path) -> Option<RgbImage> {
         // Vertex line: `v x y z [w]`. We split on whitespace; the
         // first token must be exactly "v".
         let mut tokens = trimmed.split_ascii_whitespace();
-        match tokens.next() {
-            Some("v") => {
-                let x = tokens.next().and_then(|s| s.parse::<f32>().ok());
-                let y = tokens.next().and_then(|s| s.parse::<f32>().ok());
-                let z = tokens.next().and_then(|s| s.parse::<f32>().ok());
-                if let (Some(x), Some(y), Some(z)) = (x, y, z) {
-                    if x.is_finite() && y.is_finite() && z.is_finite() {
-                        aabb.expand([x, y, z]);
-                        any = true;
-                    }
+        if tokens.next() == Some("v") {
+            let x = tokens.next().and_then(|s| s.parse::<f32>().ok());
+            let y = tokens.next().and_then(|s| s.parse::<f32>().ok());
+            let z = tokens.next().and_then(|s| s.parse::<f32>().ok());
+            if let (Some(x), Some(y), Some(z)) = (x, y, z) {
+                if x.is_finite() && y.is_finite() && z.is_finite() {
+                    aabb.expand([x, y, z]);
+                    any = true;
                 }
             }
-            _ => {}
         }
     }
     if !any || !aabb.is_valid() {

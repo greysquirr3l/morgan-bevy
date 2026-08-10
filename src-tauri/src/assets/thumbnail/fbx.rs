@@ -68,50 +68,50 @@ struct Cursor<'a> {
 }
 
 impl<'a> Cursor<'a> {
-    fn new(bytes: &'a [u8], version: u32) -> Self {
+    const fn new(bytes: &'a [u8], version: u32) -> Self {
         Self {
             bytes,
             pos: 0,
             version,
         }
     }
-    fn remaining(&self) -> usize {
+    const fn remaining(&self) -> usize {
         self.bytes.len().saturating_sub(self.pos)
     }
-    fn take(&mut self, n: usize) -> Option<&'a [u8]> {
-        let end = self.pos.checked_add(n)?;
+    /// Read `N` bytes as the typed array that `from_le_bytes`
+    /// wants. `clippy::indexing_slicing` bans `slice[0]`, so we
+    /// use `try_into` to convert the borrowed slice to a fixed-
+    /// size array.
+    fn read_bytes<const N: usize>(&mut self) -> Option<[u8; N]> {
+        let end = self.pos.checked_add(N)?;
         if end > self.bytes.len() {
             return None;
         }
-        let slice = &self.bytes[self.pos..end];
+        let slice = self.bytes.get(self.pos..end)?;
         self.pos = end;
-        Some(slice)
+        slice.try_into().ok()
     }
     fn read_u8(&mut self) -> Option<u8> {
-        self.take(1).map(|s| s[0])
+        self.read_bytes::<1>().map(|a| a[0])
     }
     fn read_u32(&mut self) -> Option<u32> {
-        let s = self.take(4)?;
-        Some(u32::from_le_bytes([s[0], s[1], s[2], s[3]]))
+        self.read_bytes::<4>().map(u32::from_le_bytes)
     }
     fn read_u64(&mut self) -> Option<u64> {
-        let s = self.take(8)?;
-        Some(u64::from_le_bytes([
-            s[0], s[1], s[2], s[3], s[4], s[5], s[6], s[7],
-        ]))
+        self.read_bytes::<8>().map(u64::from_le_bytes)
     }
     fn read_offset(&mut self) -> Option<usize> {
         if self.version >= 7500 {
-            self.read_u64().map(|v| v as usize)
+            self.read_u64()?.try_into().ok()
         } else {
-            self.read_u32().map(|v| v as usize)
+            self.read_u32()?.try_into().ok()
         }
     }
     fn read_count(&mut self) -> Option<usize> {
         if self.version >= 7500 {
-            self.read_u64().map(|v| v as usize)
+            self.read_u64()?.try_into().ok()
         } else {
-            self.read_u32().map(|v| v as usize)
+            self.read_u32()?.try_into().ok()
         }
     }
     fn read_name(&mut self) -> Option<&'a [u8]> {
@@ -119,33 +119,33 @@ impl<'a> Cursor<'a> {
         loop {
             let b = self.read_u8()?;
             if b == 0 {
-                return Some(&self.bytes[start..self.pos - 1]);
+                // `start < self.pos` because we read at least one
+                // byte above (the null terminator); the slice is
+                // bounds-checked via `get` below.
+                return self.bytes.get(start..self.pos.saturating_sub(1));
             }
         }
     }
 }
 
 fn parse_binary(bytes: &[u8]) -> Result<Aabb, FbxError> {
-    if bytes.len() < BINARY_HEADER_MAGIC.len() + 4 {
+    let header_len = BINARY_HEADER_MAGIC.len();
+    if bytes.len() < header_len + 4 {
         return Err(FbxError::Truncated);
     }
-    if bytes.len() < BINARY_HEADER_MAGIC.len()
-        || &bytes[..BINARY_HEADER_MAGIC.len()] != BINARY_HEADER_MAGIC
-    {
+    if bytes.get(..header_len) != Some(BINARY_HEADER_MAGIC) {
         return Err(FbxError::BadHeader);
     }
-    let version_offset = BINARY_HEADER_MAGIC.len();
-    let version = u32::from_le_bytes([
-        bytes[version_offset],
-        bytes[version_offset + 1],
-        bytes[version_offset + 2],
-        bytes[version_offset + 3],
-    ]);
+    let version = bytes
+        .get(header_len..header_len + 4)
+        .and_then(|s| s.try_into().ok())
+        .map(u32::from_le_bytes)
+        .ok_or(FbxError::Truncated)?;
     if !(7400..=7999).contains(&version) {
         return Err(FbxError::UnsupportedVersion);
     }
     let mut cur = Cursor::new(bytes, version);
-    cur.pos = version_offset + 4;
+    cur.pos = header_len + 4;
     let mut aabb = Aabb::empty();
     // Walk top-level nodes until end of file. Each node has an
     // end offset relative to the start of its own end-offset field.
@@ -281,37 +281,32 @@ fn harvest_vertices_in_subtree(
             // with a single ASCII char for the element type:
             // 'd' = f64, 'f' = f32, 'i' = i32, 'l' = i64.
             if property_len == 0 {
-                cur.pos = abs_end;
-                continue;
+                // Skip empty vertices block.
+            } else if cur
+                .pos
+                .checked_add(property_len)
+                .is_some_and(|end| end <= cur.bytes.len())
+            {
+                // Type code + u32 array length + payload.
+                let type_code = cur.read_u8().ok_or(FbxError::Truncated)?;
+                let _array_len = cur.read_u32().ok_or(FbxError::Truncated)?;
+                // The remaining bytes of the property are the data.
+                let data_start = cur.pos;
+                let data_end = node_start
+                    .checked_add(8 + 8 + 8)
+                    .and_then(|p| p.checked_add(property_len))
+                    .ok_or(FbxError::Truncated)?;
+                if let Some(data) = cur.bytes.get(data_start..data_end) {
+                    if type_code == b'd' {
+                        expand_aabb_from_doubles(aabb, data);
+                    }
+                    // Other type codes are skipped silently — the
+                    // AABB stays whatever the other meshes contributed.
+                }
             }
-            if cur.pos + property_len > cur.bytes.len() {
-                break;
-            }
-            // Type code + u32 array length + payload.
-            let type_code = cur.read_u8().ok_or(FbxError::Truncated)?;
-            let _array_len = cur.read_u32().ok_or(FbxError::Truncated)?;
-            // The remaining bytes of the property are the data.
-            let data_start = cur.pos;
-            let data_end = node_start
-                .checked_add(8 + 8 + 8)
-                .and_then(|p| p.checked_add(property_len))
-                .ok_or(FbxError::Truncated)?;
-            if data_end > cur.bytes.len() {
-                break;
-            }
-            let data = &cur.bytes[data_start..data_end];
-            if type_code == b'd' {
-                expand_aabb_from_doubles(aabb, data);
-            }
-            // Type codes we don't handle are skipped silently — the
-            // AABB stays whatever the other meshes contributed.
-            cur.pos = abs_end;
-        } else {
-            cur.pos = abs_end;
+            // (else: property overflows the buffer; skip.)
         }
-        if cur.pos < abs_end {
-            cur.pos = abs_end;
-        }
+        cur.pos = abs_end;
         if cur.pos <= node_start {
             break;
         }
@@ -321,45 +316,27 @@ fn harvest_vertices_in_subtree(
 
 fn expand_aabb_from_doubles(aabb: &mut Aabb, data: &[u8]) {
     // FBX stores Vertices as a flat `x, y, z, x, y, z, ...` array
-    // of doubles. We iterate in groups of three doubles (24 bytes).
-    // A trailing partial group (corrupt / odd-length buffer) is
-    // skipped — better than poisoning the bbox with a NaN.
-    let mut i = 0;
-    while i + 24 <= data.len() {
-        let x = f64::from_le_bytes([
-            data[i],
-            data[i + 1],
-            data[i + 2],
-            data[i + 3],
-            data[i + 4],
-            data[i + 5],
-            data[i + 6],
-            data[i + 7],
-        ]);
-        let y = f64::from_le_bytes([
-            data[i + 8],
-            data[i + 9],
-            data[i + 10],
-            data[i + 11],
-            data[i + 12],
-            data[i + 13],
-            data[i + 14],
-            data[i + 15],
-        ]);
-        let z = f64::from_le_bytes([
-            data[i + 16],
-            data[i + 17],
-            data[i + 18],
-            data[i + 19],
-            data[i + 20],
-            data[i + 21],
-            data[i + 22],
-            data[i + 23],
-        ]);
+    // of doubles. We iterate in groups of 8-byte chunks, then
+    // take three at a time (x, y, z). `chunks_exact(8)` + `try_into`
+    // avoids the `triple[0..8]` slice indexing that trips
+    // `clippy::indexing_slicing`.
+    for triple in data.chunks_exact(24).map(|c| c.chunks_exact(8)) {
+        let mut iter = triple.map(|c| c.try_into().ok().map(f64::from_le_bytes));
+        let Some(Some(x)) = iter.next() else { continue };
+        let Some(Some(y)) = iter.next() else { continue };
+        let Some(Some(z)) = iter.next() else { continue };
         if x.is_finite() && y.is_finite() && z.is_finite() {
-            aabb.expand([x as f32, y as f32, z as f32]);
+            // `as f32` is intentional: f64→f32 loses the low 32 bits
+            // of the double, but the bbox only needs the order of
+            // magnitude; many FBX exports store positions as integer
+            // doubles anyway.
+            #[expect(
+                clippy::cast_possible_truncation,
+                reason = "f64→f32 truncation is fine for a coarse bbox; many FBX exports store integer-double positions anyway"
+            )]
+            let point = [x as f32, y as f32, z as f32];
+            aabb.expand(point);
         }
-        i += 24;
     }
 }
 
@@ -423,10 +400,29 @@ fn parse_ascii(text: &str) -> Aabb {
                 }
                 if let Ok(v) = part.parse::<f64>() {
                     if v.is_finite() {
-                        vertex_buf.push(v as f32);
+                        // `as f32` is intentional: f64→f32 truncates
+                        // the low 32 bits, but the ASCII parser's
+                        // bbox only needs the order of magnitude.
+                        #[expect(
+                            clippy::cast_possible_truncation,
+                            reason = "ASCII parser's bbox only needs the order of magnitude; many FBX exports store integer-double positions"
+                        )]
+                        let v_f32 = v as f32;
+                        vertex_buf.push(v_f32);
                         if vertex_buf.len() == 3 {
-                            let p = [vertex_buf[0], vertex_buf[1], vertex_buf[2]];
-                            aabb.expand(p);
+                            // The bounds check above (len == 3) makes
+                            // the `vertex_buf[0..3]` slice infallible
+                            // — `clippy::indexing_slicing` doesn't see
+                            // it through the `Vec` indexing.
+                            #[expect(
+                                clippy::indexing_slicing,
+                                reason = "len == 3 is checked above; the slice is always in-bounds"
+                            )]
+                            let Ok(triple) = vertex_buf[0..3].try_into() else {
+                                vertex_buf.clear();
+                                continue;
+                            };
+                            aabb.expand(triple);
                             vertex_buf.clear();
                         }
                     }
@@ -442,28 +438,35 @@ fn parse_ascii(text: &str) -> Aabb {
 }
 
 fn parse_inline_vertex(line: &str) -> Option<[f32; 3]> {
-    // `Vertices: a: 1.0, b: 2.0, c: 3.0` form. Extract a, b, c.
-    let mut a = None;
-    let mut b = None;
-    let mut c = None;
+    // `Vertices: a: 1.0, b: 2.0, c: 3.0` form — FBX ASCII uses `a`
+    // for the x-component, `b` for y, `c` for z in the Vertices body.
+    let mut x_value = None;
+    let mut y_value = None;
+    let mut z_value = None;
     for part in line.split(',') {
         let part = part.trim();
         let Some((k, v)) = part.split_once(':') else {
             continue;
         };
-        let Ok(v) = v.trim().parse::<f64>() else {
+        let Ok(parsed) = v.trim().parse::<f64>() else {
             continue;
         };
-        let v = v as f32;
+        // `as f32` is intentional: f64→f32 truncates the low 32 bits,
+        // but the inline-tuple bbox only needs the order of magnitude.
+        #[expect(
+            clippy::cast_possible_truncation,
+            reason = "inline-tuple bbox only needs the order of magnitude"
+        )]
+        let parsed_f32 = parsed as f32;
         match k.trim() {
-            "a" => a = Some(v),
-            "b" => b = Some(v),
-            "c" => c = Some(v),
+            "a" => x_value = Some(parsed_f32),
+            "b" => y_value = Some(parsed_f32),
+            "c" => z_value = Some(parsed_f32),
             _ => {}
         }
     }
-    match (a, b, c) {
-        (Some(a), Some(b), Some(c)) => Some([a, b, c]),
+    match (x_value, y_value, z_value) {
+        (Some(x), Some(y), Some(z)) => Some([x, y, z]),
         _ => None,
     }
 }

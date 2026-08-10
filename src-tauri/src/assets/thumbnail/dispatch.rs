@@ -36,10 +36,8 @@ pub fn render_for_asset(asset_type: &str, source: &Path) -> Result<RgbImage, ima
         // preview. The fallback to a labelled placeholder kicks in
         // only when the model file is unreadable / malformed —
         // never by default.
-        "Model" => match model_renderer(source) {
-            Some(img) => img,
-            None => render_placeholder(&label_for(source), "model"),
-        },
+        "Model" => model_renderer(source)
+            .unwrap_or_else(|| render_placeholder(&label_for(source), "model")),
         // T93: `.mat` files render a labelled preview that
         // surfaces the asset's identifier. Falls back to a generic
         // "MAT" label if the file is unreadable.

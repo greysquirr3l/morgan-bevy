@@ -33,7 +33,7 @@ fn extract_identifier(source: &Path) -> String {
     };
     let raw = text
         .lines()
-        .find_map(|line| parse_identifier(line))
+        .find_map(parse_identifier)
         .unwrap_or_else(|| "MAT".to_string());
     raw.chars().take(8).collect::<String>().to_ascii_uppercase()
 }
