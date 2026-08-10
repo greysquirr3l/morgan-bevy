@@ -7,7 +7,125 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Added
+> Scope of this batch: Phases 8–12 + post-Phase-12 polish
+> (`T51`–`T93` + `T77b` + `T93 v2`). Next release is planned as `0.5.0`
+> once this batch is tagged.
+
+### Added — Advanced editor tools (Phase 8)
+
+- **Object snap points (T51)** — `src/types/snapPoints.ts` + `src/utils/snapPoints.ts`
+  define the `SnapPoint` data model (id, objectId, mutable localPosition +
+  localRotation tuples, label, category) and pure math helpers
+  (`computeSnapCandidates`, `applySnap`, `findBestSnap`, `filterByCategory`,
+  `countByCategory`). `SceneObject.snapPoints?` is the new optional field;
+  the Inspector's `SnapPointsPanel.tsx` adds / edits / removes. The
+  drag-snap integration into `TransformGizmos` is deferred (T51 v2) — the
+  data layer the integration will call into is fully shipped.
+
+- **Surface snapping math (T52)** — `src/utils/surfaceSnap.ts`'s
+  `surfaceSnapTarget` projects the cursor onto a raycast hit and aligns
+  the object's local Y with the surface normal (preserving the rotation
+  around the new up axis via `X cross Y` re-orthogonalisation). The
+  composition rules in `resolveDragTarget` evaluate object-snap first,
+  surface-snap only as a fallback, cursor position last. The
+  TransformGizmos integration (Shift+Ctrl modifier hook) is deferred
+  (T52 v2) — the math is the foundation.
+
+- **Measurement tool (T53)** — `src/types/measurements.ts` (zod-strict
+  schema with `mode: 'distance' | 'area' | 'ruler'`, 2–64 point vectors),
+  `src/utils/measurements.ts` (pure math: 3D euclidean distance,
+  midpoint, polyline length, shoelace-formula polygon area with
+  planar-3D projection, polygon centroid), `src/hooks/useMeasurementTool.ts`
+  (mode cycling, addPoint, removeLastPoint, clear, setConfig, removeById)
+  and `src/components/Measurements/MeasurementOverlay.tsx` (HUD overlay
+  in the viewport's upper-right with value readout + Remove button).
+  M-key wired through `src/shortcuts/defaults.ts`. The 3D rendering
+  integration (drawing measurement lines in the viewport) is deferred
+  (T53 v2) — the data layer + math + HUD are the foundation.
+
+- **Material/texture paint tool (T54)** — `src/utils/paintTool.ts` (pure
+  brush math: linear/smooth/flat falloff curves, computeBrushHits,
+  selectPaintTargets that filters out locked + non-mesh types),
+  `src/utils/uvTransform.ts` (clamped-scale + wrapped-offset UV pan/scale
+  math), `src/hooks/usePaintTool.ts` (raycasts the scene on pointer events
+  and applies the target material live per stroke, drives the brush-ring
+  indicator mesh imperatively via refs), and `src/components/PaintTool/`
+  (PaintToolViewport in-Canvas indicator, PaintSettingsPanel with
+  radius/falloff/material controls + UV Editor launcher, UVEditor with
+  drag-to-pan + scroll-to-scale). `src/utils/commands.ts` gains
+  `PaintCommand` (one undo entry per stroke snapshotting the pre-stroke
+  material shape for exact undo). `SceneObject.uvTransform` + the
+  `updateObjectUVTransform` action are new. P-key wired through
+  `src/shortcuts/defaults.ts`; `BoxSelection.tsx` yields its click-drag
+  gesture while the paint tool is active.
+
+- **Lighting tools (T55)** — `src/utils/lighting.ts` defines the typed
+  `LightSource` model with `LightKind` (ambient / directional / point /
+  spot) and `ShadowQuality` (off / hard / soft / ultra → 0 / 1024 / 2048 /
+  4096 shadow-map size), the `defaultLight` factory, Lambert-cosine
+  `directionalContribution`, and `normalisedDirection`. `src/utils/lightThemes.ts`
+  ships three presets (Office, Dungeon, Sci-Fi). `src/utils/autoLightPlacement.ts`
+  derives a default lighting rig from a `SceneBounds` + theme via
+  `autoLightPlacement()` (one ambient + one directional sun + a tiled
+  point grid). The store gains a `lights` array + `setLights` /
+  `addLight` / `removeLight` / `updateLight` reducers. `LightingTools.tsx`
+  is the toolbar UI with theme dropdown, Auto-Light button, and per-light
+  kind / intensity / shadow-quality / remove controls. The in-viewport
+  click-to-place flow is a follow-up.
+
+- **Navigation mesh generation (T56)** — `src-tauri/src/spatial/navmesh.rs`
+  ships the rectangle-partitioning algorithm: floor walkable surfaces
+  union into a bounding rectangle, each Wall-kind obstacle whose thin
+  axis is interior to the region splits that region into two rectangles,
+  any uncovered cross-axis span becomes a doorway `NavConnection`,
+  `FreeStanding` obstacles become holes. Deterministic, no I/O, no wall-
+  clock reads. The `spatial.rs` module converted to a directory with
+  `spatial/mod.rs` + `spatial/navmesh.rs`. `generate_navmesh` Tauri command.
+  Navmesh threaded through JSON (`LevelData.navmesh`), RON
+  (`BevyLevelData.navmesh`), and Rust-source (`NAVMESH_JSON` constant)
+  exporters. Frontend `src/types/navmesh.ts` (`deriveNavMeshInputs` +
+  zod-validated `generateNavMesh` invoke wrapper), `src/hooks/useNavMesh.ts`
+  (toggle / regenerate), `src/utils/navmeshGeometry.ts` (pure line-segment
+  builders), `src/components/Viewport3D/NavMeshOverlay.tsx` (R3F wireframe
+  toggle) wired into `Viewport3D.tsx` alongside the T54 paint-brush
+  overlay.
+
+- **AI waypoints + patrol routes (T57)** — A\* pathfinding is pure
+  TypeScript (`src/utils/navPathfinding.ts`) over `NavMesh.connections`
+  (nodes = polygon ids, edges = doorways), Euclidean centroid as
+  heuristic/edge weight (admissible + consistent), `locatePolygon` via
+  XZ-AABB containment with nearest-centroid fallback, paths reconstructed
+  as portal midpoints (funnel-algorithm string-pulling deferred per the
+  task's explicit v1 allowance). `src/types/waypoints.ts` ships the
+  `Waypoint` / `PatrolRoute` shapes + branded `WaypointId` / `PatrolRouteId`
+  in `src/types/brand.ts`. The store gains `waypoints` + `patrolRoutes`
+  slices mirroring the T55 `lights` array pattern. `src/utils/patrolTraversal.ts`'s
+  `nextPatrolIndex(route, currentIndex, direction, rng?)` is pure with RNG
+  injected as a parameter (so `random` mode is deterministic/testable).
+  `src/components/Waypoints/{WaypointViewport,WaypointSettingsPanel}.tsx`
+  - `src/hooks/useWaypointTool.ts` (click-to-place with raycast +
+    ground-plane fallback). New `src-tauri/src/spatial/waypoints.rs` (serde
+    only). `LevelData` gains `waypoints` + `patrol_routes` (`skip_serializing_if
+= "Vec::is_empty"`), threaded through JSON / RON / Rust-source
+    exporters.
+
+### Added — Polish, examples, documentation (Phase 9)
+
+- **Interactive tutorial (T58)** — `src/state/tutorial.ts` is a pure
+  React-free state machine: step/tutorial data (`GETTING_STARTED_TUTORIAL`
+  with 5 steps + `PROCEDURAL_GENERATION_TUTORIAL` with 3), `as const`-derived
+  `TutorialActionType` (`click`/`keypress`/`observe`), exhaustive-switch
+  `tutorialReducer` over `not-started`/`in-progress`/`completed`/`skipped`,
+  localStorage persistence namespaced `morgan-bevy.tutorial` (zod-validated,
+  corruption-tolerant). `src/components/Tutorial/` ships `TutorialOverlay.tsx`
+  (portal-rendered via `createPortal`, spotlight cutout built from 4 blocking
+  quadrant divs around the target rect), `useTutorialStepValidation.ts`
+  (click/keypress/observe validation in one hook), `useFocusTrap.ts`
+  (hand-rolled Tab trap — no focus-trap dependency existed),
+  `spotlightGeometry.ts` (pure `getSpotlightRect`). Wired into the Help
+  menu (`App.tsx`, `HelpModal.tsx`, new `tutorial-getting-started` /
+  `tutorial-procedural-generation` entries in `HELP_ACTIONS`). New
+  `docs/user/tutorial.md`.
 
 - **In-app help & documentation modal (T59)** — `src/components/HelpModal.tsx`
   exposes four sections (Getting Started, Procedural Generation, Export &
@@ -15,6 +133,153 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Tauri, and the GitHub repo. Inline table-of-contents for quick jumping,
   ARIA `dialog`/`doc-tab` roles, Escape-to-close. Wired from the top-bar
   `Help & Documentation` menu item and the existing `?` keyboard shortcut.
+
+- **User-rebindable keyboard shortcuts (T60)** — refactors the hard-coded
+  `useKeyboardShortcuts.ts` switch into a table-driven dispatch backed by
+  user-editable overrides. `src/shortcuts/defaults.ts` holds the canonical
+  `DEFAULT_SHORTCUTS: readonly ShortcutBinding[]` table (~25 entries
+  covering every action the old hook dispatched). Each binding is
+  JSON-serialisable with `label` / `description` / `category` /
+  `requiresSelection` / `requiresTransformMode` guard predicates, so the
+  data file describes the trigger conditions without baking them into the
+  hook. The `ShortcutAction` literal-union type is derived from the table
+  (adding a new entry without wiring a handler is a compile error).
+  `src/utils/shortcutStore.ts` reads / writes the override layer via
+  localStorage (`getEffectiveBindings`, `setShortcutOverride`,
+  `clearShortcutOverride`, `restoreDefaultShortcuts`,
+  `_resetShortcutStoreForTests`); corrupt localStorage returns defaults.
+  `src/utils/shortcutConflicts.ts` ships `shortcutKeyOf` (sorts modifiers
+  so `Ctrl+Shift+Z == Shift+Ctrl+Z`), `findShortcutConflicts`, and
+  `conflictsForCandidate`. The visual rebind UI is deferred (T60 v2) —
+  the data layer + conflict detection + storage are the foundation;
+  `Restore Defaults` button calls `restoreDefaultShortcuts()` already.
+
+- **Example levels + templates (T61)** — four hand-authored example
+  projects under `src/data/examples/*.example.json`: Office (12×12
+  open-plan office), Dungeon (16×16 stone floor), Castle (20×20
+  courtyard), SciFi (14×14 outpost deck with a T91 point-light marker
+  on a light tower — the only example that demonstrates the marker
+  system). `src/utils/exampleLevels.ts` bundles the four files via Vite's
+  `import.meta.glob` (eager, default-import) and exports `loadExampleLevels()`
+  (returns `ExampleLevelMeta[]` with stable id-sorted order; drops
+  malformed entries with `console.warn`) and `parseExampleProject(raw)`
+  (canonical-schema validation via `ProjectDataSchema.safeParse`; returns
+  `null` on drift). `FileMenu.tsx` gains a Templates submenu between Recent
+  Projects and Export Scene — clicking one shows a `confirm()` prompt
+  (current scene is discarded) and runs the same `LoadCommand` path as
+  the Open Project flow.
+
+- **Prefab template library (T62)** — seven starter prefabs in
+  `src/data/prefabs/*.prefab.json`: Door (Standard), Window (Standard),
+  Desk, Meeting Table, Corridor Section, Room Kit, Stairwell. Each is a
+  hand-authored `Prefab` (T19 shape) with embedded transforms / materials
+  / mesh types. Bundled at build time via Vite's `import.meta.glob` — no
+  runtime fetch, no `tauri.conf.json` `resources` entry needed.
+  `src/utils/prefabs.ts` gains `loadStarterPrefabs()` (re-validates each
+  entry through `isPrefab` and drops malformed ones with `console.warn`),
+  `bootstrapStarterPrefabsIfNeeded()` (idempotent first-run installer
+  behind a `morgan-bevy-prefab-starters-bootstrapped` flag; merges into the
+  user's existing library without overwriting user prefabs; returns
+  `true` if it installed anything), and `resetStarterBootstrap()` (clears
+  the flag for testing). `PrefabManager.tsx` calls the bootstrap in its
+  `useEffect` mount alongside the existing `loadStoredPrefabs()`.
+  `src/vite-env.d.ts` adds the `/// <reference types="vite/client" />`
+  triple-slash so `import.meta.glob` is typed.
+
+- **User documentation (T63)** — four new user-facing docs under
+  `docs/user/`, linking from a new "User documentation" section in
+  `README.md`: `getting-started.md` (install, the default layout, the
+  W/E/R + X/Y/Z walkthrough, save/load, the export pipeline, asset
+  library overview, asset-ref / Broken Links surface), `features.md`
+  (every major feature indexed by category with anchor links to the
+  detailed guide for each), `export-formats.md` (the exact wire format
+  of every output — Rust source, Project data, JSON, RON, GLTF, FBX —
+  with code examples, the absent-when-unset rule for the four T91
+  marker fields, the import settings schema, and the round-trip
+  determinism guarantee), `hello-bevy.md` (the end-to-end tutorial:
+  generate → export → load in Bevy → Rapier 3D collision → player spawn
+  at first `PlayerStart` → trigger volume event subscription, using the
+  SciFi example which carries a T91 point-light marker).
+
+- **Developer documentation (T64)** — four new dev docs under
+  `docs/developer/` + a "Developer documentation" section in
+  `README.md`. (`docs/developer/` rather than `docs/dev/` because the
+  latter is in `.gitignore` for wiggum/orchestrator artifacts.)
+  `architecture.md` covers the Tauri / React / Three.js / Rust process
+  boundary, the per-frame store-vs-Map-vs-Ref rule, the anti-corruption
+  boundaries (zod schemas, map serialisation, assetRefs, isPrefab),
+  component ownership rule, the `src-tauri/src/{assets,export}/` module
+  boundaries, and a decision tree for "where does new code go?".
+  `authoring-generators.md` documents the formal `Generator` trait with
+  the worked Voronoi example end-to-end. `authoring-exports.md`
+  documents the `Exporter` trait with the worked CSV example.
+  `customisation-faq.md` is the recipes page for editor / generation /
+  export / persistence / tests.
+
+### Added — Distribution, CI, and quality (Phase 10)
+
+- **GitHub Actions CI (T65)** — `.github/workflows/ci.yml` runs on push /
+  PR / manual dispatch to main with three jobs — `frontend` (`npm ci`
+  - lint + type-check + vitest + build on Node 22 across ubuntu / macOS /
+    windows), `backend` (`cargo check` + test + clippy with the strict
+    pedantic + nursery profile from AGENTS.md + cargo-deny fresh advisories
+  - debug build across the same 3-OS matrix), and `workflow-lint`
+    (actionlint on ubuntu only). Swatinem rust-cache + npm cache keyed by
+    lockfile hash for second-run cache hits. `cargo-deny` installed from
+    the prebuilt `taiki-e/install-action@cargo-deny` (faster than
+    `cargo install`), and the actual check goes through
+    `scripts/cargo-deny.sh` so it always fetches fresh advisories.
+    sccache disabled via env (`SCCACHE_DISABLE=1`) because it fails with
+    permission errors on hosted runners. `src/test/ciWorkflow.test.ts`
+    parses the workflow as YAML and asserts the matrix + flag set + cache
+    wiring + trigger rules so a flag drift fails locally before CI.
+
+- **cargo-deny supply-chain policy (T66)** — `src-tauri/deny.toml`,
+  `scripts/cargo-deny.sh`, `docs/dev/supply-chain.md`. License allow-list
+  (MIT, Apache-2.0, BSD-2/3, ISC, MPL-2.0, Unicode-\*, Zlib, OpenSSL,
+  CC0-1.0, 0BSD, MIT-0). Bans on multiple versions (`warn`),
+  wildcards (`deny`), unknown registries, unknown git sources.
+  Acknowledged unmaintained advisories (all transitive through tauri
+  v2.11.5, no safe upgrade available): RUSTSEC-2023-0089, 2024-0370,
+  2024-0411..0419, 2024-0420, 2024-0436, 2025-0075, 2025-0080, 2025-0081,
+  2025-0098, 2025-0100. CI must run with fresh advisories
+  (`cargo deny fetch && cargo deny check`) — local cache can be stale.
+  Track these and re-verify after every tauri bump.
+
+- **Cross-platform release build with Tauri bundler (T67)** —
+  `.github/workflows/auto-tag.yml` triggers on CI green (`workflow_run` of
+  `ci.yml`) and pushes the next semver tag computed by `scripts/next-tag.sh`.
+  `.github/workflows/release.yml` chains off auto-tag via `workflow_run`
+  (per `~/.claude/CLAUDE.md`, `on: push: tags` never fires when the tag
+  is pushed by `GITHUB_TOKEN`). A `resolve-tag` job derives the tag from
+  `workflow_run.head_sha` via `gh api` and also handles `workflow_dispatch`
+  inputs. The `build` job runs a 4-target matrix (linux + macOS x86_64 +
+  macOS aarch64 + windows) through `tauri-apps/tauri-action@v0`, with
+  optional `APPLE_ID` / `WINDOWS_CERTIFICATE` secrets declared at job
+  scope. A `publish` job upsorts the matching CHANGELOG section into the
+  draft release via `gh release edit`. Node 22 (matching CI).
+  `src/test/release.test.ts` + `src/test/releasePipeline.test.ts` parse
+  both YAML files and assert the matrix, the `tauri-apps/tauri-action`
+  entry, the `greysquirr3l` identity in the auto-tag job, the loop-
+  prevention guard against `on: push: tags`, and the dual workflow_run /
+  workflow_dispatch tag resolution.
+
+- **Tauri auto-updater with release-channel notifications (T68)** —
+  `tauri-plugin-updater` is wired into Cargo, `tauri.conf.json`, and
+  `main.rs` (per `src/test/auto-updater.sh.test.ts`). `src/utils/updater.ts`
+  provides the typed wrapper: `readChannel` / `writeChannel` (stable /
+  prerelease, persisted in localStorage), `checkForUpdate`, and
+  `downloadUpdate` with a normalised progress callback.
+  `src/components/Update/UpdateNotification.tsx` is a fixed-position banner
+  with Install / Dismiss / Switch-channel controls. It mounts once in
+  `App.tsx` and renders nothing when the plugin is unreachable (dev /
+  web). Survives React 18 automatic batching via `useEffect` + `useRef`
+  guards on the initial check. The Restart-to-update button invokes
+  `plugin:updater | install` via the runtime bridge. The previous
+  config still has the placeholder `pubkey`; the
+  `tauri signer generate -w ~/.tauri/morgan-bevy.key` step is required
+  before the first signed release — tracked separately because it
+  needs the tauri CLI on a developer machine.
 
 - **Crash reporting and structured logging (T69)** — `src-tauri/src/crash_log.rs`
   installs `std::panic::set_hook` writing to `{app_data_dir}/logs/crash.log`
@@ -24,6 +289,378 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   payload, source, and stack. 5 Rust tests + 5 frontend tests cover
   panic-hook idempotency, rolling capacity, payload validation, and
   unhandled-rejection surfacing.
+
+- **Comprehensive test suite (T70)** — coverage expanded with
+  `src/test/transformConstraints.test.ts` (21 cases covering axis / plane
+  constraints, X/Y/Z + Shift-modifier key handlers, escape clear,
+  `getVisualIndicator` colours, subscriber lifecycle) and
+  `src/test/clipboard.test.ts` (8 cases covering copy / paste / clear /
+  `hasData` / multi-object offset math). Two latent bugs surfaced and
+  fixed along the way: (1) `clipboard.ts` `copy()` called `.catch(...)`
+  on `navigator.clipboard.writeText(...)` without checking the return
+  value was a Promise — jsdom's `vi.fn()` returns `undefined`, so the
+  copy would throw and return `false` even though the in-memory snapshot
+  was correctly stored. Now guarded. (2) The default paste offset of
+  `(2, 0, 0)` cancelled out against the centre-subtraction math,
+  making multi-object pastes effectively no-ops; replaced with a clearer
+  "target cluster-centre position" semantics: every object shifts by
+  `offset - original_centre`, so multi-object pastes actually move the
+  cluster. The Playwright E2E + Codecov upload paths called out in the
+  task spec are deferred to T65 (CI matrix) since they require a CI
+  environment to run.
+
+- **Opt-in usage analytics (T71)** — `src/utils/analytics.ts` +
+  `src/components/Settings/AnalyticsPanel.tsx` +
+  `src/components/AnalyticsConsentDialog.tsx` + `docs/user/analytics.md`.
+  The module is **opt-in by default** — `recordEvent` is a no-op when
+  `enabled` is false, so adding a new action call site doesn't have to
+  check anything. Settings are persisted to localStorage under
+  `morgan-bevy-analytics-settings` (zod-strict; unknown keys dropped)
+  and the buffer under `morgan-bevy-analytics-events` (capped at 10k
+  entries; the cap is enforced on both write and read; corrupt entries
+  dropped element-by-element). The event schema is `z.object({seq, ts,
+action, metric?, extra?})` with bounded `action` (1-64 chars) and
+  `extra` (≤256 chars). The endpoint field defaults to `local-only` —
+  events are kept in localStorage, never sent off-device. **GDPR
+  endpoints:** `exportAnalyticsAsJson()` returns the buffer as pretty-
+  printed JSON (right to access / data portability),
+  `deleteAnalyticsData()` clears the buffer and resets settings to
+  defaults (right to erasure). The Settings panel renders three actions:
+  opt-in toggle, endpoint URL field (disabled when off), and
+  export / delete buttons. The first-launch consent dialog is shown
+  once; both Accept and Decline mark the consent-seen flag so the
+  dialog doesn't re-appear.
+
+- **Tauri auto-updater file associations + startup CLI path (T73)** —
+  `tauri.conf.json` `bundle.fileAssociations` for `.morgan` and
+  `.morgan-project` (mimeType `application/x-morgan-project`, role
+  `Editor`). Linux `src-tauri/assets/morgan-bevy.desktop` template with
+  `MimeType=application/x-morgan-project;` and `Exec=morgan-bevy %F`.
+  Rust `parse_startup_project_path()` reads the launch CLI arg,
+  `tokio_sleep_ms` helper, and emits `morgan://open-project` to the
+  frontend via the Tauri `Emitter` trait. `src/hooks/useStartupFile.ts`
+  listens for the event and routes through `handleOpenProject` →
+  `load_project_from_path` → `LoadCommand`. macOS `RunEvent::Opened` is
+  intentionally deferred — the CLI-arg path covers double-click on
+  every platform's default behaviour.
+
+- **Marketing materials (T74)** — `README.md` rewritten as an
+  "above-the-fold" version with hero pitch + install + 7-feature summary
+  - accurate Tauri 2.11 / Bevy 0.19 versions. `docs/why-morgan-bevy.md`
+    is the new one-pager (what / who / top 5 features / install / 5-min
+    tour / when not). `docs/img/README.md` scaffolds the screenshot
+    gallery with filenames the release workflow will fill in. Screenshots
+    and the 60-second demo GIF are intentionally deferred to T67 (release
+    pipeline) — they require the running app on each target platform and
+    are bulk-binary assets, not code.
+
+- **Community channels (T75)** — five new community files:
+  `CONTRIBUTING.md` (setup, daily workflow, branch + PR workflow, coding
+  style per language, test rules, release pipeline overview, the
+  one-line-per-channel table for asking a question); `CODE_OF_CONDUCT.md`
+  (Contributor Covenant v2.1, the four-tier enforcement ladder, private
+  reporting address); `.github/ISSUE_TEMPLATE/config.yml` (disables blank
+  issues, sets up the contact link pointing at Discussions, declares the
+  three templates); `.github/ISSUE_TEMPLATE/bug.yml` (severity dropdown,
+  version + OS, numbered repro steps, expected vs actual, log block with
+  `shell` rendering, a pre-flight checklist); `.github/ISSUE_TEMPLATE/feature.yml`
+  (problem / proposal / alternatives / implementation sketch, scope +
+  size dropdowns, pre-flight); `.github/ISSUE_TEMPLATE/question.yml`
+  (question, what-I've-tried, context — short, single-thread,
+  scope-limited); `docs/developer/discussions-categories.md` (the
+  maintainer's guide to enabling Discussions, the four categories:
+  General / Ideas / Show and tell / Q&A, the "when to use what" matrix,
+  the enable-Dialogue maintainer steps).
+
+### Added — Frontend TypeScript idioms audit (Phase 11)
+
+- **zod schemas at every Tauri IPC boundary (T76)** — `src/types/schemas/`
+  covers `AssetSearchResult`, `Collection`, `ScanResult`, `DatabaseStats`,
+  `Theme`, `LevelData`, `ExportResult`, `ProjectData`. `ts-type.ts` re-
+  exports the inferred types from each schema. Type drift between Rust
+  serde and TS interfaces fails loudly at parse time, not silently at
+  runtime. 12 vitest cases pin the schema shapes.
+
+- **Branded types for IDs (T77 + T77b)** — `src/types/brand.ts` defines
+  `ObjectId` / `AssetId` / `MaterialId` / `PrefabId` / `LayerId` /
+  `ThemeId` / `Seed` as `Brand<T, '...'>` newtypes. Parsing helpers
+  (`parseObjectId` / `parseAssetId` / ... / `parseSeed`) throw on garbage
+  at boundaries (Tauri `invoke` returns, URL params, clipboard payloads,
+  JSON deserialization). `parseSeed` rejects NaN / Infinity / non-
+  integers / negatives (Rust stores seeds as u64 — negatives lose
+  precision). ID pattern is alphanumeric + dash + underscore, 4-64
+  chars. 37-case vitest suite covers accept / reject / JSON round-trip /
+  NaN / Infinity / type guards / branded value round-trip.
+  `EditorState` (`src/store/editorStore.ts`) is fully branded:
+  `selectedObjects: ObjectId[]`, `hoveredObject: ObjectId | null`,
+  `activeLayer` / `layers[].id: LayerId`, `sceneObjects: Map<ObjectId,
+SceneObject>`, `missingAssetRefs: AssetId[]`, and every action
+  signature. ~20 component / hook / utility files thread the branded
+  types through instead of casting (`App.tsx`, `ActionsPanel`, `FileMenu`,
+  `GenerationPanel`, `Hierarchy`, `Inspector`, `Layers`, `MaterialEditor`,
+  `PrefabManager`, `Viewport3D/*`, `useCameraControls`, `useKeyboardShortcuts`,
+  `commands.ts`, `clipboard.ts`, `prefabs.ts`, `materialPresets.ts`,
+  `useAutoSave.ts`, `performance/InstancedRendering.tsx`). Boundary
+  parsing on bulk-restore paths (`editorStore.loadFromLocalStorage`,
+  `clipboard.paste`, `prefabs.loadPrefabs`,
+  `materialPresets.listMaterialPresets`) filters out individually malformed
+  ids with `isObjectId` / `isValidIdString` and a `console.warn` rather
+  than throwing the whole payload. Generation sites (`addObject`,
+  `duplicateObjects`, `groupObjects`, `PasteCommand`,
+  `buildPrefabFromSelection`, `newPresetId`, `addLayer`) mint ids with
+  the plain `ObjectId(...)` / `PrefabId(...)` / `LayerId(...)` /
+  `MaterialId(...)` constructors rather than `parse*Id` — user-supplied
+  names with spaces (e.g. "My Cube") would otherwise make the validating
+  parser throw at paste time. `mapToRecord` / `recordToMap` in `brand.ts`
+  made generic over the key type so they work with `Map<ObjectId, V>`.
+
+- **`Map<ObjectId, SceneObject>` store + serialise round-trip (T78)** —
+  store was already `Map<ObjectId, SceneObject>`. Added
+  `src/store/mapSerialization.ts` (`serializeMap` / `deserializeMap`)
+  wired into the real persistence paths, which fixed a data-loss bug in
+  `useAutoSave.writeSnapshot` (passing the live `Map` to `JSON.stringify`
+  serialises a Map as `{}`). All ~15 sites that called
+  `Object.values/keys(sceneObjects)` were fixed (the call returns `[]`
+  on a Map, silently breaking the 3D viewport, level export, Layers,
+  Hierarchy, and PerformanceTestPanel). 12 new component-level
+  regression tests across 4 files — a store-level test cannot catch
+  this class of bug.
+
+- **`immer` for undo snapshots (T79)** — **Spec overridden by
+  decision 2026-08-08:** undo is already a command pattern storing
+  deltas (`TransformCommand` holds two `Vec3`s, not a scene copy), which
+  already gives what immer snapshots would. Rewriting it was rejected as
+  risk without gain. Fixed the two commands that genuinely snapshot:
+  `LoadCommand` did `{ ...state.sceneObjects }` — object-spreading a
+  `Map` yields `{}`, so undoing a scene load wiped the scene. Found a
+  second bug: `FileMenu` and `useStartupFile` called `new LoadCommand(
+projectData.scene)` while `execute()` only checked `newData.scene`, so
+  Open Project and startup-file loads silently no-op'd. `setAutoFreeze
+(true)` asserted explicitly. `commands.ts` had zero test coverage;
+  now has regression tests for both bugs.
+
+- **Per-frame values moved from store to refs (T80)** —
+  `PerformanceManager.usePerformanceDebug` called `setDebugInfo` every
+  frame — a React re-render at 60 Hz; throttled to ~2 Hz via a ref
+  timestamp. `CameraSystem.mouseMovement` was `useState` written on
+  every mousemove _and_ reset every render-loop frame during pointer
+  lock; moved to a ref. `FrustumCulling` and `LevelOfDetail` gained
+  change-guards so a stationary object causes zero re-renders instead
+  of 6-12/sec. `hoveredObject` audited and deliberately left in the
+  store — it is written only from `onPointerOver`/`onPointerOut`, not
+  per-frame. Replaced `(performance as any).memory` with a narrow
+  `PerformanceWithMemory` interface and `FrustumCulling`'s sphere cast
+  with a real `THREE.Sphere`.
+
+- **`Promise.allSettled` + `AbortController` for parallel async work
+  (T81)** — verified already largely complete: `AssetBrowser.tsx`
+  implements the full pattern. Confirmed against `@tauri-apps/api`'s
+  actual `InvokeOptions` type that this is Tauri **2.x**, whose
+  `invoke` takes no `signal` — so the existing "abort = stop awaiting,
+  ignore late results" workaround is the correct achievable pattern,
+  not a gap (the task file assumed Tauri 1.x). Closed one real gap:
+  three `Promise.all` calls in `useAssetDatabase.ts` where one rejection
+  sank the batch — now `Promise.allSettled` with fallback-to-previous-
+  value. That hook has zero consumers and is dead code superseded by
+  `AssetBrowser.tsx`.
+
+- **Discriminated union editor actions (T82)** — `src/types/menuActions.ts`
+  defines `EDIT_ACTIONS` / `VIEW_ACTIONS` / `GENERATE_ACTIONS` /
+  `TOOLS_ACTIONS` / `HELP_ACTIONS` as `as const` tuples with derived
+  `*Action` literal-union types plus an `assertNeverAction` runtime guard.
+  `src/App.tsx` handlers (`handleEditAction` / `handleViewAction` /
+  `handleGenerateAction` / `handleToolsAction` / `handleHelpAction`) take
+  their narrow `*Action` type and every `switch` has a `default:
+assertNeverAction(...)` arm so adding a new literal produces a compile
+  error. The `Command` class hierarchy in `src/utils/commands.ts` is
+  intentionally retained: each command captures its own `previousState`
+  for undo/redo and a pure reducer would require a different undo
+  architecture (immer patches / event sourcing).
+
+- **Micro-patterns (T83)** — grep for `map().flat()`,
+  `JSON.parse(JSON.stringify(...))`, global `isNaN` returns zero matches
+  in `src/`. `Number.isNaN` used everywhere. `||` → `??` applied in
+  `commands.ts:224`, `GenerationPanel.tsx:228`. `parseFloat(...) | 0` in
+  `Inspector.tsx` stays as `||` because it is a NaN guard.
+
+### Added — Bevy 0.19+ compatibility (Phase 12)
+
+- **Bevy 0.19 documentation (T84/T85)** — `docs/dev/BEVY_0.18_TO_0.19_MIGRATION.md`
+  documents the migration steps from 0.18 to 0.19 (notably the new
+  `TextFont { font_size: FontSize::Px(n), ..default() }` shape), and
+  `docs/dev/bevy-compat.md` codifies the contract that generated Rust
+  source is required to compile against Bevy 0.19.
+
+- **Bevy runtime compatibility companion crate (T86)** —
+  `crates/bevy-morgan-integration/` ships as a workspace member
+  (`members = ["crates/bevy-morgan-integration"]`, `exclude = ["src-tauri"]`
+  so the editor stays on its own dependency graph). Provides Bevy 0.19
+  marker components referenced by the editor's Rust source-code exporter
+  — `SpawnPoint`, `TriggerVolume`, `Door`, `Interactable`, `Collectible`,
+  `NavMeshHint` — plus the `MorganLevelPlugin` Bevy plugin and a
+  `load_level` / `load_level_world` API that consumes the editor's JSON
+  export. Bevy 0.19 component shape (`Mesh3d`, `MeshMaterial3d`,
+  `Transform`, `Name`) with `avian3d` `Collider` for collision. Depends
+  only on `bevy_app` + `bevy_ecs` + `bevy_transform` — no full Bevy
+  dep so consumers stay in control of their Bevy version. 20 lib tests
+  pass; clippy `-D warnings` clean. End-to-end docs at
+  `docs/user/bevy-integration.md`.
+
+- **Security hardening and vulnerability review (T87)** —
+  `src/test/securityAudit.test.ts` (10 vitest cases, all green) covers
+  the OWASP-relevant surface for a desktop Tauri app: dangerous DOM
+  APIs (`dangerouslySetInnerHTML` / `eval` / `new Function` /
+  `innerHTML =`), `localStorage` keys must start with `morgan-bevy.`,
+  `process.env` cannot leak secrets, backend SQL via `format!()` must
+  not interpolate user input, every `#[tauri::command]` path arg must
+  be `String` or `&str` (not `Vec<u8>`), React versions are pinned,
+  `@tauri-apps/api` is on a single 2.x major. The audit caught and
+  fixed 11 non-namespaced localStorage keys (`morgan-bevy-foo` →
+  `morgan-bevy.foo`). Findings document at
+  `docs/AUDIT_T87-security-hardening.md` with an OWASP cross-reference
+  table.
+
+- **Integration wiring audit (T88)** — `src/test/wiringAudit.test.ts`
+  (4 vitest cases, all green) programmatically verifies (1) every export
+  in `src/` has a consumer, (2) every `#[tauri::command]` function in
+  `src-tauri/src/main.rs` is registered in `tauri::generate_handler![]`,
+  (3) every registered command is invoked from the frontend (soft
+  check, ≤ 5 allowed for forward-looking API surface), and (4) every
+  hook in `src/hooks/` has a consumer. Caught 8 dead-surface exports —
+  `SelectionCommand` + `CompositeCommand` (commands.ts),
+  `MorganBevyIcon` (component file deleted), `useAsset` (hook),
+  `pasteFromClipboard` + `hasClipboardData` (clipboard wrappers),
+  `instanceMatches` (material-presets predicate),
+  `addConstraintKeyHandlers` (transform-constraints), and
+  `downloadUpdate` (updater wrapper) — all removed. Fast (~75 ms) and
+  runs on every commit via the T65 CI matrix. Findings document at
+  `docs/dev/integration-wiring-audit.md`.
+
+- **Stub and placeholder cleanup (T89)** — grep for stub patterns
+  returns zero matches in `src/` (excluding tests): no `throw new Error(
+"Not implemented")`, no `return undefined as any`, no `console.log(
+'TODO:')`. Zero `todo!()` / `unimplemented!()` in `src-tauri/src`.
+  Clippy's `-D clippy::unwrap_used`, `-D clippy::expect_used`,
+  `-D clippy::panic` enforce no stub fallbacks in production Rust.
+
+- **Generated Bevy systems per marker type (T90)** — companion crate
+  `crates/bevy-morgan-integration/src/systems.rs` provides Bevy 0.19
+  `MorganLevelSystems` plugin + 5 reference systems
+  (`door_proximity_open`, `collectible_pickup`, `spawn_point_observer`,
+  `trigger_volume_observer`, `nav_mesh_collector`) + companion types
+  (`Open`, `PickupEvent`, `TriggerActivated`, `PlayerStart`,
+  `NavMeshSource`, `EntityId`, `Player`) + `MarkerSet` bitset +
+  `SystemsMode` enum (`CompanionReference` | `Inline`). Editor
+  `src-tauri/src/export/exporters.rs` computes `marker_tags_present(
+level_data)` and conditionally emits the `use bevy_morgan_integration::
+systems::{...}` import block + a `pub fn plugin_init(app: &mut App)`
+  helper. The mode is recorded in the generated header as
+  `// Systems mode: CompanionReference` and re-selected on re-export via
+  `parse_systems_mode_from_header`. `re_export_rust_code()` preserves the
+  choice across exports. After T90 a consumer's `main.rs` shrinks
+  from 25 lines to ~12 (one `add_plugins(plugin_init(...))` call).
+  Companion crate: 28/28 lib tests pass; clippy `-D warnings` clean.
+  Editor: 65/65 cargo tests pass.
+
+- **Runtime marker expansion: animation, audio, lighting, VFX (T91)** —
+  split into T91a–T91e. **Rust side**: `src-tauri/src/export/exporters.rs`
+  has the four marker enums, `MarkerSet` bools
+  (`light`/`animation`/`audio`/`vfx`) and the emission branches;
+  `GameObject` carries the four fields; the companion crate has mirror
+  components plus `light_observer` / `animation_player_observer` /
+  `audio_observer` / `vfx_observer`. **Frontend** (T91a–T91d): zod
+  schemas + type guards (`src/types/markers.ts`), store fields + actions
+  (`editorStore.ts`), Inspector marker panels
+  (`src/components/Inspector/{Light,Animation,Audio,Vfx}MarkerPanel.tsx`),
+  and export-payload threading (`src/utils/exportPayload.ts`). **Docs**
+  (T91e): `docs/user/markers.md` + updates to `bevy-integration.md` and
+  the companion crate README.
+
+- **Blank-screen diagnostic + viewport clear color (T92)** — running
+  Tauri dev produced a dark window that read as empty. Diagnostic
+  (`src/test/blankScreen.test.ts`, new — 2 tests) mounts `<App />` in
+  jsdom with a `ResizeObserver` stub, stubbed Tauri `__TAURI_INTERNALS__`
+  (with `transformCallback` + `__TAURI_EVENT_PLUGIN_INTERNALS__`) +
+  `window.__TAURI__` invoke/event surface, a stubbed 2d `getContext`
+  (jsdom returns null otherwise and the `GridView`'s `useEffect`
+  crashes), and seeded `morgan-bevy.autosave` for the recovery-dialog
+  path. Diagnostic result: the editor IS rendering — the body dump
+  shows all panels. The "blank screen" was the 3D viewport: `<Canvas>`
+  had no `setClearColor`, so Three.js defaulted to opaque black
+  (`#000000`), making the viewport indistinguishable from the dark
+  editor chrome on a fresh launch with no scene objects. **Fix** (`src/
+components/Viewport3D/Viewport3D.tsx`): in `onCreated`, call
+  `gl.setClearColor('#1e2536', 1)` and add `scene.fog = new THREE.Fog(
+'#1e2536', 30, 80)` so the empty viewport reads as a 3D editor rather
+  than a black hole. One real Tauri quirk discovered along the way:
+  Tauri 2.x requires `window.__TAURI_INTERNALS__.transformCallback` to
+  be defined for `useStartupFile`'s `event.listen` to succeed; without
+  it, the startup-file hook throws a `TypeError: window.__TAURI_INTERNALS__
+.transformCallback is not a function` (silent, not visible in the UI).
+  Not fixed — the hook's failure is non-fatal and the editor continues
+  to work — but worth a follow-up if `useStartupFile` ever needs to load
+  `.morgan` files.
+
+### Added — Real asset thumbnails (T93)
+
+- **Real thumbnails for every supported asset format (no C deps, no
+  labelled placeholders)** — five new submodules under
+  `src-tauri/src/assets/thumbnail/`:
+  - **`waveform.rs`** — shared peak-vs-time renderer extracted from
+    `audio.rs` so every audio format feeds one implementation.
+  - **`glb.rs`** — hand-rolled binary glTF 2.0 chunk parser (12-byte
+    header, JSON + BIN chunk walk via `serde_json::Value` for the
+    `meshes → primitives → POSITION → accessor → bufferView → BIN offset`
+    chain, handles FLOAT/BYTE/UBYTE/SHORT/USHORT/UINT POSITION component
+    types, produces orthographic wireframe bbox + centre dot).
+  - **`obj.rs`** — hand-rolled Wavefront OBJ parser (scans `v x y z`
+    lines, AABB + bbox render).
+  - **`fbx.rs`** — hand-rolled FBX parser for both binary 7.4/7.5+ and
+    ASCII (magic detection on first byte, walks the nested node
+    structure `(end_offset, num_children, properties, children,
+sentinel)`, harvests the typed-double `Vertices` property from every
+    `Geometry` under `Objects`).
+  - **`mat.rs`** — Bevy `.mat` (RON-style text) identifier extractor;
+    parses `// Material: <name>` / `# <name>` / `name = "<name>"` and
+    renders a labelled preview with the asset name truncated to 8 chars,
+    purple background to distinguish from text/audio placeholders.
+
+  **`audio.rs` rewritten**: WAV via `hound` (existing path); MP3/OGG/
+  FLAC via `symphonia` 0.6 (`Probe::probe → Box<dyn FormatReader>`,
+  `next_packet → Result<Option<Packet>>`, `decoder.decode →
+GenericAudioBufferRef`, `copy_to_slice_interleaved::<f32, _>` handles
+  the sample-format conversion — F32/S16/S24/etc. all → f32).
+
+  Dispatch (`dispatch.rs`) routes Model by extension: `glb → render_glb`,
+  `obj → render_obj`, `fbx → render_fbx`, unknown → placeholder.
+  `database.rs::determine_asset_type` extended: GLB + OBJ → "Model";
+  FLAC + WebP → "Audio"/"Texture".
+
+  Cargo dep `symphonia = { version = "0.6", default-features = false,
+features = ["mp3", "vorbis", "flac", "pcm"] }` (pure Rust, no C deps).
+
+  **T93 v2** swept the pedantic-nursery clippy lints that T93 deferred —
+  `Cursor::read_bytes::<N>` helper + `.get(..n).try_into()` everywhere,
+  `Aabb::expand` via `iter_mut().zip`, `mul_add` for the cube-render FMA
+  chain, `let-else` throughout `render_via_symphonia`, `repeat().take()`
+  → `repeat_n`, `match` → `unwrap_or_else` / `if let` for single-pattern
+  destructuring. `cargo clippy --all-targets -- -W clippy::all -W
+clippy::pedantic -W clippy::nursery` is clean for the T93 files.
+
+  **Test count: 141 / 141 cargo pass** (was 117; +24 new). Vitest 680/680
+  unchanged. `cargo deny check` clean — `symphonia` 0.6.0 + transitive
+  (`symphonia-core`, `symphonia-bundle-{mp3,flac}`, `symphonia-codec-
+{pcm,vorbis}`, `symphonia-common`) all have current upstream
+  maintenance, no advisories.
+
+### Changed
+
+- **Tauri dependency alignment** — Cargo resolves `tauri = "2.11.5"`; the
+  npm `@tauri-apps/*` packages have been moved onto the matching 2.11.x
+  line: `api` 2.11.1, `cli` 2.11.4, `plugin-dialog` 2.7.2, `plugin-fs`
+  2.5.1, `plugin-shell` 2.5.2, `plugin-sql` 2.4.0, plus the newly added
+  `plugin-updater` 2.10.1. Eliminates the previous 2.9.0 ↔ 2.11.5 mismatch
+  that surfaced as missing-CLI warnings under `tauri dev`.
 
 - **Auto-save with debounced localStorage snapshots (T20)** —
   `src/hooks/useAutoSave.ts` debounces 5 s and flushes every 60 s, with a
@@ -40,26 +677,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   recent-projects tests cover ordering, dedupe, prune, persistence, and
   corruption recovery.
 
-- **Bevy 0.19 documentation (T84/T85)** — `docs/dev/BEVY_0.18_TO_0.19_MIGRATION.md`
-  documents the migration steps from 0.18 to 0.19 (notably the new
-  `TextFont { font_size: FontSize::Px(n), ..default() }` shape), and
-  `docs/dev/bevy-compat.md` codifies the contract that generated Rust
-  source is required to compile against Bevy 0.19.
-
-### Changed
-
-- **Tauri dependency alignment** — Cargo resolves `tauri = "2.11.5"`; the
-  npm `@tauri-apps/*` packages have been moved onto the matching 2.11.x
-  line: `api` 2.11.1, `cli` 2.11.4, `plugin-dialog` 2.7.2, `plugin-fs`
-  2.5.1, `plugin-shell` 2.5.2, `plugin-sql` 2.4.0, plus the newly added
-  `plugin-updater` 2.10.1. Eliminates the previous 2.9.0 ↔ 2.11.5 mismatch
-  that surfaced as missing-CLI warnings under `tauri dev`.
-
 ### Fixed
 
 - `App.tsx` no-extra-semi lint error in the `toggle-grid` shortcut
   branch: replaced the leading `;` IIFE pattern with a `void()` expression
   to keep the lint profile at 0 errors without an eslint-disable comment.
+
+### Removed / Reverted
+
+- **T72 — Distribution packaging** (rolled back per user request on
+  2026-08-08). The three package-manager formulas
+  (`packaging/homebrew/morgan-bevy.rb`, `packaging/aur/PKGBUILD`,
+  `packaging/scoop/morgan-bevy.json`) and the maintainer runbook
+  (`docs/developer/distribution.md`) were authored and committed in
+  `9484b00` but the user opted to keep `packaging/` untracked going
+  forward. `git rm -r --cached packaging/` + `packaging/` added to
+  `.gitignore` so the files stay on disk for the maintainer but are
+  never re-committed. The previous commit `9484b00` remains in history;
+  the runbook is still useful as a local reference for what the
+  formulas would look like if T72 is re-attempted; the formulas
+  themselves remain on disk in `packaging/` for the same purpose.
 
 ### Security
 
