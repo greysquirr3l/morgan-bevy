@@ -209,19 +209,26 @@ tools** to enable rapid level design and iteration.
 The remaining work is tracked per-task in [`PROGRESS.md`](PROGRESS.md).
 Headline items:
 
-- **Lighting tools** (T55) — placement, configuration, theme presets
-- **Snap points & surface snapping** (T51 / T52) — door frames, wall corners, Shift+Ctrl
-- **Measurement tool** (T53) — distance, area, ruler overlay
-- **Material/texture paint** (T54) — P-key brush with UV editor
-- **Tags, collections, smart folders** (T32) — asset library curation
-- **Collision/spawn/trigger export** (T42) — across JSON / RON / Rust / GLTF / FBX
-- **CI matrix** (T65) — ubuntu / macOS / windows GitHub Actions
-- **Cross-platform release pipeline** (T67) — Tauri bundler + `gh release` + `greysquirr3l` identity
-- **Auto-updater** (T68) — already plumbed, release-channel wiring remains
-- **Distribution channels** (T72) — Homebrew / AUR / scoop formulas
+- **T90 v2 — Inline emission mode** — the `SystemsMode::Inline` enum
+  variant is wired through the parser and the generated header, but
+  the actual emission still falls through to `CompanionReference`
+  (see `src-tauri/src/export/exporters.rs:343-345, 570-573`). Wiring
+  it up means embedding the per-marker system bodies as a
+  `SYSTEMS_SOURCE` constant in the companion crate and switching
+  the `add_plugins(plugin())` call site for inline mode to inline
+  `add_systems(...)` + `add_observer(...)` directly. Substantial but
+  mechanical.
+- **T72 — Distribution channels** — Homebrew / AUR / scoop formulas
+  were authored in commit `9484b00` but rolled back per maintainer
+  preference. `packaging/` lives on disk (gitignored) as a local
+  reference; re-introducing it is a single git command plus the
+  maintainer runbook in [`docs/developer/distribution.md`](docs/developer/distribution.md).
 
-The Bevy 0.19 export contract is the only stability promise we make;
-see [`docs/dev/bevy-compat.md`](docs/dev/bevy-compat.md).
+Beyond that, the editor is feature-complete for the MVP scope — the
+remaining work is polish (UI ergonomics, additional export targets,
+real Bevy-side consumer examples) tracked in the contributing section
+below. The Bevy 0.19 export contract is the only stability promise
+we make; see [`docs/dev/bevy-compat.md`](docs/dev/bevy-compat.md).
 
 ---
 
