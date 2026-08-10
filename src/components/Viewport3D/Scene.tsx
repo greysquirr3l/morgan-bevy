@@ -77,7 +77,14 @@ function SceneObject3D({
     setHoveredObject(null)
   }
 
-  // Choose geometry based on mesh type
+  // Choose geometry based on mesh type.
+  // All three primitives share a 1×1×1 bounding box at scale=[1,1,1]:
+  //   - cube:    1×1×1 box
+  //   - sphere:  diameter 1.0 (radius 0.5)
+  //   - pyramid: square base side 1.0, height 1.0 — radius = 1/√2 ≈ 0.7071
+  //     so the inscribed square's side equals its height (was radius
+  //     0.5 which gave side ≈ 0.707, making the pyramid visibly taller
+  //     than wide / "oblong" in the viewport).
   const renderGeometry = () => {
     switch (meshType) {
       case 'cube':
@@ -85,7 +92,7 @@ function SceneObject3D({
       case 'sphere':
         return <sphereGeometry args={[0.5, 32, 16]} />
       case 'pyramid':
-        return <coneGeometry args={[0.5, 1, 4]} />
+        return <coneGeometry args={[1 / Math.sqrt(2), 1, 4]} />
       default:
         return <boxGeometry args={[1, 1, 1]} />
     }
