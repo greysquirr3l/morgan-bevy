@@ -1,7 +1,8 @@
-# Morgan-Bevy 3D Level Editor
+# Morgan
 
-> Hybrid Rust + React 3D level editor for the Bevy game engine with
-> procedural generation (BSP, WFC) and professional manual editing tools.
+> A free, open-source desktop 3D level editor for the
+> [Bevy game engine](https://bevyengine.org/). Procedural generation
+> (BSP, WFC) meets professional manual editing tools.
 
 **Core Philosophy**: _"Generate smart, edit fast, export perfect."_
 
@@ -12,14 +13,56 @@
 [![Three.js](https://img.shields.io/badge/threejs-black?style=for-the-badge&logo=three.js&logoColor=white)](https://threejs.org/)
 [![License](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue.svg)](LICENSE-MIT)
 
-## Why Morgan-Bevy?
+## What Morgan is
+
+- **A free, open-source desktop app** for designing 3D levels that
+  compile into a [Bevy](https://bevyengine.org/) game project.
+- **A procedural-generation toolkit.** BSP room-and-hall layout and
+  Wave Function Collapse tile-by-tile generation, both deterministic
+  given a seed.
+- **A manual editor that respects the procedural output.** Click any
+  object and drag; type a new value; undo/redo through command
+  pattern. The generator's output is just another set of objects in
+  the same scene.
+- **A small, fast, dependency-aware code base.** ~10 MB binary per
+  platform, ~1.2 s to recompile a Rust change end-to-end, every Tauri
+  IPC call validated with zod at the boundary.
+- **A project that ships a stable, tested Bevy export contract**
+  (see [`docs/dev/bevy-compat.md`](docs/dev/bevy-compat.md)). The
+  rest of the editor is allowed to evolve.
+
+## What Morgan isn't
+
+- **Not a general-purpose 3D modeller.** It's a _level_ editor:
+  rooms, corridors, lights, waypoints, paint blobs, navmeshes. If
+  you want to model a character or sculpt a hero prop, use
+  [Blender](https://blender.org) and import the result.
+- **Not a Bevy engine.** Morgan targets Bevy 0.19 and emits Rust
+  source / RON / JSON / glTF / FBX — it does not embed Bevy or
+  replace the Bevy asset pipeline. Generated levels load with a
+  thin integration crate ([`crates/bevy-morgan-integration/`](crates/bevy-morgan-integration/))
+  the consumer adds to their Bevy project.
+- **Not Unity / Unreal / Godot compatible.** The exporter targets
+  Bevy's component model (System Sets, Resources, observers). Other
+  engines would need a different export path.
+- **Not a runtime engine.** Morgan runs at design-time on a desktop.
+  No headless server, no editor-as-a-service, no runtime scripting.
+- **Not a multiplayer / MMO / networked tool.** No collaboration,
+  no cloud sync, no live cursors. Single-user, local-first.
+- **Not finished.** The surface area is broad (BSP, WFC, paint,
+  navmesh, AI waypoints, export to 5 formats, multi-window UI,
+  theme system, etc.) and several editor features are still
+  rough-edged — see [`PROGRESS.md`](PROGRESS.md) for what shipped
+  and what remains.
+
+## Why Morgan?
 
 Most level editors either lock you into a single engine or treat
-procedural generation as an afterthought. Morgan-Bevy does both:
+procedural generation as an afterthought. Morgan does both:
 
 - **First-class Bevy 0.19 exporter.** Generated Rust source compiles
   against a vanilla Bevy project — no proprietary runtime, no
-  schema-drift patches. See `docs/dev/bevy-compat.md` for the contract.
+  schema-drift patches. See [`docs/dev/bevy-compat.md`](docs/dev/bevy-compat.md) for the contract.
 - **Deterministic BSP + WFC generation.** Same seed, same level. No
   `Instant::now()` calls in the domain layer.
 - **Manual editing that doesn't fight you.** 60 FPS with 10K+ objects,
@@ -70,7 +113,7 @@ Double-click the `.msi` installer from the GitHub Release.
 
 ## 🎯 Project Overview
 
-Morgan-Bevy is a hybrid Rust + React 3D level editor for the
+Morgan is a hybrid Rust + React 3D level editor for the
 [Bevy game engine](https://bevyengine.org/). It combines **procedural
 generation algorithms** (BSP, WFC) with **professional manual editing
 tools** to enable rapid level design and iteration.
@@ -288,35 +331,66 @@ To regenerate locally, run the editor, capture each scene via
 
 ## 🤝 Contributing
 
-**🚀 We're actively seeking contributors!** Morgan-Bevy is an ambitious open-source project that would benefit greatly from community involvement. Whether you're a Rust developer, TypeScript expert, 3D graphics enthusiast, or UI/UX designer, there are opportunities to make a significant impact.
+**🚀 Morgan is open to contributors — first-time and seasoned alike.**
+The codebase is small, the gates (`just preflight` = lint + test +
+audit) all run in under a minute, and the maintainer is reachable
+on GitHub. If you've ever wanted a real `cargo clippy -- -W pedantic`
 
-### 🎯 **Areas Where We Need Help**
+- `vitest` + Tauri project to cut your teeth on, this is it.
 
-- **Rust Backend Development** - Procedural generation algorithms (BSP, WFC), export systems
-- **Three.js/WebGL** - 3D rendering optimizations, advanced visual features
-- **React/TypeScript** - UI components, state management, performance improvements
-- **Game Development** - Bevy engine integration, level design workflows
-- **Documentation** - Technical writing, tutorials, examples
-- **Testing** - Unit tests, integration tests, performance testing
+### How to get started
 
-### 🐛 **Bug Reports & Feature Requests**
+1. **Read [`CONTRIBUTING.md`](CONTRIBUTING.md)** for the commit-style
+   conventions, `nick.md`-style strictness rules, and how to send a
+   PR that passes preflight on the first try.
+2. **Look for [`good first issue`](https://github.com/greysquirr3l/morgan-bevy/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22)
+   labels** on GitHub — those are scoped, low-risk, and a great way
+   to learn the codebase without touching the Bevy export contract
+   or the asset database.
+3. **For bigger work, open an issue first** so we can agree on
+   direction before you spend hours on a PR that gets rejected.
 
-- Open an [issue](https://github.com/greysquirr3l/morgan-bevy/issues) with detailed reproduction steps
-- Check existing issues before creating new ones
-- Include system information and error messages
+### 🎯 Areas where contributions land well right now
 
-### 💻 **Development Contributions**
+| Area                                | Why it matters                                                                                                                                                                 | Where to start                                                                              |
+| ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------- |
+| **Bevy export consumers**           | The exported Rust source has to compile against real Bevy 0.19 projects. Adding real-world consumer code to `crates/bevy-morgan-integration/` validates the contract.          | `crates/bevy-morgan-integration/` README + `examples/`                                      |
+| **Procedural generation**           | BSP and WFC are the headline features. Better heuristics, additional constraints (corridor width, room aspect ratio), new algorithms (Drunkard's Walk, WFC with backtracking). | `src-tauri/src/generation/`                                                                 |
+| **Export targets**                  | The export pipeline supports JSON / RON / Rust / glTF / binary FBX. Adding more (e.g. native Bevy scenes with markers) widens the consumer audience.                           | `src-tauri/src/export/`                                                                     |
+| **Theming / paint / navmesh tools** | Editor polish — brushes, snap points, surface snapping, navmesh generation. Smaller, self-contained tasks.                                                                     | `src/components/PaintTool/`, `src/utils/surfaceSnap.ts`, `src-tauri/src/spatial/navmesh.rs` |
+| **Documentation**                   | User docs (`docs/user/`) and developer docs (`docs/dev/`) are both under-served. Typos, broken examples, and missing tutorials are all welcome.                                | `docs/user/`, `docs/dev/`                                                                   |
+| **CI / packaging**                  | The cross-platform release pipeline (T67), Homebrew / AUR / scoop formulas, and CI matrix.                                                                                     | `.github/workflows/`, `packaging/` (gitignored local), `justfile`                           |
 
-- Fork the repository and create a feature branch
-- Follow existing code style and patterns
-- Add tests for new functionality
-- Update documentation for user-facing changes
+### 🐛 Bug reports & feature requests
 
-### 📚 **Documentation**
+- Open an [issue](https://github.com/greysquirr3l/morgan-bevy/issues)
+  with reproduction steps, expected vs actual, and your OS / Tauri
+  runtime version. The maintainer triages weekly.
+- Search existing issues before opening a new one — duplicates slow
+  the triage queue for everyone.
 
-- Improve README, code comments, or user guides
-- Create tutorials or example projects
-- Report unclear or missing documentation
+### 💻 Development contributions
+
+- Fork the repo and branch from `main`.
+- Follow existing patterns: `feat:`, `fix:`, `refactor:`,
+  `test:`, `docs:`, `chore:` commits (see `CONTRIBUTING.md`).
+- All public functions need at least one test. Run `just preflight`
+  locally before pushing — CI runs the same gate.
+- Keep PRs scoped. A 50-line bug fix beats a 5000-line "while I was
+  in there" PR every time.
+
+### 📚 Documentation
+
+- Improve README, code comments, `docs/user/`, `docs/dev/`.
+- Create tutorials or example Bevy projects that consume Morgan output.
+- Report unclear or missing documentation — even "I didn't understand
+  X" is useful feedback.
+
+### Code of conduct
+
+This project follows the [Contributor Covenant](CODE_OF_CONDUCT.md).
+Be kind, assume good faith, and remember there's a person behind
+every PR.
 
 ---
 
@@ -355,8 +429,8 @@ Unless you explicitly state otherwise, any contribution intentionally submitted 
 
 <div align="center">
 
-**⭐ Star this repository if you find it useful!**
+**⭐ Star this repository if Morgan saved you a few weekends.**
 
-**🚧 This project is under active development - watch for updates!**
+**🤝 PRs welcome — see [CONTRIBUTING.md](CONTRIBUTING.md) for the workflow.**
 
 </div>
