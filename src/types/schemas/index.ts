@@ -353,3 +353,106 @@ export function parseInvoke<S extends z.ZodTypeAny>(
   }
   return result.data
 }
+
+// ─── Spatial / Scene primitives ───────────────────────────────────────────────
+//
+// These mirror the Rust `Transform3D` and `BoundingBox` shapes
+// consumed by `query_objects_in_bounds` and `update_object_transform`.
+// Keep in sync with `src-tauri/src/main.rs::Transform3D` and
+// `src-tauri/src/spatial/mod.rs::BoundingBox`.
+
+export const Transform3DSchema = z.object({
+  position: Vec3Schema,
+  // Quaternion [x, y, z, w] for smooth interpolation.
+  rotation: z.tuple([z.number(), z.number(), z.number(), z.number()]),
+  scale: Vec3Schema,
+})
+export type Transform3D = z.infer<typeof Transform3DSchema>
+
+export const BoundingBoxSchema = z.object({
+  min: Vec3Schema,
+  max: Vec3Schema,
+})
+export type BoundingBox = z.infer<typeof BoundingBoxSchema>
+
+// ─── Theme shapes ────────────────────────────────────────────────────────────
+//
+// The Rust `Theme` struct (src-tauri/src/generation/themes.rs) is
+// richer than the `Theme` we previously declared — it carries
+// lighting, materials, and mesh variants. We expose the full shape
+// here so `get_theme_by_id` and `get_theme_legend` can validate
+// the response, while the legacy `ThemeSchema` (above) keeps the
+// minimal subset for callers that only need `id` / `name`.
+
+export const ThemeLightingSchema = z.object({
+  ambient_color: z.tuple([z.number(), z.number(), z.number()]),
+  ambient_intensity: z.number(),
+  directional_color: z.tuple([z.number(), z.number(), z.number()]),
+  directional_intensity: z.number(),
+  directional_direction: z.tuple([z.number(), z.number(), z.number()]),
+  shadow_enabled: z.boolean(),
+})
+export type ThemeLighting = z.infer<typeof ThemeLightingSchema>
+
+export const MaterialInfoSchema = z.object({
+  diffuse: z.string().nullable().optional(),
+  normal: z.string().nullable().optional(),
+  metallic: z.string().nullable().optional(),
+  roughness: z.string().nullable().optional(),
+  emission: z.string().nullable().optional(),
+})
+export type MaterialInfo = z.infer<typeof MaterialInfoSchema>
+
+export const TileDefinitionSchema = z
+  .object({
+    tile_type: z.string(),
+    name: z.string(),
+    description: z.string(),
+    visual: z.object({}).passthrough(),
+    mesh: z.unknown().nullable().optional(),
+    collision: z.boolean().optional(),
+    walkable: z.boolean().optional(),
+    tags: z.array(z.string()).optional(),
+  })
+  .passthrough()
+export type TileDefinition = z.infer<typeof TileDefinitionSchema>
+
+export const FullThemeSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  description: z.string(),
+  author: z.string(),
+  version: z.string(),
+  tiles: z.record(z.string(), TileDefinitionSchema),
+  default_floor_height: z.number(),
+  wall_height: z.number(),
+  lighting: ThemeLightingSchema,
+  materials: z.record(z.string(), MaterialInfoSchema),
+  mesh_variants: z.record(z.string(), z.array(z.string())),
+})
+export type FullTheme = z.infer<typeof FullThemeSchema>
+
+// ─── Asset import shapes ─────────────────────────────────────────────────────
+//
+// Mirrors the Rust `ImportSettings` / `ImportEntry` / `ImportResult`
+// shapes (src-tauri/src/assets/import.rs). Used by `import_assets`.
+
+export const ImportSettingsSchema = z.object({
+  texture_max_size: z.number().int().nonnegative().default(0),
+  texture_quality: z.number().int().min(0).max(100).default(80),
+  skip_invalid: z.boolean().default(false),
+})
+export type ImportSettings = z.infer<typeof ImportSettingsSchema>
+
+export const ImportEntrySchema = z.object({
+  source: z.string(),
+  destination: z.string(),
+  error: z.string().optional(),
+})
+export type ImportEntry = z.infer<typeof ImportEntrySchema>
+
+export const ImportResultSchema = z.object({
+  entries: z.array(ImportEntrySchema),
+  transformed: z.number().int().nonnegative(),
+})
+export type ImportResult = z.infer<typeof ImportResultSchema>

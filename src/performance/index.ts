@@ -1,46 +1,41 @@
 // Performance optimization exports
-export { 
-  useLOD, 
-  LODSphereGeometry, 
-  LODBoxGeometry, 
+export {
+  DEFAULT_LOD_LEVELS,
+  LODBoxGeometry,
   LODConeGeometry,
-  DEFAULT_LOD_LEVELS 
+  LODSphereGeometry,
+  useLOD,
 } from './LevelOfDetail'
 
-export { 
-  useFrustumCulling, 
-  useBoundingBoxCulling, 
-  usePerformanceCulling 
+export {
+  useBoundingBoxCulling,
+  useFrustumCulling,
+  usePerformanceCulling,
+  useSpatialIndexQuery,
 } from './FrustumCulling'
 
-export { 
-  useInstancedRendering,
-  InstancedCubes,
-  InstancedSpheres, 
+export {
   InstancedCones,
-  InstancedObjectManager 
+  InstancedCubes,
+  InstancedObjectManager,
+  InstancedSpheres,
+  useInstancedRendering,
 } from './InstancedRendering'
 
-export { 
-  useSelectionHighlight,
+export {
   SelectionHighlight,
-  useSelectionManager 
+  useSelectionHighlight,
+  useSelectionManager,
 } from './SelectionOptimization'
 
-export { 
-  usePerformanceManager,
+export {
   useAdaptiveQuality,
-  usePerformanceDebug 
+  usePerformanceDebug,
+  usePerformanceManager,
 } from './PerformanceManager'
 
-export type { 
-  LODLevel 
-} from './LevelOfDetail'
+export type { LODLevel } from './LevelOfDetail'
 
-export type { 
-  InstancedObjectData 
-} from './InstancedRendering'
+export type { InstancedObjectData } from './InstancedRendering'
 
-export type { 
-  PerformanceObject 
-} from './PerformanceManager'
+export type { PerformanceObject } from './PerformanceManager'

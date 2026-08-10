@@ -49,11 +49,68 @@ export function useStartupFile(): void {
       }
     })()
 
+    // T97: also probe the Rust side for a `current_level` cache.
+    // If the Rust side has a level loaded (e.g. the user re-launched
+    // the app while a level was open in the Rust-side cache), pull
+    // it into the front-end store so the UI doesn't show a stale
+    // empty scene. Best-effort — failures here don't block the
+    // hook's main purpose.
+    void syncCurrentLevelFromRust()
+
     return () => {
       cancelled = true
       if (unlisten) unlisten()
     }
   }, [executeCommand])
+}
+
+/**
+ * Probe the Rust side for a `current_level` cache and apply it to
+ * the front-end store if present. Used as the startup rehydration
+ * step — a previous app session may have left the Rust side with a
+ * level loaded (the Bevy-runtime cache, distinct from the
+ * editor's `ProjectData` file), and we want to show that level on
+ * launch instead of an empty scene.
+ *
+ * Distinct from `handleOpenProject` which reads a `.morgan` file
+ * from disk via the OS file association.
+ */
+async function syncCurrentLevelFromRust(): Promise<void> {
+  try {
+    const { getCurrentLevel } = await import('@/types/levelBridge')
+    const levelData = await getCurrentLevel()
+    if (!levelData) return
+    const projectData: ProjectData = ProjectDataSchema.parse({
+      schemaVersion: 1,
+      scene: {
+        objects: levelData.entities ?? [],
+        layers: [],
+        activeLayer: null,
+        selectedObjects: [],
+        settings: {
+          gridSize: 1,
+          snapToGrid: false,
+          transformMode: 'select',
+          coordinateSpace: 'world',
+        },
+      },
+      metadata: {
+        name: levelData.metadata.theme,
+        savedAt: new Date().toISOString(),
+        objectCount: Array.isArray(levelData.entities) ? levelData.entities.length : 0,
+        layerCount: 0,
+      },
+    })
+    const executeCommand = useEditorStore.getState().executeCommand
+    executeCommand(new LoadCommand(projectData.scene as never))
+    const md = projectData.metadata
+    console.log(
+      `Restored level from Rust cache (theme=${levelData.metadata.theme}, objects=${md?.objectCount ?? 0})`
+    )
+  } catch (e) {
+    // Non-fatal — the user can always open a project via File > Open.
+    console.warn('syncCurrentLevelFromRust: failed', e)
+  }
 }
 
 /**

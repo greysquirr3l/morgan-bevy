@@ -1,4 +1,5 @@
 import { useEditorStore } from '@/store/editorStore'
+import { getThemeLegend } from '@/types/themes'
 import { invoke } from '@tauri-apps/api/core'
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 
@@ -31,6 +32,9 @@ interface Theme {
 
 export interface GridViewRef {
   exportGrid: () => string
+  /** Server-canonical grid export (Rust-rendered, validates against
+   *  the theme's icon table). Falls back to '' on Tauri errors. */
+  exportGridCanonical: () => Promise<string>
   importGrid: (gridString: string) => void
   clearGrid: () => void
   getGridData: () => string[][] // Add method to get current grid data
@@ -45,6 +49,12 @@ const GridView = React.forwardRef<GridViewRef, GridViewProps>(({ className = '' 
   const [gridSize, setGridSize] = useState({ width: 48, height: 36 })
   const [cellSize, setCellSize] = useState(16)
   const [showGrid, setShowGrid] = useState(true)
+  // Human-readable legend for the currently-selected theme; surfaced
+  // as the tile-palette button `title` attribute via the
+  // `getThemeLegend` wrapper. Cached separately from the theme
+  // object so legend refreshes don't require re-fetching the full
+  // theme shape.
+  const [legend, setLegend] = useState<string | null>(null)
   const [dragStart, setDragStart] = useState<{ x: number; y: number } | null>(null)
   const [selection, setSelection] = useState<{
     start: { x: number; y: number }
@@ -123,6 +133,29 @@ const GridView = React.forwardRef<GridViewRef, GridViewProps>(({ className = '' 
   }, [gridSize.width, gridSize.height])
 
   // Load available themes from backend
+  /**
+   * Hydrate each lightweight theme with the full Rust shape via
+   * `getThemeById`. We don't replace the theme object (the
+   * lightweight shape already drives the palette tooltip), we just
+   * log when a theme is missing on the Rust side so the operator
+   * notices the drift. Best-effort — failures here don't block
+   * the rest of the theme pipeline.
+   */
+  const hydrateThemesWithRustShape = async (themeIds: string[]) => {
+    if (themeIds.length === 0) return
+    try {
+      const { getThemeById } = await import('@/types/themes')
+      for (const id of themeIds) {
+        const full = await getThemeById(id)
+        if (!full) {
+          console.warn(`Theme "${id}" missing on Rust side`)
+        }
+      }
+    } catch (e) {
+      console.warn('hydrateThemesWithRustShape: failed', e)
+    }
+  }
+
   const loadThemes = useCallback(async () => {
     console.log('=== loadThemes START ===')
     console.log('loadThemes called, selectedTheme from store:', selectedTheme)
@@ -135,6 +168,11 @@ const GridView = React.forwardRef<GridViewRef, GridViewProps>(({ className = '' 
         console.log('Setting first theme as selected:', themes[0])
         setSelectedTheme(themes[0])
       }
+      // T97: hydrate each lightweight theme with the full Rust
+      // shape (lighting, materials, mesh_variants). The
+      // `get_available_themes` endpoint returns a slim shape; the
+      // inspector / palette tooltip want the full thing.
+      void hydrateThemesWithRustShape(themes.map(t => t.id))
     } catch (error) {
       console.log('=== FALLBACK THEME CREATION ===')
       console.error('Failed to load themes, using fallback:', error)
@@ -480,6 +518,32 @@ const GridView = React.forwardRef<GridViewRef, GridViewProps>(({ className = '' 
     renderGrid()
   }, [renderGrid])
 
+  // Refresh the legend whenever the user picks a different theme.
+  // Cheap call — Rust side is a string format, <1ms typically.
+  // Failures are non-fatal (legend is a tooltip-only feature), so
+  // we log + fall back to null rather than throw.
+  useEffect(() => {
+    let cancelled = false
+    const themeId = selectedTheme?.id
+    if (!themeId) {
+      setLegend(null)
+      return
+    }
+    void getThemeLegend(themeId)
+      .then(text => {
+        if (!cancelled) setLegend(text)
+      })
+      .catch(e => {
+        if (!cancelled) {
+          console.warn('GridView: failed to fetch theme legend', e)
+          setLegend(null)
+        }
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [selectedTheme?.id])
+
   // Expose methods via ref
   React.useImperativeHandle(ref, () => ({
     exportGrid: () => {
@@ -487,6 +551,28 @@ const GridView = React.forwardRef<GridViewRef, GridViewProps>(({ className = '' 
       return gridData
         .map(row => row.map(tileType => selectedTheme.tiles[tileType]?.visual.icon || ' ').join(''))
         .join('\n')
+    },
+    /**
+     * Round-trip the grid back through Rust to validate against
+     * the theme — catches themes where the local `tiles` map
+     * drifted from the Rust `Theme` shape. Returns a stringified
+     * Rust-canonical grid; mirrors `exportGrid` but with the
+     * server-side icon table as the source of truth.
+     */
+    exportGridCanonical: async () => {
+      if (!selectedTheme) return ''
+      const { renderTilesToGrid } = await import('@/types/themes')
+      try {
+        return await renderTilesToGrid(
+          selectedTheme.id,
+          gridData.map(row =>
+            row.map(tileType => selectedTheme.tiles[tileType]?.visual.icon || ' ')
+          )
+        )
+      } catch (e) {
+        console.warn('exportGridCanonical: Rust round-trip failed', e)
+        return ''
+      }
     },
     importGrid: async (gridString: string) => {
       if (!selectedTheme) return
@@ -641,9 +727,9 @@ const GridView = React.forwardRef<GridViewRef, GridViewProps>(({ className = '' 
                     className={`w-full text-left px-2 py-1 rounded text-xs flex items-center space-x-2 ${
                       selectedTile === tileKey
                         ? 'bg-editor-accent text-white'
-                        : 'bg-editor-bg text-editor-text hover:bg-gray-600'
+                        : 'bg-editor-bg text-editor-text hover:bg-editor-hover'
                     }`}
-                    title={tile.description}
+                    title={legend ?? tile.description}
                   >
                     <span
                       className="w-4 h-4 flex items-center justify-center font-mono text-xs"

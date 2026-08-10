@@ -4,10 +4,12 @@
 // matches the TypeScript declaration (see docs/dev/typescript-counterintuitive-patterns.md §17).
 
 import { z } from 'zod'
+import type { ImportResult, ImportSettings } from './schemas'
 import {
   AssetSearchResultSchema,
   CollectionSchema,
   DatabaseStatsSchema,
+  ImportResultSchema,
   ScanResultSchema,
   parseInvoke,
 } from './schemas'
@@ -237,4 +239,64 @@ export function matchesFilter(
     }
   }
   return true
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// T97 — additional asset command wrappers
+//
+// These three commands existed on the Rust side but had no
+// front-end callers. Now they do — `AssetDatabaseService` exposes
+// them as static methods so any component that needs them can
+// reach them through the same validated boundary as the existing
+// wrappers above.
+// ─────────────────────────────────────────────────────────────────────────
+
+/**
+ * Trigger a full thumbnail-generation sweep. The Rust side iterates
+ * the asset database, enqueues jobs on the thumbnail worker queue,
+ * and returns the number of jobs submitted. Returns `0` if every
+ * asset already has a fresh thumbnail (the queue is idempotent).
+ *
+ * Use this from a "Re-generate all thumbnails" UI button or as a
+ * post-migration step after dropping the `thumbnails/` cache
+ * directory.
+ */
+export async function generateThumbnails(): Promise<number> {
+  const { invoke } = await import('@tauri-apps/api/core')
+  const raw = await invoke<number>('generate_thumbnails')
+  // The Rust side returns a `Result<usize, String>` so a failure
+  // surfaces as a rejected promise — `parseInvoke` would never
+  // run. Just return the count directly.
+  return raw
+}
+
+/**
+ * Reclaim disk space: delete thumbnail files on disk with no
+ * matching DB row, and drop DB rows whose file is missing.
+ * Returns the number of orphaned entries (files + rows combined).
+ */
+export async function cleanupThumbnails(): Promise<number> {
+  const { invoke } = await import('@tauri-apps/api/core')
+  return invoke<number>('cleanup_thumbnails')
+}
+
+/**
+ * Import a batch of asset files into the project's cache directory.
+ * Textures are compressed to WebP at `texture_quality`; non-image
+ * formats (FBX) are copied through. `sources` are absolute paths
+ * on the local filesystem; `cacheDir` defaults to the project's
+ * `.morgana/imports/` directory if omitted.
+ */
+export async function importAssets(
+  sources: string[],
+  settings: ImportSettings,
+  cacheDir?: string
+): Promise<ImportResult> {
+  const { invoke } = await import('@tauri-apps/api/core')
+  const raw = await invoke<unknown>('import_assets', {
+    sources,
+    settings,
+    cacheDir,
+  })
+  return parseInvoke(ImportResultSchema, raw, 'import_assets')
 }

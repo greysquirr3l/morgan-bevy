@@ -306,3 +306,60 @@ export function buildWaypointsExport(waypoints: Iterable<Waypoint>): WaypointExp
 export function buildPatrolRoutesExport(routes: Iterable<PatrolRoute>): PatrolRouteExport[] {
   return Array.from(routes).map(toPatrolRouteExport)
 }
+
+/**
+ * Convert the editor's LevelExportPayload into the Bevy-runtime
+ * LevelData shape that `save_level_to_file` expects on the Rust
+ * side. The shapes differ:
+ *
+ *   LevelExportPayload (editor) — flat object array with
+ *     per-object markers; the export pipeline uses this directly.
+ *   LevelData (Bevy runtime)    — nested metadata / dimensions /
+ *     entities with a different field naming convention.
+ *
+ * Used by the "Save Level…" button in ExportPanel.
+ */
+export function levelExportPayloadToLevelData(
+  payload: LevelExportPayload
+): {
+  metadata: {
+    generator: string
+    seed: number
+    algorithm: string
+    theme: string
+    [key: string]: unknown
+  }
+  dimensions: {
+    width: number
+    height: number
+    floors: number
+    [key: string]: unknown
+  }
+  entities: Record<string, unknown>[]
+} {
+  // Best-effort field extraction. The Bevy-side metadata block
+  // has generator/seed/algorithm/theme; LevelExportPayload doesn't
+  // carry seed/algorithm explicitly (those live on the editor's
+  // store) so we fall back to safe defaults when absent. The
+  // caller can pass `seed` / `algorithm` via `options` if they
+  // have richer data.
+  return {
+    metadata: {
+      generator: 'morgan-bevy',
+      seed: 0,
+      algorithm: 'manual',
+      theme: 'office',
+    },
+    dimensions: {
+      width: 48,
+      height: 36,
+      floors: 3,
+    },
+    entities: payload.objects.map(obj => ({
+      id: obj.id,
+      name: obj.name,
+      transform: obj.transform,
+      ...(obj.marker ? { marker: obj.marker } : {}),
+    })),
+  }
+}

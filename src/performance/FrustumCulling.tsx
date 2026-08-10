@@ -1,5 +1,5 @@
 import { useThree, useFrame } from '@react-three/fiber'
-import { useRef, useState, useMemo } from 'react'
+import { useEffect, useRef, useState, useMemo } from 'react'
 import { Vector3, Frustum, Matrix4, Box3, Sphere } from 'three'
 
 // Hook for frustum culling - determines if objects are visible to camera
@@ -177,4 +177,66 @@ export function usePerformanceCulling(
   })
 
   return cullState
+}
+
+/**
+ * T97 — Server-side spatial-index query hook.
+ *
+ * Asks the Rust side `query_objects_in_bounds` which objects are
+ * inside the given AABB and returns the IDs. The Rust spatial
+ * index is the authoritative source of truth (R-tree over the
+ * scene's transforms) so this is faster than walking the
+ * Zustand store on the JS side for large scenes.
+ *
+ * `bounds` is the AABB to query. Returns `null` while the query
+ * is in flight; consumers should treat null as "no data yet, use
+ * local fallback".
+ */
+import type { BoundingBox } from '@/types/schemas'
+
+export function useSpatialIndexQuery(
+  bounds: BoundingBox | null
+): readonly string[] | null {
+  const [result, setResult] = useState<readonly string[] | null>(null)
+  const lastBoundsRef = useRef<BoundingBox | null>(null)
+
+  useEffect(() => {
+    if (!bounds) {
+      setResult(null)
+      lastBoundsRef.current = null
+      return
+    }
+    // Skip the round-trip if the bounds haven't changed since the
+    // last query — common case when the camera is idle.
+    if (
+      lastBoundsRef.current &&
+      boundsArrayEquals(lastBoundsRef.current.min, bounds.min) &&
+      boundsArrayEquals(lastBoundsRef.current.max, bounds.max)
+    ) {
+      return
+    }
+    lastBoundsRef.current = bounds
+    let cancelled = false
+    void (async () => {
+      try {
+        const { queryObjectsInBounds } = await import('@/types/levelBridge')
+        const ids = await queryObjectsInBounds(bounds)
+        if (!cancelled) setResult(ids)
+      } catch (e) {
+        if (!cancelled) {
+          console.warn('useSpatialIndexQuery: Rust query failed', e)
+          setResult(null)
+        }
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [bounds?.min[0], bounds?.min[1], bounds?.min[2], bounds?.max[0], bounds?.max[1], bounds?.max[2]])
+
+  return result
+}
+
+function boundsArrayEquals(a: readonly number[], b: readonly number[]): boolean {
+  return a[0] === b[0] && a[1] === b[1] && a[2] === b[2]
 }

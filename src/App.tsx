@@ -17,6 +17,7 @@ import { CameraProvider, useCameraContext } from '@/contexts/CameraContext'
 import { useAutoSave } from '@/hooks/useAutoSave'
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts'
 import { useResizablePanels } from '@/hooks/useResizablePanels'
+import { useRustTransformSync } from '@/hooks/useRustTransformSync'
 import { useStartupFile } from '@/hooks/useStartupFile'
 import { useEditorStore, useSceneObjects } from '@/store/editorStore'
 import {
@@ -476,6 +477,11 @@ function AppContent() {
   // Mounted alongside `useAutoSave`; both are zero-state side-effect
   // hooks at the root of the editor.
   useStartupFile()
+
+  // T97: debounced Rust-side transform sync. Mirrors every drag-end
+  // `updateObjectTransform` store update to the Rust spatial index
+  // so culling/LOD stays accurate on the Bevy-runtime side.
+  useRustTransformSync()
 
   // Initialize resizable panels
   const { panels, handleMouseDown, toggleLeftPanel, toggleRightPanel, getCenterWidth } =

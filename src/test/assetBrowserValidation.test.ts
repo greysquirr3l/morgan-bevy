@@ -20,10 +20,7 @@ import React from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 class StubResizeObserver {
-  private cb: ResizeObserverCallback
-  constructor(cb: ResizeObserverCallback) {
-    this.cb = cb
-  }
+  constructor(_cb: ResizeObserverCallback) {}
   observe() {}
   unobserve() {}
   disconnect() {}

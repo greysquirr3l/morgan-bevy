@@ -1,5 +1,6 @@
 import { useEditorStore } from '@/store/editorStore'
-import { buildLevelExportPayload } from '@/utils/exportPayload'
+import { loadLevelFromFile, saveLevelToFile } from '@/types/levelBridge'
+import { buildLevelExportPayload, levelExportPayloadToLevelData } from '@/utils/exportPayload'
 import { invoke } from '@tauri-apps/api/core'
 import { open } from '@tauri-apps/plugin-dialog'
 import { Box, Code, Download, FileText, FolderOpen } from 'lucide-react'
@@ -98,6 +99,68 @@ export default function ExportPanel() {
       }
     } catch (error) {
       console.error('Failed to select output path:', error)
+    }
+  }
+
+  /**
+   * Save the current level (the Bevy-shaped payload, not the
+   * editor's project file) to a specific path on disk. Distinct
+   * from `handleExport` (which runs the full export pipeline and
+   * writes JSON / RON / Rust / glTF / FBX in parallel): this
+   * writes a single `.morgan-level` file that can be loaded
+   * back via `loadLevelFromFile`. Useful for version-control
+   * snapshots of generated levels before they're exported into
+   * the engine runtime.
+   *
+   * Note: LevelData and LevelExportPayload have different shapes
+   * — LevelData is the Bevy-runtime shape (metadata/dimensions/
+   * entities) and LevelExportPayload is the editor's
+   * serialization. We map between the two here.
+   */
+  const handleSaveLevel = async () => {
+    try {
+      const exported = buildLevelExportPayload(sceneObjects.values(), {
+        waypoints,
+        patrolRoutes,
+      })
+      const levelData = levelExportPayloadToLevelData(exported)
+      const path = window.prompt(
+        'Save level to (full path, including filename):',
+        'untitled.morgan-level'
+      )
+      if (!path || !path.trim()) return
+      await saveLevelToFile(levelData, path.trim())
+      alert(`Level saved to ${path.trim()}`)
+    } catch (error) {
+      console.error('Save level failed:', error)
+      alert(`Save level failed: ${error}`)
+    }
+  }
+
+  /**
+   * Load a `.morgan-level` file from disk. The Rust side
+   * round-trips through the spatial index (so culling / LOD stay
+   * accurate) and returns the parsed LevelData which we surface
+   * as a summary; the editor's scene objects come from
+   * `load_project_from_path` in FileMenu.
+   */
+  const handleLoadLevel = async () => {
+    try {
+      const selected = await open({
+        multiple: false,
+        title: 'Open Level',
+        filters: [{ name: 'Level', extensions: ['morgan-level', 'json'] }],
+      })
+      if (!selected || typeof selected !== 'string') return
+      const loaded = await loadLevelFromFile(selected)
+      const objs = Array.isArray(loaded.entities) ? loaded.entities : []
+      console.log(
+        `Loaded level with ${objs.length} entities from ${selected} (theme=${loaded.metadata.theme})`
+      )
+      alert(`Level loaded with ${objs.length} entities. Apply via File > Open Project.`)
+    } catch (error) {
+      console.error('Load level failed:', error)
+      alert(`Load level failed: ${error}`)
     }
   }
 
@@ -257,6 +320,25 @@ export default function ExportPanel() {
           </>
         )}
       </button>
+
+      {/* Level-file round-trip (save/load `.morgan-level`) */}
+      <div className="flex gap-2 mt-2">
+        <button
+          onClick={handleSaveLevel}
+          disabled={isExporting || sceneObjects.size === 0}
+          className="flex-1 px-3 py-1 text-xs bg-editor-bg hover:bg-editor-hover border border-editor-border rounded text-editor-text disabled:opacity-50 disabled:cursor-not-allowed"
+          title="Save the current level as a single .morgan-level file"
+        >
+          Save Level…
+        </button>
+        <button
+          onClick={handleLoadLevel}
+          className="flex-1 px-3 py-1 text-xs bg-editor-bg hover:bg-editor-hover border border-editor-border rounded text-editor-text"
+          title="Load a .morgan-level file from disk"
+        >
+          Load Level…
+        </button>
+      </div>
 
       {/* Export Results */}
       {lastExportResult && (

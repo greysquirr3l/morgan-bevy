@@ -1,6 +1,6 @@
 import { DatabaseStatsSchema, ScanResultSchema } from '@/types/schemas'
-import { invoke } from '@tauri-apps/api/core'
 import { isTauriRuntime } from '@/utils/tauriEnv'
+import { invoke } from '@tauri-apps/api/core'
 import {
   BarChart3,
   Box,
@@ -171,7 +171,9 @@ export default function AssetBrowser({ hideHeader = false }: AssetBrowserProps) 
       // `Cannot read properties of undefined (reading 'invoke')`.
       // Surface a friendly "feature unavailable" message instead.
       if (!isTauriRuntime()) {
-        setError('Asset browser requires the Tauri runtime. Run `npm run tauri:dev` to use this feature.')
+        setError(
+          'Asset browser requires the Tauri runtime. Run `npm run tauri:dev` to use this feature.'
+        )
         setIsLoading(false)
         return
       }
@@ -281,7 +283,9 @@ export default function AssetBrowser({ hideHeader = false }: AssetBrowserProps) 
   const scanAssets = async (signal?: AbortSignal) => {
     try {
       if (!isTauriRuntime()) {
-        setError('Asset browser requires the Tauri runtime. Run `npm run tauri:dev` to use this feature.')
+        setError(
+          'Asset browser requires the Tauri runtime. Run `npm run tauri:dev` to use this feature.'
+        )
         return
       }
       setIsScanning(true)
@@ -320,6 +324,75 @@ export default function AssetBrowser({ hideHeader = false }: AssetBrowserProps) 
         setIsScanning(false)
         setScanProgress(null)
       }
+    }
+  }
+
+  // Force-rebuild every thumbnail from the original source files.
+  // Used after a theme migration or when the user has dropped the
+  // .morgana/thumbnails/ cache and wants to repopulate it. The
+  // Rust side enqueues one job per asset on the thumbnail worker
+  // and returns immediately with the job count; the UI doesn't
+  // wait for the worker to drain.
+  const regenerateThumbnails = async () => {
+    if (!isTauriRuntime()) {
+      setError('Regenerating thumbnails requires the Tauri runtime.')
+      return
+    }
+    try {
+      setIsScanning(true)
+      setError(null)
+      const { generateThumbnails, cleanupThumbnails } = await import('@/types/assetDatabase')
+      const cleaned = await cleanupThumbnails()
+      const submitted = await generateThumbnails()
+      console.log(`Thumbnails: cleaned ${cleaned} orphans, enqueued ${submitted} jobs`)
+    } catch (error) {
+      console.error('Failed to regenerate thumbnails:', error)
+      setError(error instanceof Error ? error.message : 'Failed to regenerate thumbnails')
+    } finally {
+      setIsScanning(false)
+    }
+  }
+
+  // Import specific asset files (PNG, JPEG, FBX) into the project
+  // cache. Calls the Rust `import_assets` command which runs the
+  // transform pipeline (texture compression + magic-byte checks)
+  // and returns a structured result the UI can summarise.
+  const importAssetsFromClipboard = async () => {
+    if (!isTauriRuntime()) {
+      setError('Importing assets requires the Tauri runtime.')
+      return
+    }
+    try {
+      setError(null)
+      const raw = window.prompt('Enter absolute paths to import, one per line:', '')
+      if (!raw || !raw.trim()) return
+      const sources = raw
+        .split('\n')
+        .map(line => line.trim())
+        .filter(line => line.length > 0)
+      if (sources.length === 0) return
+
+      setIsScanning(true)
+      const { importAssets } = await import('@/types/assetDatabase')
+      const result = await importAssets(sources, {
+        texture_max_size: 1024,
+        texture_quality: 80,
+        skip_invalid: false,
+      })
+      const failures = result.entries.filter(e => e.error).length
+      console.log(
+        `Imported ${result.entries.length} entries (${result.transformed} transformed, ${failures} failed)`
+      )
+      if (failures > 0) {
+        setError(`${failures} file(s) failed to import. See console for details.`)
+      }
+      // Refresh the asset list so newly-imported files show up.
+      await loadAssets()
+    } catch (error) {
+      console.error('Asset import failed:', error)
+      setError(error instanceof Error ? error.message : 'Asset import failed')
+    } finally {
+      setIsScanning(false)
     }
   }
 
@@ -464,6 +537,14 @@ export default function AssetBrowser({ hideHeader = false }: AssetBrowserProps) 
                 title="Rescan Assets"
               >
                 <RefreshCw className={`w-4 h-4 ${isScanning ? 'animate-spin' : ''}`} />
+              </button>
+              <button
+                onClick={() => regenerateThumbnails()}
+                disabled={isScanning}
+                className="p-2 bg-editor-bg hover:bg-editor-hover disabled:opacity-50 disabled:cursor-not-allowed rounded text-editor-textMuted"
+                title="Re-generate every thumbnail (force-rebuild)"
+              >
+                <RefreshCw className="w-4 h-4" />
               </button>
             </div>
           </div>
@@ -626,6 +707,13 @@ export default function AssetBrowser({ hideHeader = false }: AssetBrowserProps) 
               className="px-4 py-2 bg-editor-accent hover:bg-blue-600 rounded text-white"
             >
               Scan Assets
+            </button>
+            <button
+              onClick={() => importAssetsFromClipboard()}
+              className="px-4 py-2 bg-editor-bg hover:bg-editor-hover border border-editor-border rounded text-editor-text mt-2"
+              title="Import specific files (PNG, JPEG, FBX) into the project cache"
+            >
+              Import Files…
             </button>
           </div>
         ) : (

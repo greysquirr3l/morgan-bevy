@@ -98,9 +98,7 @@ function findFrontendInvokes(): string[] {
   // lazy `[^()]*?` couldn't satisfy the `s` lookahead until it had
   // consumed the entire `string` token, which then didn't match
   // the `save_project` string literal.
-  const matches = [
-    ...body.matchAll(/invoke(?:\s*<[^>]+>)?\s*\(\s*['"`]([a-z_][a-z0-9_]*)['"`]/g),
-  ]
+  const matches = [...body.matchAll(/invoke(?:\s*<[^>]+>)?\s*\(\s*['"`]([a-z_][a-z0-9_]*)['"`]/g)]
   return uniq(matches.map(m => m[1]!))
 }
 
