@@ -250,66 +250,54 @@
 > Describe what now exists, what is wired up, and what key decisions were made.
 > A fresh agent should be able to orient from this section alone.
 
-### Baseline (2026-08-06 audit)
+### Current snapshot (2026-08-10)
 
-**Implemented across Phases 1–7 (38 tasks marked `[x]`):**
+96 of the 97 catalogued tasks are `[x]` (Phases 1–9 + 11 + 12 fully done; Phase 10 fully done except T72). The single outstanding row is **T72 — Distribution packaging** (`[ ]`), deliberately rolled back per user request on 2026-08-08 — the three formulas (`packaging/homebrew/`, `packaging/aur/`, `packaging/scoop/`) and `docs/developer/distribution.md` are present on disk and git-ignored, retained as a maintainer reference but not tracked.
 
-- Full Tauri + React + Three.js desktop app: scaffold, R3F viewport, orbit/fly/orthographic cameras, raycast selection, TransformControls gizmos (W/E/R), grid snapping, hierarchy panel with visibility/lock, assets panel with drag-drop.
-- Selection and manipulation: box selection with frustum culling, command-pattern undo/redo (Ctrl+Z/Y), copy/paste/duplicate, axis-locking X/Y/Z, group/ungroup (Ctrl+G).
-- Scene management: Inspector with mixed-value handling and undoable transforms, layer system with visibility/lock/color.
-- Procedural generation: BSP (`src-tauri/src/generation/bsp.rs`) and WFC (`wfc.rs`) with `thiserror`-compatible errors; 4 themes (Office/Dungeon/Castle/SciFi) at `themes.rs`; generation panel + seed management; 2D grid view with bidirectional 2D↔3D sync; tile-to-3D conversion.
-- Asset database: SQLite at `assets/database.rs` with `assets`/`asset_metadata`/`collections`/`asset_tags`/`thumbnails` tables + FTS-style search; multi-threaded scanner at `scanner.rs` with `asset_scan_progress` events; DB-driven asset browser.
-- Export system: trait-based multi-format pipeline with manifest; JSON, RON, Rust code, GLTF, FBX exporters; export panel UI with 5 format checkboxes.
-- Performance: performance manager (adaptive quality), LOD (5 distance tiers), frustum culling, instanced rendering, optimized-scene composer, performance test panel.
+### What's wired end-to-end
 
-**Partial (20 tasks marked `[~]`):**
+- **Editor app** — Tauri 2.x + React 18 + Three.js (R3F), `Map<ObjectId, SceneObject>` store with branded IDs (`src/types/brand.ts`), per-frame data in refs (never Zustand), narrow selectors via `useShallow`. Viewport has `setClearColor('#1e2536')` + fog (T92 fix).
+- **Generation** — BSP + WFC + 4 themes, deterministic, time-injected; tile-to-3D + 2D grid view bidirectional sync.
+- **Asset database** — SQLite with `assets` / `asset_metadata` / `collections` / `asset_tags` / `thumbnails` tables, `is_favorite` + `thumbnail_size` + `source_mtime` columns added via idempotent `ALTER TABLE` migrations, smart-folder evaluator, thumbnail queue with WebP encode, import pipeline with magic-byte validation + re-encoded cache.
+- **Export** — Five formats (JSON / RON / Rust source / GLTF / FBX), the Rust-source path emits Bevy 0.19 `Mesh3d + MeshMaterial3d + Transform + Name` components + `MorganLevelSystems` companion plugin + collision/spawn/trigger markers; collision shapes threaded through the Rust exporter (GLTF/FBX are transform-only — vendor extensions deferred). Companion crate at `crates/bevy-morgan-integration/` (`bevy_app` + `bevy_ecs` + `bevy_transform` only — consumers pin their own Bevy version).
+- **Advanced tools (Phase 8)** — object snap points, surface snap math, measurement tool, paint tool with UV editor, lighting rig + theme presets, navmesh (rectangle partitioning, O(surfaces+obstacles)), A\* patrol waypoints.
+- **Polish (Phase 9)** — tutorial state machine + spotlight overlay, in-app help modal, user-rebindable shortcuts with conflict detection, four hand-authored example levels, seven starter prefabs, full user + developer docs under `docs/user/` and `docs/developer/`.
+- **Distribution (Phase 10)** — `.github/workflows/ci.yml` (3-OS matrix, strict clippy + cargo-deny with fresh-advisory fetch), `deny.toml` + `scripts/cargo-deny.sh` (17 documented unmaintained-advisory ignores are all transitive tauri v2.11.5 — re-verify on bump), `auto-tag.yml` + `release.yml` (workflow_run chain so tag-from-`GITHUB_TOKEN` fires downstream), `tauri-plugin-updater` wired with channel switching, opt-in local-only analytics with GDPR endpoints, rolling crash.log at `{app_data_dir}/logs/`, `.morgan`/`.morgan-project` file associations + startup-CLI path.
+- **TS idioms (Phase 11)** — zod schemas at every Tauri IPC boundary, branded IDs throughout, `Map` store, per-frame in refs, `Promise.allSettled` for parallel work, discriminated `*Action` unions with `assertNeverAction` exhaustiveness, `??` not `||`, `Number.isNaN`, no `useEffect`-for-derived-state.
+- **Bevy 0.19+ (Phase 12)** — companion crate emits 0.19 components, generated source compiles against 0.19, ten runtime markers (light/animation/audio/vfx — wire-format examples in `docs/user/markers.md`), security audit (`docs/AUDIT_T87-security-hardening.md`) and wiring audit (`src/test/wiringAudit.test.ts` — 4 cases, catches dead-surface exports on every commit) both green.
 
-- T18/T19/T20 — Material editor (no materials registry yet), PrefabManager functional, auto-save loop wired (T20 partial). T21 file menu is `[x]` — recent-projects list + load-project wired.
-- T32 — Tags/collections schema exists; no API surface for tag editing
-- T39 — ✅ done as of commit afa7de8
-- T41 — ✅ done in this session (commit pending)
-- T42 — Collision data exists; no `export_collision` tauri command
-- T48 — Selection outline via material swap, not shader-based
-- T55 — Scene lights wired, but no placement tool / Light objects in store
-- T59 — Keyboard-shortcuts modal only, no in-app help / tooltips beyond `title=`
-- T69/T70 — `log::info!` + sparse tests, no panic handler / CI enforcement
-- T73/T74 — Icons + README scaffold, no file associations / demo video
-- T76/T82/T83 — `as const` in 1 site / 4 switch blocks but no typed Action union / `??` used at 5 sites but no `structuredClone`
-- T84/T85/T89 — Migration doc present but no `Mesh3d`/`MeshMaterial3d` port / no automated release tracker / TODO + `unwrap()` remain
+### Architecture decisions worth re-reading before touching code
 
-**Missing (30 tasks marked `[ ]`):**
+- **Store vs. ref vs. memo** — Zustand for durable state, refs for per-frame derived values (camera, mouse, hover), `useMemo` only when recomputation is expensive. Mutation must go through `immer.produce` (T79 — undo snapshots rely on structural sharing).
+- **Boundaries** — Tauri `invoke` returns are untrusted; every response is parsed with a zod schema before use. IDs are minted at the construction site (not `parse*Id`) so user-supplied names with spaces don't blow up. `missingAssetRefs: AssetId[]` is the one branded-without-`ID_PATTERN` field — underlying values are texture paths.
+- **Rust side** — edition 2024, stable toolchain (no pin), `thiserror` in libraries + `anyhow` at binary boundaries, generation algorithms are pure (no I/O, no `Instant::now()` inside domain logic), `LazyLock` not `lazy_static!`. `src-tauri` is excluded from the workspace so the companion crate has its own dep graph.
+- **Generation modules** — `bsp.rs`, `wfc.rs`, `navmesh.rs` are pure + deterministic + unit-tested; the Tauri command is the only I/O seam.
 
-- T33/T34/T35 — No thumbnail generator, asset relationships, import wizard
-- T51–T57 — Snap points, surface snapping, measurement, paint, light placement, navmesh, AI waypoints
-- T58/T60–T64 — Tutorial, shortcut rebinding, examples, prefab templates, user/developer docs
-- T65 — ✅ done as of next commit
-- T65–T68/T71/T72/T75 — Zero CI infrastructure (no `.github/workflows/`, no `deny.toml`, no release pipeline, no updater, no analytics, no distribution channels, no community channels)
-- T77–T81 — TS idioms migration (branded IDs, `Map` store, `immer` snapshots, refs for per-frame, `AbortController`)
-
-**Critical gaps to address first:**
-
-1. T41 (real FBX) and T39 (Bevy 0.19 PbrBundle port)
-2. CI pipeline + cargo-deny (T65, T66)
-3. Phases 8–9 advanced editor tools (T51–T57) and polish
-4. TypeScript idioms migration (T76–T83)
-5. Documentation (T63, T64, T87, T88)
-
-### Key file locations (snapshot)
+### Key file locations (current)
 
 | Concern | File |
 | --- | --- |
-| Zustand store | `src/store/editorStore.ts:62` (Record<string, ...> needs migration to Map) |
-| Command pattern | `src/utils/commands.ts:130` (uses immer-style reducers but no structural sharing in snapshots) |
-| Camera system | `src/components/Viewport3D/CameraSystem.tsx` |
-| BSP algorithm | `src-tauri/src/generation/bsp.rs` |
-| WFC algorithm | `src-tauri/src/generation/wfc.rs` |
-| Themes | `src-tauri/src/generation/themes.rs` (4 themes, 1500+ lines) |
-| SQLite DB | `src-tauri/src/assets/database.rs` |
-| Scanner | `src-tauri/src/assets/scanner.rs` |
-| Exporters | `src-tauri/src/export/exporters.rs:153` (GLTF), `:164` (FBX placeholder), `:198` (Rust code, PbrBundle) |
-| Performance | `src/performance/{PerformanceManager,LevelOfDetail,FrustumCulling,InstancedRendering,SelectionOptimization}.tsx` |
-| TODO/FIXME markers | `src/components/FileMenu/FileMenu.tsx:156` (project load), `src-tauri/src/export/exporters.rs:165` (FBX placeholder), `src-tauri/src/assets/assets.rs:90` (`scanner.lock().unwrap()`) |
-| Forbidden clippy | `editorStore.ts:62`, `assets.rs:90` still use forbidden patterns per AGENTS.md |
+| Zustand store | `src/store/editorStore.ts` — `Map<ObjectId, SceneObject>` with branded-id fields, immer-producer actions, `serializeMap` round-trip (T78) |
+| Command pattern | `src/utils/commands.ts` — per-command `previousState` for undo, immer `produce` for structural sharing (T79); `menuActions.ts` defines the discriminated `*Action` unions (T82) |
+| Branded IDs | `src/types/brand.ts` — `parseObjectId` / `parseAssetId` / `parseLayerId` / `parseMaterialId` / `parsePrefabId` / `parseThemeId` / `parseSeed`, plus `mapToRecord` / `recordToMap` generic over the key type |
+| Camera system | `src/components/Viewport3D/CameraSystem.tsx` (mouse-movement in a ref, not state — T80) |
+| Viewport + overlays | `src/components/Viewport3D/Viewport3D.tsx` — `<Canvas>` with `setClearColor` + fog (T92); sibling overlays: `PaintToolViewport`, `NavMeshOverlay`, `WaypointViewport` |
+| BSP / WFC | `src-tauri/src/generation/{bsp,wfc,themes}.rs` |
+| Navmesh | `src-tauri/src/spatial/navmesh.rs` — rectangle partitioning, doorway `NavConnection`s |
+| SQLite DB | `src-tauri/src/assets/database.rs` — schema migrations via `column_exists` + `ALTER TABLE` |
+| Thumbnail pipeline | `src-tauri/src/assets/thumbnail/{texture,audio,placeholder,dispatch,queue,cleanup}.rs` |
+| Import pipeline | `src-tauri/src/assets/import.rs` + `src/types/import.ts` (`ImportSettings` round-trip through `ProjectData.metadata.importSettings`) |
+| Exporters | `src-tauri/src/export/exporters.rs` — JSON / RON / Rust-source / GLTF; Rust-source emits Bevy 0.19 shape with optional `MorganLevelSystems` plugin; collision/spawn/trigger markers threaded through |
+| Real FBX | `src-tauri/src/export/binary_fbx.rs` — hand-rolled binary FBX 7.7.0 (header + global settings + objects/connections + footer) |
+| Marker types | `src/types/markers.ts` (`as const` literal tables + zod `.strict()` discriminated unions) + `src/components/Inspector/{Light,Animation,Audio,Vfx}MarkerPanel.tsx` |
+| Companion crate | `crates/bevy-morgan-integration/` — `MorganLevelPlugin`, ten marker components, `MorganLevelSystems` plugin + five observer systems |
+| Workflows | `.github/workflows/{ci,auto-tag,release}.yml` — `workflow_run` chain (T67), `resolve-tag` job derives the tag from `head_sha` |
+| Cargo deny | `deny.toml` + `scripts/cargo-deny.sh` (always fetch fresh advisories) |
+| Crash log | `src-tauri/src/crash_log.rs` + `src/utils/crashHandler.ts` (panic hook + rolling 256 KiB log at `{app_data_dir}/logs/`) |
+| Updater | `src/utils/updater.ts` + `src/components/Update/UpdateNotification.tsx` |
+| Shortcuts | `src/shortcuts/defaults.ts` (canonical binding table) + `src/utils/shortcutStore.ts` (override layer) + `src/utils/shortcutConflicts.ts` |
+| Tutorial | `src/state/tutorial.ts` (pure state machine) + `src/components/Tutorial/{TutorialOverlay,useTutorialStepValidation,useFocusTrap}.ts(x)` |
+| Audits | `src/test/securityAudit.test.ts` (T87) + `src/test/wiringAudit.test.ts` (T88) — both run on every commit via CI |
 
 ### Reference docs (in repo, do not duplicate)
 
