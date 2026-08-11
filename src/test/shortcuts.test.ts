@@ -136,7 +136,7 @@ describe('T60 shortcut store', () => {
       JSON.stringify({
         overrides: {
           'transform.translate': { action: 'transform.translate', key: 'q', modifiers: [] },
-          'broken': 'not an object',
+          broken: 'not an object',
           'also-broken': { action: 'x' }, // missing `key`
           'transform.rotate': null,
         },
@@ -157,7 +157,7 @@ describe('T60 shortcut store', () => {
 
 describe('T60 conflict detection', () => {
   it('flags a key combo shared by two bindings', () => {
-    const bindings: typeof DEFAULT_SHORTCUTS[number][] = [
+    const bindings: (typeof DEFAULT_SHORTCUTS)[number][] = [
       ...DEFAULT_SHORTCUTS,
       {
         action: 'duplicate.test',
@@ -191,7 +191,11 @@ describe('T60 conflict detection', () => {
   it('conflictsForCandidate excludes the candidate action itself', () => {
     const bindings = [...DEFAULT_SHORTCUTS]
     const conflicts = conflictsForCandidate(
-      { action: 'transform.translate', key: 'z', modifiers: [] as Array<'ctrl' | 'shift' | 'alt' | 'meta'> },
+      {
+        action: 'transform.translate',
+        key: 'z',
+        modifiers: [] as Array<'ctrl' | 'shift' | 'alt' | 'meta'>,
+      },
       bindings
     )
     // Default `constraint.z` is on bare `z`, so this collides.
@@ -201,8 +205,18 @@ describe('T60 conflict detection', () => {
   })
 
   it('conflictsForCandidate returns empty for a free combo', () => {
+    // `h` is a key that is not bound by any entry in
+    // `DEFAULT_SHORTCUTS` — the table intentionally leaves a
+    // handful of single letters free for future shortcuts and
+    // for user rebinding of existing ones without a built-in
+    // collision. Earlier versions of this test probed `q`
+    // (transform.select was added in T100).
     const conflicts = conflictsForCandidate(
-      { action: 'unused.action', key: 'q', modifiers: [] as Array<'ctrl' | 'shift' | 'alt' | 'meta'> },
+      {
+        action: 'unused.action',
+        key: 'h',
+        modifiers: [] as Array<'ctrl' | 'shift' | 'alt' | 'meta'>,
+      },
       DEFAULT_SHORTCUTS
     )
     expect(conflicts).toEqual([])

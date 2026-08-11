@@ -286,6 +286,11 @@ const GridView = React.forwardRef<GridViewRef, GridViewProps>(({ className = '' 
 
   // Mouse event handlers
   const handleMouseDown = (event: React.MouseEvent<HTMLCanvasElement>) => {
+    // Only respond to primary (left) mouse button. Middle / right
+    // click must NOT start a paint stroke — they should fall
+    // through to the browser's context menu / pan handlers.
+    if (event.button !== 0) return
+
     const canvas = canvasRef.current
     if (!canvas) return
 
@@ -316,7 +321,24 @@ const GridView = React.forwardRef<GridViewRef, GridViewProps>(({ className = '' 
     }
   }
 
-  const handleMouseMove = (event: React.MouseEvent<HTMLCanvasElement>) => {
+  // Stable refs pointing at the latest mouse handlers. Used by
+  // the cross-canvas drag effect below so the effect's deps
+  // don't have to include every state value the handlers read —
+  // the handlers read state via the closures set on every render,
+  // the refs always point at the latest closure, and the effect
+  // itself only needs to re-run when `dragStart` flips. Wrapping
+  // each handler in its own `useCallback` would either produce
+  // stale closures (omit deps) or re-create the callback on
+  // every render (include every dep), neither of which solves
+  // the real problem.
+  const handleMouseMoveRef = useRef<(event: { nativeEvent: MouseEvent }) => void>(null!)
+  const handleMouseUpRef = useRef<(event?: { nativeEvent: MouseEvent; button: number }) => void>(
+    null!
+  )
+
+  const handleMouseMove = (
+    event: React.MouseEvent<HTMLCanvasElement> | { nativeEvent: MouseEvent }
+  ) => {
     const canvas = canvasRef.current
     if (!canvas || !dragStart) return
 
@@ -339,16 +361,77 @@ const GridView = React.forwardRef<GridViewRef, GridViewProps>(({ className = '' 
     }
   }
 
-  const handleMouseUp = () => {
+  const handleMouseUp = (
+    event?: React.MouseEvent<HTMLCanvasElement> | { nativeEvent: MouseEvent; button: number }
+  ) => {
+    // Only the primary button ends a drag; if the user releases
+    // the middle / right button mid-drag, the left-button drag
+    // is still in progress.
+    if (event && event.button !== 0) return
     setIsDrawing(false)
     setDragStart(null)
     setDragMode(null)
     setLastPaintedPos(null) // Reset to prevent interference with next paint operation
   }
 
+  handleMouseMoveRef.current = handleMouseMove
+  handleMouseUpRef.current = handleMouseUp
+
+  // Cross-canvas drag tracking. While a paint / select drag is
+  // in progress, listen to mousemove / mouseup on the document
+  // instead of the canvas — otherwise the drag terminates the
+  // moment the cursor leaves the canvas bounds (e.g. the user
+  // is painting a long row and overshoots the right edge).
+  // The listener is only attached when `dragStart` is non-null,
+  // so there's no cost during idle. The handlers run through
+  // the refs above so we never see a stale closure, regardless
+  // of which `handleMouseMove` / `handleMouseUp` invocation
+  // last wrote the current state.
+  useEffect(() => {
+    if (!dragStart) return
+
+    const handleDocumentMouseMove = (event: MouseEvent) => {
+      handleMouseMoveRef.current({ nativeEvent: event })
+    }
+
+    const handleDocumentMouseUp = (event: MouseEvent) => {
+      handleMouseUpRef.current({ nativeEvent: event, button: event.button })
+    }
+
+    document.addEventListener('mousemove', handleDocumentMouseMove)
+    document.addEventListener('mouseup', handleDocumentMouseUp)
+    return () => {
+      document.removeEventListener('mousemove', handleDocumentMouseMove)
+      document.removeEventListener('mouseup', handleDocumentMouseUp)
+    }
+  }, [dragStart])
+
   // Keyboard handlers for copy/paste
   const handleKeyDown = useCallback(
     (event: KeyboardEvent) => {
+      // Only handle grid-view keyboard shortcuts when the 2D view
+      // is actually active. Without this guard, the listener stays
+      // attached for the whole session and would race with the
+      // global `useKeyboardShortcuts` for Ctrl+C / Ctrl+V / Delete,
+      // which target the 3D scene graph — a no-op in 2D but also
+      // a confusing "delete didn't work in the grid" UX when the
+      // grid is hidden behind the 3D canvas.
+      if (useEditorStore.getState().viewportMode !== '2d') return
+
+      // Don't intercept when the user is typing in an input
+      // field (theme selector, grid-size number, etc.). The
+      // global hook also early-returns on this, but the local
+      // guard avoids racey double-handling in inputs that bubble
+      // keydowns before the global hook sees them.
+      const target = event.target
+      if (
+        target instanceof HTMLInputElement ||
+        target instanceof HTMLTextAreaElement ||
+        (target instanceof HTMLElement && target.isContentEditable)
+      ) {
+        return
+      }
+
       if (!selection) return
 
       if (event.ctrlKey || event.metaKey) {
@@ -755,7 +838,6 @@ const GridView = React.forwardRef<GridViewRef, GridViewProps>(({ className = '' 
             onMouseDown={handleMouseDown}
             onMouseMove={handleMouseMove}
             onMouseUp={handleMouseUp}
-            onMouseLeave={handleMouseUp}
             className="border border-editor-border cursor-crosshair"
             style={{ imageRendering: 'pixelated' }}
           />

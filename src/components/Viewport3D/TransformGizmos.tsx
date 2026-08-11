@@ -1,9 +1,9 @@
-import { useRef, useEffect } from 'react'
-import { TransformControls } from '@react-three/drei'
-import { useThree } from '@react-three/fiber'
 import { useEditorStore } from '@/store/editorStore'
 import type { ObjectId } from '@/types/brand'
 import { TransformCommand } from '@/utils/commands'
+import { TransformControls } from '@react-three/drei'
+import { useThree } from '@react-three/fiber'
+import { useEffect, useRef } from 'react'
 import * as THREE from 'three'
 
 interface TransformGizmosProps {
@@ -16,8 +16,9 @@ export default function TransformGizmos({ selectedObjects }: TransformGizmosProp
     snapToGrid,
     gridSize,
     sceneObjects,
+    coordinateSpace,
     updateObjectTransform,
-    executeCommand
+    executeCommand,
   } = useEditorStore()
   const { scene, camera } = useThree()
   const transformRef = useRef<any>(null)
@@ -36,13 +37,13 @@ export default function TransformGizmos({ selectedObjects }: TransformGizmosProp
       // Single object: find the mesh in the scene
       const objectId = selectedObjects[0]
       let targetMesh: THREE.Mesh | null = null
-      
-      scene.traverse((child) => {
+
+      scene.traverse(child => {
         if (child.userData?.objectId === objectId) {
           targetMesh = child as THREE.Mesh
         }
       })
-      
+
       if (targetMesh) {
         transformRef.current.attach(targetMesh)
       }
@@ -50,7 +51,7 @@ export default function TransformGizmos({ selectedObjects }: TransformGizmosProp
       // Multiple objects: use a group positioned at the center
       const center = new THREE.Vector3()
       let validObjects = 0
-      
+
       selectedObjects.forEach(objectId => {
         const obj = sceneObjects.get(objectId)
         if (obj) {
@@ -58,13 +59,13 @@ export default function TransformGizmos({ selectedObjects }: TransformGizmosProp
           validObjects++
         }
       })
-      
+
       if (validObjects > 0) {
         center.divideScalar(validObjects)
         groupRef.current.position.copy(center)
         groupRef.current.rotation.set(0, 0, 0)
         groupRef.current.scale.set(1, 1, 1)
-        
+
         if (!groupRef.current.parent) {
           scene.add(groupRef.current)
         }
@@ -122,25 +123,25 @@ export default function TransformGizmos({ selectedObjects }: TransformGizmosProp
       // Single object: get transform from the mesh
       const objectId = selectedObjects[0]
       let targetMesh: THREE.Mesh | undefined = undefined
-      
+
       scene.traverse((child: THREE.Object3D) => {
         if (child.userData?.objectId === objectId && child instanceof THREE.Mesh) {
           targetMesh = child
         }
       })
-      
+
       if (targetMesh) {
         const mesh = targetMesh as THREE.Mesh
         updateObjectTransform(objectId, {
           position: [mesh.position.x, mesh.position.y, mesh.position.z],
           rotation: [mesh.rotation.x, mesh.rotation.y, mesh.rotation.z],
-          scale: [mesh.scale.x, mesh.scale.y, mesh.scale.z]
+          scale: [mesh.scale.x, mesh.scale.y, mesh.scale.z],
         })
       }
     } else if (selectedObjects.length > 1 && groupRef.current) {
       // Multiple objects: apply group transform relative to initial positions
       const groupTransform = groupRef.current
-      
+
       // Calculate the original center position
       const originalCenter = new THREE.Vector3()
       selectedObjects.forEach(objectId => {
@@ -150,7 +151,7 @@ export default function TransformGizmos({ selectedObjects }: TransformGizmosProp
         }
       })
       originalCenter.divideScalar(selectedObjects.length)
-      
+
       // Update each object based on group transform
       selectedObjects.forEach(objectId => {
         const initial = initialTransforms.current[objectId]
@@ -159,19 +160,23 @@ export default function TransformGizmos({ selectedObjects }: TransformGizmosProp
             // Calculate offset from original center
             const offset = new THREE.Vector3(...initial.position).sub(originalCenter)
             const newPosition = groupTransform.position.clone().add(offset)
-            
+
             updateObjectTransform(objectId, {
-              position: [newPosition.x, newPosition.y, newPosition.z]
+              position: [newPosition.x, newPosition.y, newPosition.z],
             })
           } else if (transformMode === 'rotate') {
             updateObjectTransform(objectId, {
-              rotation: [groupTransform.rotation.x, groupTransform.rotation.y, groupTransform.rotation.z]
+              rotation: [
+                groupTransform.rotation.x,
+                groupTransform.rotation.y,
+                groupTransform.rotation.z,
+              ],
             })
           } else if (transformMode === 'scale') {
             const newScale: [number, number, number] = [
               initial.scale[0] * groupTransform.scale.x,
               initial.scale[1] * groupTransform.scale.y,
-              initial.scale[2] * groupTransform.scale.z
+              initial.scale[2] * groupTransform.scale.z,
             ]
             updateObjectTransform(objectId, { scale: newScale })
           }
@@ -185,32 +190,36 @@ export default function TransformGizmos({ selectedObjects }: TransformGizmosProp
     selectedObjects.forEach(objectId => {
       const obj = sceneObjects.get(objectId)
       const initial = initialTransforms.current[objectId]
-      
+
       if (obj && initial) {
         // Check if transform actually changed
-        const positionChanged = !obj.position.every((val, i) => Math.abs(val - initial.position[i]) < 0.001)
-        const rotationChanged = !obj.rotation.every((val, i) => Math.abs(val - initial.rotation[i]) < 0.001)
+        const positionChanged = !obj.position.every(
+          (val, i) => Math.abs(val - initial.position[i]) < 0.001
+        )
+        const rotationChanged = !obj.rotation.every(
+          (val, i) => Math.abs(val - initial.rotation[i]) < 0.001
+        )
         const scaleChanged = !obj.scale.every((val, i) => Math.abs(val - initial.scale[i]) < 0.001)
-        
+
         if (positionChanged || rotationChanged || scaleChanged) {
           const command = new TransformCommand(objectId, initial, {
             position: [...obj.position] as [number, number, number],
             rotation: [...obj.rotation] as [number, number, number],
-            scale: [...obj.scale] as [number, number, number]
+            scale: [...obj.scale] as [number, number, number],
           })
           executeCommand(command)
         }
       }
     })
-    
+
     // Clear initial transforms
     initialTransforms.current = {}
-    
+
     // Reset group transform for next operation
     if (selectedObjects.length > 1 && groupRef.current) {
       const center = new THREE.Vector3()
       let validObjects = 0
-      
+
       selectedObjects.forEach(objectId => {
         const obj = sceneObjects.get(objectId)
         if (obj) {
@@ -218,7 +227,7 @@ export default function TransformGizmos({ selectedObjects }: TransformGizmosProp
           validObjects++
         }
       })
-      
+
       if (validObjects > 0) {
         center.divideScalar(validObjects)
         groupRef.current.position.copy(center)
@@ -242,7 +251,7 @@ export default function TransformGizmos({ selectedObjects }: TransformGizmosProp
       showY={true}
       showZ={true}
       enabled={true}
-      space="world"
+      space={coordinateSpace}
       size={1}
       onObjectChange={handleObjectChange}
       onMouseDown={handleMouseDown}

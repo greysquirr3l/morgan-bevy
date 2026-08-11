@@ -1,4 +1,3 @@
-import { useEditorStore } from '@/store/editorStore'
 import { CameraControls } from '@react-three/drei'
 import { useFrame, useThree } from '@react-three/fiber'
 import { useCallback, useEffect, useRef, useState } from 'react'
@@ -8,10 +7,9 @@ export type CameraMode = 'orbit' | 'fly' | 'orthographic'
 
 interface CameraSystemProps {
   mode: CameraMode
-  onModeChange?: (mode: CameraMode) => void
 }
 
-export default function CameraSystem({ mode, onModeChange }: CameraSystemProps) {
+export default function CameraSystem({ mode }: CameraSystemProps) {
   const { camera, gl } = useThree()
   const controlsRef = useRef<CameraControls>(null)
   const [flySpeed] = useState(10)
@@ -103,6 +101,25 @@ export default function CameraSystem({ mode, onModeChange }: CameraSystemProps) 
     }
   }, [mode, gl.domElement])
 
+  // Release the pointer lock when the user exits fly mode via
+  // anything OTHER than the canvas click (which only ever sets the
+  // lock, never releases it). Pressing ESC or switching to 1 / 3
+  // from the keyboard dispatches `setCameraMode` through the
+  // store, the `mode` prop on this component flips to
+  // 'orbit' / 'orthographic', and we need to break the lock here
+  // so the cursor reappears. Without this, the fly camera keeps
+  // swallowing mouse-moves even after the user has "switched
+  // cameras", because the lock is what enables the
+  // `handleMouseMove` integration.
+  useEffect(() => {
+    if (mode !== 'fly' && isMouseLocked) {
+      if (document.pointerLockElement === gl.domElement) {
+        document.exitPointerLock()
+      }
+      setIsMouseLocked(false)
+    }
+  }, [mode, isMouseLocked, gl.domElement])
+
   const handlePointerLockChange = useCallback(() => {
     setIsMouseLocked(document.pointerLockElement === gl.domElement)
   }, [gl.domElement])
@@ -175,37 +192,15 @@ export default function CameraSystem({ mode, onModeChange }: CameraSystemProps) 
     camera.rotation.set(flyRotation.current.pitch, flyRotation.current.yaw, 0, 'YXZ')
   })
 
-  // Camera mode switch handlers
-  const { setCameraMode } = useEditorStore()
-
-  useEffect(() => {
-    const handleKeyPress = (event: KeyboardEvent) => {
-      // Only handle camera switching if not in an input field
-      if (event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement) {
-        return
-      }
-
-      switch (event.key) {
-        case '1':
-          setCameraMode('orbit')
-          onModeChange?.('orbit')
-          setIsMouseLocked(false)
-          break
-        case '2':
-          setCameraMode('fly')
-          onModeChange?.('fly')
-          break
-        case '3':
-          setCameraMode('orthographic')
-          onModeChange?.('orthographic')
-          setIsMouseLocked(false)
-          break
-      }
-    }
-
-    window.addEventListener('keydown', handleKeyPress)
-    return () => window.removeEventListener('keydown', handleKeyPress)
-  }, [setCameraMode, onModeChange])
+  // Camera mode switching (1 / 2 / 3) and ESC-to-exit-fly are
+  // handled centrally by `useKeyboardShortcuts` so the binding
+  // table stays the single source of truth. We previously also
+  // listened here, which meant every mode-switch keypress
+  // dispatched through two keydown handlers and called
+  // `setCameraMode` twice. Removing the local listener also
+  // removes the `onModeChange?.(...)` calls — those were
+  // redundant because the store update is the only signal
+  // subscribers care about.
 
   return (
     <>
@@ -235,65 +230,4 @@ export default function CameraSystem({ mode, onModeChange }: CameraSystemProps) 
       )}
     </>
   )
-}
-
-// Hook for camera controls
-export function useCameraControls() {
-  const [cameraMode, setCameraMode] = useState<CameraMode>('orbit')
-
-  const frameSelected = useCallback(() => {
-    const { selectedObjects, sceneObjects } = useEditorStore.getState()
-    if (selectedObjects.length === 0) return
-
-    // Calculate bounding box of selected objects
-    let minX = Infinity,
-      minY = Infinity,
-      minZ = Infinity
-    let maxX = -Infinity,
-      maxY = -Infinity,
-      maxZ = -Infinity
-
-    selectedObjects.forEach(id => {
-      const obj = sceneObjects.get(id)
-      if (obj && obj.position) {
-        const [x, y, z] = obj.position
-        minX = Math.min(minX, x)
-        minY = Math.min(minY, y)
-        minZ = Math.min(minZ, z)
-        maxX = Math.max(maxX, x)
-        maxY = Math.max(maxY, y)
-        maxZ = Math.max(maxZ, z)
-      }
-    })
-
-    // Center camera on selection
-    const centerX = (minX + maxX) / 2
-    const centerY = (minY + maxY) / 2
-    const centerZ = (minZ + maxZ) / 2
-
-    const distance = Math.max(maxX - minX, maxY - minY, maxZ - minZ) * 2
-
-    // Set camera position based on mode
-    // Implementation would depend on specific camera mode
-    console.log(
-      `Framing selection at (${centerX}, ${centerY}, ${centerZ}) with distance ${distance}`
-    )
-  }, [])
-
-  const frameAll = useCallback(() => {
-    const { sceneObjects } = useEditorStore.getState()
-    const objectIds = Array.from(sceneObjects.keys())
-
-    if (objectIds.length === 0) return
-
-    // Similar logic to frameSelected but for all objects
-    console.log('Framing all objects')
-  }, [])
-
-  return {
-    cameraMode,
-    setCameraMode,
-    frameSelected,
-    frameAll,
-  }
 }

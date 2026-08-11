@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react'
-import { X, Search, Keyboard, Mouse, Camera, Move, Eye, Copy, FileText, Layers } from 'lucide-react'
+import { Camera, Copy, Eye, FileText, Keyboard, Layers, Mouse, Move, Search, X } from 'lucide-react'
+import React, { useEffect, useState } from 'react'
 
 interface ShortcutGroup {
   title: string
@@ -25,6 +25,7 @@ export default function KeyboardShortcutsModal({ isOpen, onClose }: KeyboardShor
       title: 'Transform & Selection',
       icon: <Move className="w-4 h-4" />,
       shortcuts: [
+        { keys: ['Q'], description: 'Select mode - click to pick, no transform gizmo' },
         { keys: ['W'], description: 'Translate mode - Move objects in 3D space' },
         { keys: ['E'], description: 'Rotate mode - Rotate objects around axes' },
         { keys: ['R'], description: 'Scale mode - Resize objects uniformly or per-axis' },
@@ -33,10 +34,12 @@ export default function KeyboardShortcutsModal({ isOpen, onClose }: KeyboardShor
         { keys: ['X'], description: 'Lock to X-axis during transform' },
         { keys: ['Y'], description: 'Lock to Y-axis during transform' },
         { keys: ['Z'], description: 'Lock to Z-axis during transform' },
-        { keys: ['Esc'], description: 'Clear selection and exit transform mode' },
+        { keys: ['V'], description: 'Toggle 2D grid / 3D viewport view' },
+        { keys: ['Home'], description: 'Reset camera to default position' },
+        { keys: ['Esc'], description: 'Clear selection (or exit fly camera when active)' },
         { keys: ['Delete'], description: 'Delete selected objects' },
         { keys: ['Backspace'], description: 'Delete selected objects (alternative)' },
-      ]
+      ],
     },
     {
       title: 'Camera Controls',
@@ -47,10 +50,11 @@ export default function KeyboardShortcutsModal({ isOpen, onClose }: KeyboardShor
         { keys: ['3'], description: 'Orthographic top-down view - 2D precision' },
         { keys: ['F'], description: 'Frame selected objects - Focus camera on selection' },
         { keys: ['Alt', 'F'], description: 'Frame all objects - Show entire scene' },
+        { keys: ['Home'], description: 'Reset camera to default position' },
         { keys: ['Middle Mouse'], description: 'Pan camera (orbit mode)' },
         { keys: ['Right Mouse'], description: 'Rotate camera (orbit mode)' },
         { keys: ['Scroll Wheel'], description: 'Zoom camera in/out' },
-      ]
+      ],
     },
     {
       title: 'Fly Camera (Mode 2)',
@@ -65,7 +69,7 @@ export default function KeyboardShortcutsModal({ isOpen, onClose }: KeyboardShor
         { keys: ['Shift'], description: 'Fast movement (hold while moving)' },
         { keys: ['Mouse'], description: 'Look around (pointer lock mode)' },
         { keys: ['Esc'], description: 'Exit fly mode back to orbit' },
-      ]
+      ],
     },
     {
       title: 'Selection & Editing',
@@ -79,7 +83,7 @@ export default function KeyboardShortcutsModal({ isOpen, onClose }: KeyboardShor
         { keys: ['Ctrl', 'Shift', 'G'], description: 'Ungroup selected objects' },
         { keys: ['H'], description: 'Hide selected objects' },
         { keys: ['Shift', 'H'], description: 'Unhide all objects' },
-      ]
+      ],
     },
     {
       title: 'Copy & Paste',
@@ -91,7 +95,7 @@ export default function KeyboardShortcutsModal({ isOpen, onClose }: KeyboardShor
         { keys: ['Ctrl', 'Z'], description: 'Undo last operation' },
         { keys: ['Ctrl', 'Y'], description: 'Redo previously undone operation' },
         { keys: ['Ctrl', 'Shift', 'Z'], description: 'Redo (alternative shortcut)' },
-      ]
+      ],
     },
     {
       title: 'File Operations',
@@ -103,32 +107,21 @@ export default function KeyboardShortcutsModal({ isOpen, onClose }: KeyboardShor
         { keys: ['Ctrl', 'Shift', 'S'], description: 'Save project as new file' },
         { keys: ['Ctrl', 'E'], description: 'Export level in multiple formats' },
         { keys: ['Ctrl', 'I'], description: 'Import assets or models' },
-      ]
+      ],
     },
     {
       title: 'View & Layout',
       icon: <Layers className="w-4 h-4" />,
       shortcuts: [
-        { keys: ['Tab'], description: 'Toggle between 3D and 2D grid view' },
-        { keys: ['Shift', 'Tab'], description: 'Toggle panel visibility' },
-        { keys: ['F11'], description: 'Toggle fullscreen mode' },
-        { keys: ['Ctrl', '1'], description: 'Reset panel layout to default' },
-        { keys: ['Ctrl', '2'], description: 'Minimal layout - viewport focus' },
-      ]
+        { keys: ['V'], description: 'Toggle between 3D viewport and 2D grid view' },
+        { keys: ['Home'], description: 'Reset camera to default position' },
+      ],
     },
     {
       title: 'Tools & Modes',
       icon: <Keyboard className="w-4 h-4" />,
-      shortcuts: [
-        { keys: ['V'], description: 'Select tool (default cursor)' },
-        { keys: ['M'], description: 'Measure tool - Click two points for distance' },
-        { keys: ['P'], description: 'Paint tool - Apply materials to surfaces' },
-        { keys: ['L'], description: 'Light placement tool' },
-        { keys: ['B'], description: 'Box creation tool' },
-        { keys: ['Shift', 'A'], description: 'Add object menu' },
-        { keys: ['?'], description: 'Show this keyboard shortcuts help' },
-      ]
-    }
+      shortcuts: [{ keys: ['P'], description: 'Paint tool - Apply materials to surfaces' }],
+    },
   ]
 
   // Filter shortcuts based on search query and category
@@ -136,15 +129,17 @@ export default function KeyboardShortcutsModal({ isOpen, onClose }: KeyboardShor
     .map(group => ({
       ...group,
       shortcuts: group.shortcuts.filter(shortcut => {
-        const matchesSearch = searchQuery === '' || 
+        const matchesSearch =
+          searchQuery === '' ||
           shortcut.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
           shortcut.keys.some(key => key.toLowerCase().includes(searchQuery.toLowerCase()))
-        
-        const matchesCategory = selectedCategory === 'all' || 
+
+        const matchesCategory =
+          selectedCategory === 'all' ||
           group.title.toLowerCase().includes(selectedCategory.toLowerCase())
-        
+
         return matchesSearch && matchesCategory
-      })
+      }),
     }))
     .filter(group => group.shortcuts.length > 0)
 
@@ -194,20 +189,22 @@ export default function KeyboardShortcutsModal({ isOpen, onClose }: KeyboardShor
                 type="text"
                 placeholder="Search shortcuts..."
                 value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
+                onChange={e => setSearchQuery(e.target.value)}
                 className="w-full pl-10 pr-4 py-2 bg-editor-bg border border-editor-border rounded-lg text-editor-text placeholder-editor-textMuted focus:outline-none focus:border-editor-accent"
               />
             </div>
-            
+
             {/* Category Filter */}
             <select
               value={selectedCategory}
-              onChange={(e) => setSelectedCategory(e.target.value)}
+              onChange={e => setSelectedCategory(e.target.value)}
               className="px-3 py-2 bg-editor-bg border border-editor-border rounded-lg text-editor-text focus:outline-none focus:border-editor-accent"
             >
               {categories.map(category => (
                 <option key={category} value={category}>
-                  {category === 'all' ? 'All Categories' : category.charAt(0).toUpperCase() + category.slice(1)}
+                  {category === 'all'
+                    ? 'All Categories'
+                    : category.charAt(0).toUpperCase() + category.slice(1)}
                 </option>
               ))}
             </select>
@@ -224,7 +221,10 @@ export default function KeyboardShortcutsModal({ isOpen, onClose }: KeyboardShor
           ) : (
             <div className="grid gap-6">
               {filteredGroups.map((group, groupIndex) => (
-                <div key={groupIndex} className="bg-editor-bg border border-editor-border rounded-lg p-4">
+                <div
+                  key={groupIndex}
+                  className="bg-editor-bg border border-editor-border rounded-lg p-4"
+                >
                   <div className="flex items-center space-x-2 mb-4">
                     <span className="text-editor-accent">{group.icon}</span>
                     <h3 className="text-lg font-semibold text-editor-text">{group.title}</h3>
@@ -232,10 +232,13 @@ export default function KeyboardShortcutsModal({ isOpen, onClose }: KeyboardShor
                       {group.shortcuts.length} shortcuts
                     </span>
                   </div>
-                  
+
                   <div className="grid gap-2">
                     {group.shortcuts.map((shortcut, index) => (
-                      <div key={index} className="flex items-center justify-between py-2 px-3 hover:bg-editor-border rounded-lg transition-colors">
+                      <div
+                        key={index}
+                        className="flex items-center justify-between py-2 px-3 hover:bg-editor-border rounded-lg transition-colors"
+                      >
                         <div className="flex items-center space-x-3">
                           <div className="flex items-center space-x-1">
                             {shortcut.keys.map((key, keyIndex) => (
@@ -264,12 +267,15 @@ export default function KeyboardShortcutsModal({ isOpen, onClose }: KeyboardShor
         <div className="p-4 border-t border-editor-border bg-editor-bg">
           <div className="flex items-center justify-between text-sm text-editor-textMuted">
             <div className="flex items-center space-x-4">
-              <span>💡 Tip: Press <kbd className="px-1 bg-editor-border rounded text-xs">?</kbd> anytime to open shortcuts</span>
-              <span>Press <kbd className="px-1 bg-editor-border rounded text-xs">Esc</kbd> to close</span>
+              <span>
+                💡 Tip: Press <kbd className="px-1 bg-editor-border rounded text-xs">?</kbd> anytime
+                to open shortcuts
+              </span>
+              <span>
+                Press <kbd className="px-1 bg-editor-border rounded text-xs">Esc</kbd> to close
+              </span>
             </div>
-            <div className="text-xs">
-              Morgan-Bevy v0.3.5
-            </div>
+            <div className="text-xs">Morgan-Bevy v0.3.5</div>
           </div>
         </div>
       </div>
@@ -289,9 +295,9 @@ export function useKeyboardShortcutsModal() {
     const handleKeyDown = (event: KeyboardEvent) => {
       // Only handle the ? key if not in an input field
       if (
-        event.key === '?' && 
-        !event.ctrlKey && 
-        !event.altKey && 
+        event.key === '?' &&
+        !event.ctrlKey &&
+        !event.altKey &&
         !event.metaKey &&
         !(event.target instanceof HTMLInputElement) &&
         !(event.target instanceof HTMLTextAreaElement)
@@ -308,6 +314,6 @@ export function useKeyboardShortcutsModal() {
   return {
     isOpen,
     openModal,
-    closeModal
+    closeModal,
   }
 }

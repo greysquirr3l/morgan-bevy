@@ -63,7 +63,7 @@ function CameraControls({
   cameraControlsRef: React.ForwardedRef<CameraControlsRef>
 }) {
   const { resetView, focusSelection, frameAll } = useCameraControls()
-  const { cameraMode, setCameraMode } = useEditorStore()
+  const { cameraMode } = useEditorStore()
 
   useImperativeHandle(
     cameraControlsRef,
@@ -75,7 +75,7 @@ function CameraControls({
     [resetView, focusSelection, frameAll]
   )
 
-  return <CameraSystem mode={cameraMode} onModeChange={setCameraMode} />
+  return <CameraSystem mode={cameraMode} />
 }
 
 export default forwardRef<CameraControlsRef, object>(function Viewport3D(_props, ref) {

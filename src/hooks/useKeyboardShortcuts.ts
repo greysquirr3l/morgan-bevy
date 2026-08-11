@@ -119,6 +119,9 @@ export function useKeyboardShortcuts() {
       // compile error.
       const action = binding.action as unknown as ShortcutAction
       switch (action) {
+        case 'transform.select':
+          setTransformMode('select')
+          break
         case 'transform.translate':
           setTransformMode('translate')
           break
@@ -137,10 +140,23 @@ export function useKeyboardShortcuts() {
         case 'tool.paint':
           setPaintToolActive(!paintToolActive)
           break
-        case 'selection.clear':
+        case 'selection.clear': {
+          // ESC has two distinct jobs: exit fly camera, or clear
+          // selection. Fly mode is the higher-priority escape — the
+          // user pressed ESC because the pointer-locked fly camera
+          // hijacked their mouse, not because they wanted to
+          // deselect. Switching to orbit causes the CameraSystem
+          // to release the pointer lock and we leave the
+          // selection intact. ESC in any other mode is the
+          // classic "deselect everything" gesture.
+          if (useEditorStore.getState().cameraMode === 'fly') {
+            setCameraMode('orbit')
+            break
+          }
           clearSelection()
           transformConstraints.clearConstraint()
           break
+        }
         case 'selection.delete':
           if (selectedObjects.length > 0) {
             selectedObjects.forEach(id => {
@@ -208,9 +224,27 @@ export function useKeyboardShortcuts() {
         case 'camera.focusSelection':
           cameraControlsRef.current?.focusSelection()
           break
+        case 'camera.reset':
+          // Reset the camera to its default position. The
+          // `resetView` method on the controls ref points at the
+          // same OrbitControls instance that `frameAll` /
+          // `focusSelection` use; all three live on the forwarded
+          // `cameraControlsRef` from `useCameraContext`.
+          cameraControlsRef.current?.resetView()
+          break
         case 'camera.toggleCoordinateSpace':
           toggleCoordinateSpace()
           break
+        case 'viewport.toggle': {
+          // Flip between 2D and 3D. Goes through the store so
+          // every component subscribed to `viewportMode` updates
+          // in lockstep — bypasses the debounced button handler
+          // because the keyboard path is one-shot and doesn't
+          // need bounce protection.
+          const current = useEditorStore.getState().viewportMode
+          useEditorStore.getState().setViewportMode(current === '3d' ? '2d' : '3d')
+          break
+        }
         case 'constraint.x':
           transformConstraints.setConstraint('x')
           break
