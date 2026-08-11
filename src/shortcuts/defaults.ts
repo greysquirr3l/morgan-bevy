@@ -253,6 +253,45 @@ export const DEFAULT_SHORTCUTS: readonly ShortcutBinding[] = [
     description: 'Delete the selected objects.',
   },
 
+  // ─── Grouping (Ctrl+G / Ctrl+Shift+G) ───────────────────────────────
+  {
+    action: 'group',
+    label: 'Group Selection',
+    key: 'g',
+    modifiers: ['ctrl'],
+    category: 'Selection',
+    requiresSelection: true,
+    description: 'Group the selected objects (2 or more required).',
+  },
+  {
+    action: 'ungroup',
+    label: 'Ungroup Selection',
+    key: 'g',
+    modifiers: ['ctrl', 'shift'],
+    category: 'Selection',
+    requiresSelection: true,
+    description: 'Ungroup the selected group back into its child objects.',
+  },
+
+  // ─── Visibility (H / Shift+H) ───────────────────────────────────────
+  {
+    action: 'selection.hide',
+    label: 'Hide Selection',
+    key: 'h',
+    modifiers: [],
+    category: 'Selection',
+    requiresSelection: true,
+    description: 'Hide the selected objects.',
+  },
+  {
+    action: 'selection.unhideAll',
+    label: 'Unhide All',
+    key: 'h',
+    modifiers: ['shift'],
+    category: 'Selection',
+    description: 'Unhide every object in the scene.',
+  },
+
   // ─── Clipboard (Ctrl+C / Ctrl+V) ───────────────────────────────────
   {
     action: 'clipboard.copy',
@@ -288,6 +327,14 @@ export const DEFAULT_SHORTCUTS: readonly ShortcutBinding[] = [
     modifiers: ['ctrl'],
     category: 'History',
     description: 'Redo the last undone command.',
+  },
+  {
+    action: 'redo.alt',
+    label: 'Redo (alternative)',
+    key: 'z',
+    modifiers: ['ctrl', 'shift'],
+    category: 'History',
+    description: 'Redo the last undone command (alternative binding).',
   },
 
   // ─── Selection (Ctrl+A) ────────────────────────────────────────────

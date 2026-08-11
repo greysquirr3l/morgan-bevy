@@ -1,6 +1,7 @@
 import { useBoxSelection } from '@/hooks/useBoxSelection'
 import { useCameraControls } from '@/hooks/useCameraControls'
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts'
+import { useMeasurementTool } from '@/hooks/useMeasurementTool'
 import { useNavMesh } from '@/hooks/useNavMesh'
 import { PerformanceObject, usePerformanceManager } from '@/performance'
 import { useEditorStore } from '@/store/editorStore'
@@ -8,12 +9,14 @@ import { Grid, Stats } from '@react-three/drei'
 import { Canvas } from '@react-three/fiber'
 import React, { forwardRef, useCallback, useImperativeHandle, useMemo, useState } from 'react'
 import * as THREE from 'three'
+import MeasurementOverlay from '../Measurements/MeasurementOverlay'
+import MeasurementToolViewport from '../Measurements/MeasurementToolViewport'
 import { PaintSettingsPanel, PaintToolViewport } from '../PaintTool'
 import TransformConstraintIndicator from '../TransformConstraintIndicator'
 import TransformGizmos from '../TransformGizmos'
 import { WaypointSettingsPanel, WaypointViewport } from '../Waypoints'
 import BoxSelection, { BoxSelectionOverlay } from './BoxSelection'
-import CameraSystem from './CameraSystem'
+import CameraSystem, { FLY_SPEED } from './CameraSystem'
 import NavMeshOverlay from './NavMeshOverlay'
 import OptimizedScene, { PerformanceOverlay } from './OptimizedScene'
 import Scene from './Scene'
@@ -79,8 +82,16 @@ function CameraControls({
 }
 
 export default forwardRef<CameraControlsRef, object>(function Viewport3D(_props, ref) {
-  const { showGrid, showStats, transformMode, addObject, cameraMode, sceneObjects, layers } =
-    useEditorStore()
+  const {
+    showGrid,
+    showStats,
+    transformMode,
+    addObject,
+    cameraMode,
+    sceneObjects,
+    layers,
+    isCameraPointerLocked,
+  } = useEditorStore()
   const [isDragOver, setIsDragOver] = useState(false)
   const [useOptimizedRendering, setUseOptimizedRendering] = useState(true)
   const { boxState } = useBoxSelection()
@@ -94,6 +105,12 @@ export default forwardRef<CameraControlsRef, object>(function Viewport3D(_props,
   const handleGenerateNavMesh = useCallback(() => {
     void navMeshTool.regenerate(sceneObjects)
   }, [navMeshTool, sceneObjects])
+
+  // T53: measurement tool. Local hook state (not Zustand — see the
+  // hook's own header comment), called here (outside <Canvas>) and
+  // threaded down to the in-Canvas click handler + the HUD overlay,
+  // same "lift once, pass down" shape as `navMeshTool` above.
+  const measurementTool = useMeasurementTool()
 
   // Performance state managed locally
   const [metrics, setMetrics] = useState({
@@ -226,6 +243,32 @@ export default forwardRef<CameraControlsRef, object>(function Viewport3D(_props,
       {/* Transform Constraint Indicator */}
       <TransformConstraintIndicator />
 
+      {/* Fly / Orthographic camera HUDs. Rendered here (outside
+          <Canvas>) rather than by CameraSystem itself — CameraSystem
+          lives inside the R3F tree and returning raw DOM from a
+          component R3F renders throws "Div is not part of the THREE
+          namespace" and unmounts the whole Canvas subtree. */}
+      {cameraMode === 'fly' && isCameraPointerLocked && (
+        <div className="fixed top-4 left-1/2 transform -translate-x-1/2 bg-black/80 text-white px-4 py-2 rounded text-sm z-50">
+          <div className="text-center">
+            <div className="font-semibold">Fly Camera Mode</div>
+            <div className="text-xs mt-1">
+              WASD: Move • Mouse: Look • Space/C: Up/Down • Shift: Fast • ESC: Exit
+            </div>
+            <div className="text-xs text-gray-300 mt-1">Speed: {FLY_SPEED.toFixed(1)} units/sec</div>
+          </div>
+        </div>
+      )}
+
+      {cameraMode === 'orthographic' && (
+        <div className="fixed top-4 left-1/2 transform -translate-x-1/2 bg-black/80 text-white px-4 py-2 rounded text-sm z-50">
+          <div className="text-center">
+            <div className="font-semibold">Orthographic Top-Down View</div>
+            <div className="text-xs mt-1">Mouse: Pan • Scroll: Zoom • 1: Orbit • 2: Fly</div>
+          </div>
+        </div>
+      )}
+
       <Canvas
         camera={{
           position: [10, 10, 10],
@@ -308,6 +351,12 @@ export default forwardRef<CameraControlsRef, object>(function Viewport3D(_props,
         {/* Navmesh overlay (T56) - needs to be inside Canvas for R3F hooks */}
         <NavMeshOverlay navMesh={navMeshTool.navMesh} visible={navMeshTool.visible} />
 
+        {/* Measurement tool click-to-place (T53) - needs to be inside Canvas for R3F hooks */}
+        <MeasurementToolViewport
+          active={measurementTool.mode !== null}
+          onAddPoint={measurementTool.addPoint}
+        />
+
         {/* Waypoint spheres + patrol route paths (T57) - needs to be inside Canvas for R3F hooks */}
         <WaypointViewport navMesh={navMeshTool.navMesh} />
 
@@ -320,6 +369,13 @@ export default forwardRef<CameraControlsRef, object>(function Viewport3D(_props,
 
       {/* Waypoint / patrol route settings overlay (T57) */}
       <WaypointSettingsPanel />
+
+      {/* Measurement HUD (T53) */}
+      <MeasurementOverlay
+        measurement={measurementTool.current}
+        config={measurementTool.config}
+        onRemove={measurementTool.removeById}
+      />
 
       {/* Viewport UI Overlay */}
       <div className="absolute top-2 left-2 bg-black bg-opacity-50 text-white text-xs p-2 rounded">
@@ -362,6 +418,18 @@ export default forwardRef<CameraControlsRef, object>(function Viewport3D(_props,
           data-testid="navmesh-generate"
         >
           {navMeshTool.loading ? 'Generating…' : 'Generate Navmesh'}
+        </button>
+        <button
+          className={`px-2 py-1 text-xs rounded ${
+            measurementTool.mode !== null
+              ? 'bg-editor-accent text-white'
+              : 'bg-black bg-opacity-50 text-white hover:bg-opacity-75'
+          }`}
+          onClick={measurementTool.cycleMode}
+          title="Cycle the measurement tool mode (off / distance / area / ruler). Click two or more points in the viewport to measure."
+          data-testid="measurement-toggle"
+        >
+          {measurementTool.mode ? `Measure: ${measurementTool.mode}` : 'Measure'}
         </button>
       </div>
 

@@ -8,7 +8,6 @@ describe('EditorStore', () => {
     useEditorStore.setState({
       selectedObjects: [],
       sceneObjects: new Map(),
-      gridSnapEnabled: false,
       transformMode: 'translate',
       coordinateSpace: 'world',
       layers: [
@@ -118,6 +117,38 @@ describe('EditorStore', () => {
     })
   })
 
+  describe('Visibility', () => {
+    it('hideSelection hides only the selected objects', () => {
+      const store = useEditorStore.getState()
+
+      const objectId1 = store.addObject('cube', [0, 0, 0])
+      const objectId2 = store.addObject('sphere', [2, 0, 0])
+      store.setSelectedObjects([objectId1])
+
+      store.hideSelection()
+
+      const state = useEditorStore.getState()
+      expect(state.sceneObjects.get(objectId1)?.visible).toBe(false)
+      expect(state.sceneObjects.get(objectId2)?.visible).toBe(true)
+    })
+
+    it('unhideAll unhides every object regardless of selection', () => {
+      const store = useEditorStore.getState()
+
+      const objectId1 = store.addObject('cube', [0, 0, 0])
+      const objectId2 = store.addObject('sphere', [2, 0, 0])
+      store.updateObjectVisibility(objectId1, false)
+      store.updateObjectVisibility(objectId2, false)
+      store.clearSelection()
+
+      store.unhideAll()
+
+      const state = useEditorStore.getState()
+      expect(state.sceneObjects.get(objectId1)?.visible).toBe(true)
+      expect(state.sceneObjects.get(objectId2)?.visible).toBe(true)
+    })
+  })
+
   describe('Grid and Transform Settings', () => {
     it('should toggle grid visibility', () => {
       const store = useEditorStore.getState()
@@ -128,17 +159,6 @@ describe('EditorStore', () => {
 
       const state = useEditorStore.getState()
       expect(state.showGrid).toBe(false)
-    })
-
-    it('should toggle grid snapping', () => {
-      const store = useEditorStore.getState()
-
-      expect(store.gridSnapEnabled).toBe(false)
-
-      store.toggleGridSnap()
-
-      const state = useEditorStore.getState()
-      expect(state.gridSnapEnabled).toBe(true)
     })
 
     it('should change transform mode', () => {
@@ -178,6 +198,28 @@ describe('EditorStore', () => {
       const state = useEditorStore.getState()
       expect(state.sceneObjects.size).toBe(0)
       expect(state.selectedObjects).toHaveLength(0)
+    })
+
+    it('clearHistory resets the scene AND the undo/redo history (single source of truth for "New Scene")', () => {
+      const store = useEditorStore.getState()
+
+      const objectId = store.addObject('cube', [0, 0, 0])
+      store.setSelectedObjects([objectId])
+      // Populate history so we can assert it's actually cleared, not
+      // just coincidentally empty.
+      useEditorStore.setState({
+        undoHistory: [{ execute: () => {}, undo: () => {}, description: 'test' }],
+        redoHistory: [{ execute: () => {}, undo: () => {}, description: 'test' }],
+      })
+
+      store.clearHistory()
+
+      const state = useEditorStore.getState()
+      expect(state.sceneObjects.size).toBe(0)
+      expect(state.selectedObjects).toHaveLength(0)
+      expect(state.undoHistory).toHaveLength(0)
+      expect(state.redoHistory).toHaveLength(0)
+      expect(state.activeLayer).toBe(LayerId('default'))
     })
   })
 

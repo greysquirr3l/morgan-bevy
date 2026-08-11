@@ -26,7 +26,6 @@ function resetStore(): void {
   useEditorStore.setState({
     selectedObjects: [],
     sceneObjects: new Map(),
-    gridSnapEnabled: false,
     transformMode: 'translate',
     coordinateSpace: 'world',
     layers: [

@@ -14,7 +14,6 @@
 
 import { useState } from 'react'
 
-import { useEditorStore } from '@/store/editorStore'
 import {
   deleteAnalyticsData,
   exportAnalyticsAsJson,
@@ -32,13 +31,6 @@ export interface AnalyticsPanelProps {
 }
 
 export default function AnalyticsPanel(props: AnalyticsPanelProps) {
-  // The store update is just a "set a flag" — the panel reads
-  // from the analytics module directly, not from the store, so
-  // we don't have to wire a per-event store action. The
-  // component re-renders on toggle because `settings.enabled`
-  // changes, which forces a re-read of the buffer.
-  const setSelectedObjects = useEditorStore(s => s.setSelectedObjects)
-  void setSelectedObjects
   const [settings, setLocalSettings] = useState<AnalyticsSettings>(
     props.settingsOverride ?? getAnalyticsSettings()
   )
@@ -91,11 +83,7 @@ export default function AnalyticsPanel(props: AnalyticsPanelProps) {
         </label>
         <p className="mt-1 pl-5 text-[10px] text-editor-textMuted">
           Off by default. We collect which features are used and performance timings — never scene
-          contents, file paths, or object names. See the{' '}
-          <a href="#/analytics-help" className="underline">
-            Help
-          </a>{' '}
-          panel for the full privacy story.
+          contents, file paths, or object names. Export or delete the stored data any time below.
         </p>
       </div>
 

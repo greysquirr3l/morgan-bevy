@@ -54,6 +54,7 @@ export const TOOLS_ACTIONS = [
   'transform-scale',
   'toggle-snap',
   'grid-size',
+  'settings',
 ] as const
 export type ToolsAction = (typeof TOOLS_ACTIONS)[number]
 

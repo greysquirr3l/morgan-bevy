@@ -54,6 +54,7 @@ describe('menu-action unions', () => {
       'transform-scale',
       'toggle-snap',
       'grid-size',
+      'settings',
     ])
   })
 

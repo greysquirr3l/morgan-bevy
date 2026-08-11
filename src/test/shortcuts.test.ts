@@ -205,16 +205,17 @@ describe('T60 conflict detection', () => {
   })
 
   it('conflictsForCandidate returns empty for a free combo', () => {
-    // `h` is a key that is not bound by any entry in
+    // `j` is a key that is not bound by any entry in
     // `DEFAULT_SHORTCUTS` — the table intentionally leaves a
     // handful of single letters free for future shortcuts and
     // for user rebinding of existing ones without a built-in
-    // collision. Earlier versions of this test probed `q`
-    // (transform.select was added in T100).
+    // collision. Earlier versions of this test probed `q` (T100)
+    // then `h` (hide/unhide selection shortcuts landed on bare `h`
+    // / Shift+H).
     const conflicts = conflictsForCandidate(
       {
         action: 'unused.action',
-        key: 'h',
+        key: 'j',
         modifiers: [] as Array<'ctrl' | 'shift' | 'alt' | 'meta'>,
       },
       DEFAULT_SHORTCUTS

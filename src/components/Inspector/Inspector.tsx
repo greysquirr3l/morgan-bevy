@@ -6,6 +6,7 @@ import MaterialEditor from '../MaterialEditor'
 import { ConnectedAnimationMarkerPanel } from './AnimationMarkerPanel'
 import { ConnectedAudioMarkerPanel } from './AudioMarkerPanel'
 import { ConnectedLightMarkerPanel } from './LightMarkerPanel'
+import SnapPointsPanel from './SnapPointsPanel'
 import { ConnectedVfxMarkerPanel } from './VfxMarkerPanel'
 
 // Helper function to get default tile character for tile types
@@ -341,6 +342,7 @@ export default function Inspector() {
             <ConnectedAnimationMarkerPanel objectId={primaryObject.id} />
             <ConnectedAudioMarkerPanel objectId={primaryObject.id} />
             <ConnectedVfxMarkerPanel objectId={primaryObject.id} />
+            <SnapPointsPanel />
           </div>
         )}
 

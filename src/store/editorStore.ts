@@ -164,7 +164,6 @@ export interface EditorState {
   // Transform
   transformMode: 'select' | 'translate' | 'rotate' | 'scale'
   coordinateSpace: 'local' | 'world'
-  gridSnapEnabled: boolean
   snapToGrid: boolean
   gridSize: number
 
@@ -183,6 +182,11 @@ export interface EditorState {
 
   // Camera
   cameraMode: 'orbit' | 'fly' | 'orthographic'
+  // Whether the fly-camera pointer lock is currently engaged. Lives
+  // in the store (not component state) because the fly-mode HUD is
+  // rendered as a DOM sibling of <Canvas> in Viewport3D.tsx, outside
+  // the R3F tree where CameraSystem actually tracks the lock.
+  isCameraPointerLocked: boolean
 
   // Layers
   activeLayer: LayerId
@@ -257,11 +261,11 @@ export interface EditorState {
   setPaintBrushFalloff: (falloff: BrushFalloff) => void
   setPaintTargetMaterialId: (id: MaterialId | null) => void
   updateObjectUVTransform: (id: ObjectId, transform: UVTransform) => void
-  toggleGridSnap: () => void
   toggleSnapToGrid: () => void
   setGridSize: (size: number) => void
   setViewportMode: (mode: '3d' | '2d') => void
   setCameraMode: (mode: 'orbit' | 'fly' | 'orthographic') => void
+  setCameraPointerLocked: (locked: boolean) => void
   setGridData: (data: string[][]) => void
   setSelectedTheme: (theme: SelectedTheme | null) => void
   toggleGrid: () => void
@@ -338,6 +342,12 @@ export interface EditorState {
   ) => void
   updateObjectName: (id: ObjectId, name: string) => void
   updateObjectVisibility: (id: ObjectId, visible: boolean) => void
+  // T-hide: bulk visibility actions backing the H / Shift+H shortcuts.
+  // Per-object toggling already goes through `updateObjectVisibility`
+  // (the Hierarchy eye icon); these cover "hide everything I've got
+  // selected" / "unhide everything in the scene" in one shot.
+  hideSelection: () => void
+  unhideAll: () => void
   updateObjectLock: (id: ObjectId, locked: boolean) => void
   updateObjectMaterial: (
     id: ObjectId,
@@ -397,7 +407,6 @@ export const useEditorStore = create<EditorState>()(
     selectedTheme: null as SelectedTheme | null,
     transformMode: 'select',
     coordinateSpace: 'world',
-    gridSnapEnabled: true,
     snapToGrid: true,
     gridSize: 1.0,
     paintToolActive: false,
@@ -406,6 +415,7 @@ export const useEditorStore = create<EditorState>()(
     paintTargetMaterialId: null as MaterialId | null,
     viewportMode: '3d' as '3d' | '2d',
     cameraMode: 'orbit',
+    isCameraPointerLocked: false,
     activeLayer: LayerId('default'),
     layers: [
       { id: LayerId('default'), name: 'Default', visible: true, locked: false, color: '#ffffff' },
@@ -525,11 +535,6 @@ export const useEditorStore = create<EditorState>()(
         if (o) o.uvTransform = transform
       }),
 
-    toggleGridSnap: () =>
-      set(state => {
-        state.gridSnapEnabled = !state.gridSnapEnabled
-      }),
-
     toggleSnapToGrid: () =>
       set(state => {
         state.snapToGrid = !state.snapToGrid
@@ -581,6 +586,11 @@ export const useEditorStore = create<EditorState>()(
     setCameraMode: (mode: 'orbit' | 'fly' | 'orthographic') =>
       set(state => {
         state.cameraMode = mode
+      }),
+
+    setCameraPointerLocked: (locked: boolean) =>
+      set(state => {
+        state.isCameraPointerLocked = locked
       }),
 
     setGridData: (data: string[][]) =>
@@ -912,6 +922,21 @@ export const useEditorStore = create<EditorState>()(
         }
       }),
 
+    hideSelection: () =>
+      set(state => {
+        state.selectedObjects.forEach(id => {
+          const o = state.sceneObjects.get(id)
+          if (o) o.visible = false
+        })
+      }),
+
+    unhideAll: () =>
+      set(state => {
+        state.sceneObjects.forEach(o => {
+          o.visible = true
+        })
+      }),
+
     updateObjectLock: (id: ObjectId, locked: boolean) =>
       set(state => {
         if (state.sceneObjects.has(id)) {
@@ -1175,10 +1200,19 @@ export const useEditorStore = create<EditorState>()(
       return state.redoHistory.length > 0
     },
 
+    // T-scene-new: the single source of truth for "start a fresh
+    // scene." Originally this only cleared undo/redo history; the
+    // `scene.new` shortcut duplicated the rest of the reset (scene
+    // objects, selection, active layer) inline via `setState`. Folded
+    // that logic in here so there's one implementation instead of two
+    // that can drift apart.
     clearHistory: () =>
       set(state => {
+        state.sceneObjects = new Map()
+        state.selectedObjects = []
         state.undoHistory = []
         state.redoHistory = []
+        state.activeLayer = LayerId('default')
       }),
 
     // Auto-save functionality

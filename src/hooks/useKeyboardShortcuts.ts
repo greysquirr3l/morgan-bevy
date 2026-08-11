@@ -19,7 +19,6 @@ import { useCameraContext } from '@/contexts/CameraContext'
 import { type ShortcutAction, type ShortcutBinding } from '@/shortcuts/defaults'
 import { useEditorStore } from '@/store/editorStore'
 import { serializeMap } from '@/store/mapSerialization'
-import { LayerId } from '@/types/brand'
 import { clipboard, copySelectedObjects } from '@/utils/clipboard'
 import {
   DeleteObjectCommand,
@@ -53,6 +52,9 @@ export function useKeyboardShortcuts() {
     toggleCoordinateSpace,
     paintToolActive,
     setPaintToolActive,
+    hideSelection,
+    unhideAll,
+    clearHistory,
   } = useEditorStore(
     useShallow(s => ({
       selectedObjects: s.selectedObjects,
@@ -71,6 +73,9 @@ export function useKeyboardShortcuts() {
       toggleCoordinateSpace: s.toggleCoordinateSpace,
       paintToolActive: s.paintToolActive,
       setPaintToolActive: s.setPaintToolActive,
+      hideSelection: s.hideSelection,
+      unhideAll: s.unhideAll,
+      clearHistory: s.clearHistory,
     }))
   )
 
@@ -209,6 +214,19 @@ export function useKeyboardShortcuts() {
         case 'redo':
           if (canRedo()) redo()
           break
+        case 'redo.alt':
+          // Alternative redo binding (Ctrl+Shift+Z) — same action as
+          // 'redo', just a second key combo. Kept as a distinct
+          // action id because DEFAULT_SHORTCUTS requires unique
+          // action ids per binding (see shortcuts.test.ts).
+          if (canRedo()) redo()
+          break
+        case 'selection.hide':
+          hideSelection()
+          break
+        case 'selection.unhideAll':
+          unhideAll()
+          break
         case 'camera.orbit':
           setCameraMode('orbit')
           break
@@ -264,13 +282,10 @@ export function useKeyboardShortcuts() {
           transformConstraints.setConstraint('xy')
           break
         case 'scene.new':
-          useEditorStore.setState({
-            sceneObjects: new Map(),
-            selectedObjects: [],
-            undoHistory: [],
-            redoHistory: [],
-            activeLayer: LayerId('default'),
-          })
+          // `clearHistory` is the single source of truth for "start
+          // a fresh scene" (scene objects, selection, active layer,
+          // undo/redo) — see the doc comment on the store action.
+          clearHistory()
           break
         case 'scene.save': {
           const saveCommand = new SaveCommand()
@@ -366,6 +381,9 @@ export function useKeyboardShortcuts() {
     cameraControlsRef,
     paintToolActive,
     setPaintToolActive,
+    hideSelection,
+    unhideAll,
+    clearHistory,
   ])
 
   return { transformMode }

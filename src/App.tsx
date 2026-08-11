@@ -10,8 +10,10 @@ import KeyboardShortcutsModal, {
   useKeyboardShortcutsModal,
 } from '@/components/KeyboardShortcutsModal'
 import Layers from '@/components/Layers'
+import LightingTools from '@/components/Lighting/LightingTools'
 import PerformanceTestPanel from '@/components/PerformanceTestPanel'
 import PrefabManager from '@/components/PrefabManager/PrefabManager'
+import SettingsModal from '@/components/Settings/SettingsModal'
 import Viewport3D from '@/components/Viewport3D/Viewport3D'
 import { CameraProvider, useCameraContext } from '@/contexts/CameraContext'
 import { useAutoSave } from '@/hooks/useAutoSave'
@@ -391,6 +393,7 @@ function AppContent() {
   const [activeMenu, setActiveMenu] = useState<string | null>(null)
   const [menuPosition, setMenuPosition] = useState({ x: 0, y: 0 })
   const [helpOpen, setHelpOpen] = useState(false)
+  const [settingsOpen, setSettingsOpen] = useState(false)
   // T58: which tutorial (if any) the TutorialOverlay is showing.
   const [activeTutorialId, setActiveTutorialId] = useState<string | null>(null)
   const lastViewportChangeRef = useRef(0)
@@ -620,6 +623,9 @@ function AppContent() {
         // Focus grid size selector in toolbar
         const gridSelect = document.querySelector('select[title="Grid Size"]') as HTMLSelectElement
         gridSelect?.focus()
+        break
+      case 'settings':
+        setSettingsOpen(true)
         break
       default:
         assertNeverAction(action, TOOLS_ACTIONS)
@@ -1097,6 +1103,10 @@ function AppContent() {
                 <CollapsiblePanel title="Inspector" enableScrollbarlessScrolling={true}>
                   <Inspector />
                 </CollapsiblePanel>
+                {/* T55: lighting rig — self-contained collapsible
+                    section (own header/expand state), same tier as
+                    the CollapsiblePanel-wrapped panels around it. */}
+                <LightingTools />
                 <CollapsiblePanel
                   title="Export System"
                   maxHeight="350px"
@@ -1298,6 +1308,13 @@ function AppContent() {
                 >
                   Grid Size Settings
                 </button>
+                <div className="border-t border-editor-border my-1"></div>
+                <button
+                  className="w-full text-left px-4 py-2 text-sm hover:bg-editor-hover"
+                  onClick={() => handleToolsAction('settings')}
+                >
+                  Settings...
+                </button>
               </div>
             )}
 
@@ -1383,6 +1400,9 @@ function AppContent() {
 
       {/* Help Modal */}
       <HelpModal isOpen={helpOpen} onClose={() => setHelpOpen(false)} />
+
+      {/* Settings Modal (Tools > Settings...) */}
+      <SettingsModal isOpen={settingsOpen} onClose={() => setSettingsOpen(false)} />
 
       {/* T58: Tutorial overlay */}
       <TutorialOverlay tutorialId={activeTutorialId} onClose={() => setActiveTutorialId(null)} />
