@@ -109,6 +109,10 @@ pub fn load_level_world(
 /// - `Interactable` (if `obj.tags` contains `"interactable"`)
 /// - `Collectible` (if `obj.tags` contains `"collectible"`)
 /// - `NavMeshHint` (if `obj.tags` contains `"nav-mesh"`)
+/// - `Light` (if `obj.light.is_some()`)
+/// - `Animation` (if `obj.animation.is_some()`)
+/// - `Audio` (if `obj.audio.is_some()`)
+/// - `Vfx` (if `obj.vfx.is_some()`)
 pub fn spawn_entity(commands: &mut Commands, obj: &ExportedEntity) -> Entity {
     let id = commands
         .spawn((
@@ -213,6 +217,25 @@ fn attach_marker_components(ec: &mut EntityCommandWriter<'_, '_>, obj: &Exported
     if lower.iter().any(|t| t == "nav-mesh" || t == "navmesh") {
         ec.insert(NavMeshHint::default());
     }
+
+    // T91: lighting / animation / audio / VFX markers. These fields
+    // carry the same enum types as the companion crate's marker
+    // components (see `ExportedEntity::light` etc. in `lib.rs`), so
+    // they can be inserted directly without a conversion step — unlike
+    // `spawn_point` / `trigger_volume` above, which have separate
+    // `Exported*` wire types.
+    if let Some(ref light) = obj.light {
+        ec.insert(light.clone());
+    }
+    if let Some(ref animation) = obj.animation {
+        ec.insert(animation.clone());
+    }
+    if let Some(ref audio) = obj.audio {
+        ec.insert(audio.clone());
+    }
+    if let Some(ref vfx) = obj.vfx {
+        ec.insert(vfx.clone());
+    }
 }
 
 /// Returns the bounding box as `(min, max)` corners. Convenience
@@ -296,7 +319,7 @@ mod tests {
         reason = "test code is allowed to use unwrap/expect for concise assertions"
     )]
     use super::*;
-    use crate::{BoundingBox, ExportedLevel};
+    use crate::{Animation, Audio, BoundingBox, ExportedLevel, Light, Vfx};
 
     fn sample_level() -> ExportedLevel {
         ExportedLevel {
@@ -486,6 +509,78 @@ mod tests {
 
         let mut q = world.query::<&NavMeshHint>();
         assert_eq!(q.iter(&world).count(), 1);
+    }
+
+    /// Regression test: `attach_marker_components` used to silently
+    /// drop `obj.light` / `obj.animation` / `obj.audio` / `obj.vfx` —
+    /// the loader only ever inserted `SpawnPoint` / `TriggerVolume` /
+    /// tag-driven markers, even though those four fields exist on
+    /// `ExportedEntity` and the companion crate ships `On<Add, _>`
+    /// observers (`light_observer`, `animation_player_observer`,
+    /// `audio_observer`, `vfx_observer`) specifically to react to
+    /// them. Build a level with all four markers set and assert the
+    /// spawned entity actually carries the components, so the
+    /// observers have something to fire on.
+    #[test]
+    fn light_animation_audio_vfx_markers_attached_when_present() {
+        let mut world = World::new();
+        let mut level = sample_level();
+        level.objects = vec![ExportedEntity {
+            id: "obj-fx".to_string(),
+            name: "FX Object".to_string(),
+            transform: crate::ExportedTransform::default(),
+            mesh: None,
+            material: None,
+            layer: "default".to_string(),
+            tags: vec![],
+            collision_shape: None,
+            spawn_point: None,
+            trigger_volume: None,
+            light: Some(Light::Point {
+                color: [1.0, 0.5, 0.0],
+                intensity: 2.0,
+                range: 10.0,
+                shadows: true,
+            }),
+            animation: Some(Animation::Play {
+                clip: "walk.glb".to_string(),
+                repeat: true,
+                speed: 1.5,
+            }),
+            audio: Some(Audio::Ambient {
+                path: "sounds/fountain.ogg".to_string(),
+                volume: 0.8,
+                looping: true,
+            }),
+            vfx: Some(Vfx::Billboard {
+                texture: "vfx/smoke.png".to_string(),
+                size: [2.0, 2.0],
+            }),
+        }];
+
+        let ids = load_level_world(&mut world, &NullAssetServer, &level);
+        assert_eq!(ids.len(), 1);
+        let entity = ids[0];
+
+        let light = world
+            .get::<Light>(entity)
+            .expect("Light component should be attached");
+        assert!(matches!(light, Light::Point { shadows: true, .. }));
+
+        let animation = world
+            .get::<Animation>(entity)
+            .expect("Animation component should be attached");
+        assert!(matches!(animation, Animation::Play { clip, .. } if clip == "walk.glb"));
+
+        let audio = world
+            .get::<Audio>(entity)
+            .expect("Audio component should be attached");
+        assert!(matches!(audio, Audio::Ambient { looping: true, .. }));
+
+        let vfx = world
+            .get::<Vfx>(entity)
+            .expect("Vfx component should be attached");
+        assert!(matches!(vfx, Vfx::Billboard { texture, .. } if texture == "vfx/smoke.png"));
     }
 
     #[test]

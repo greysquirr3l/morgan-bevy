@@ -628,9 +628,6 @@ impl LevelExporter {
         }
         code.push('\n');
 
-        // T42: emit `SpawnPoint` / `TriggerVolume` type definitions so the
-        // generated file is self-contained (the consuming project does not
-        // need a separate runtime plugin for these marker components).
         // `Collider` is imported on-demand via the `avian3d` crate, which
         // is the documented Bevy 0.19 collision provider.
         let needs_avian = level_data
@@ -640,24 +637,12 @@ impl LevelExporter {
         if needs_avian {
             code.push_str("use avian3d::prelude::Collider;\n");
         }
-        code.push_str(
-            "/// Marker component for spawn points emitted by `Morgan-Bevy`.\n\
-             #[derive(Component)]\n\
-             pub enum SpawnPoint {\n\
-             \x20\x20\x20\x20PlayerStart,\n\
-             \x20\x20\x20\x20EnemySpawn { team: String },\n\
-             \x20\x20\x20\x20ItemSpawn { item_id: String },\n\
-             }\n\n",
-        );
-        code.push_str(
-            "/// Marker component for trigger volumes emitted by `Morgan-Bevy`.\n\
-             #[derive(Component)]\n\
-             pub enum TriggerVolume {\n\
-             \x20\x20\x20\x20Box { half_extents: Vec3, event: String },\n\
-             \x20\x20\x20\x20Sphere { radius: f32, event: String },\n\
-             \x20\x20\x20\x20Polygon { points: Vec<Vec3>, event: String },\n\
-             }\n\n",
-        );
+
+        // T42/T91 bugfix: import `SpawnPoint` / `TriggerVolume` /
+        // `Light` / `Animation` / `Audio` / `Vfx` from the companion
+        // crate instead of redefining them locally -- see
+        // `emit_companion_type_imports` for the rationale.
+        Self::emit_companion_type_imports(&mut code, level_data)?;
 
         // T56: emit the navmesh (if generated) as a JSON string
         // constant. The `NavMesh` shape (plain vertex / triangle /
@@ -853,6 +838,63 @@ impl LevelExporter {
         Ok(code)
     }
 
+    /// T42/T91 bugfix: emit `use bevy_morgan_integration::{...};`
+    /// importing whichever of `SpawnPoint` / `TriggerVolume` / `Light`
+    /// / `Animation` / `Audio` / `Vfx` the level's objects actually
+    /// use, instead of the generator locally redefining `SpawnPoint`
+    /// / `TriggerVolume` as its own `enum`s (as it used to).
+    ///
+    /// The per-marker systems registered by
+    /// `bevy_morgan_integration::systems::plugin()`
+    /// (`spawn_point_observer`, `light_observer`,
+    /// `animation_player_observer`, `audio_observer`, `vfx_observer`,
+    /// ...) are `On<Add, T>` observers written against the companion
+    /// crate's own marker types. A locally-redefined `enum SpawnPoint
+    /// { ... }` would be a *different* nominal Rust type even if
+    /// structurally identical, so those observers could never fire on
+    /// entities spawned from the generated file. Emitting `use
+    /// bevy_morgan_integration::{...};` keeps the generated file's
+    /// types identical to the companion crate's. `Light` / `Animation`
+    /// / `Audio` / `Vfx` additionally had no import at all previously,
+    /// which produced an E0433 unresolved-type compile error.
+    ///
+    /// Extracted out of `generate_rust_code` purely to keep that
+    /// function under clippy's `too_many_lines` budget -- same
+    /// rationale as `emit_waypoint_json_constants` below.
+    fn emit_companion_type_imports(code: &mut String, level_data: &LevelData) -> Result<()> {
+        let mut companion_types: Vec<&str> = Vec::new();
+        if level_data.objects.iter().any(|o| o.spawn_point.is_some()) {
+            companion_types.push("SpawnPoint");
+        }
+        if level_data
+            .objects
+            .iter()
+            .any(|o| o.trigger_volume.is_some())
+        {
+            companion_types.push("TriggerVolume");
+        }
+        if level_data.objects.iter().any(|o| o.light.is_some()) {
+            companion_types.push("Light");
+        }
+        if level_data.objects.iter().any(|o| o.animation.is_some()) {
+            companion_types.push("Animation");
+        }
+        if level_data.objects.iter().any(|o| o.audio.is_some()) {
+            companion_types.push("Audio");
+        }
+        if level_data.objects.iter().any(|o| o.vfx.is_some()) {
+            companion_types.push("Vfx");
+        }
+        if !companion_types.is_empty() {
+            writeln!(
+                code,
+                "use bevy_morgan_integration::{{{}}};\n",
+                companion_types.join(", ")
+            )?;
+        }
+        Ok(())
+    }
+
     /// T57: append `WAYPOINTS_JSON` / `PATROL_ROUTES_JSON` string
     /// constants to `code` when `level_data` carries any waypoints /
     /// patrol routes. Extracted out of `generate_rust_code` (which
@@ -949,9 +991,11 @@ impl LevelExporter {
         }
     }
 
-    // T42: render a `SpawnPoint` as a marker component. The
-    // `SpawnPoint` struct is *defined* in the generated file (see
-    // `spawn_component_struct_def`) so each level is self-contained.
+    // T42: render a `SpawnPoint` as a marker component. `SpawnPoint`
+    // is imported from `bevy_morgan_integration` (see the
+    // `companion_types` block in `generate_rust_code`) rather than
+    // defined locally, so the emitted literal shares the same
+    // nominal type as the companion crate's `spawn_point_observer`.
     fn rust_spawn_component(spawn: &SpawnPoint) -> String {
         match spawn {
             SpawnPoint::PlayerStart => "        SpawnPoint::PlayerStart,\n".to_string(),
@@ -966,12 +1010,18 @@ impl LevelExporter {
         }
     }
 
-    // T42: render a `TriggerVolume` as a marker component. The
-    // `TriggerVolume` enum is defined in `trigger_component_enum_def`.
+    // T42: render a `TriggerVolume` as a marker component, using the
+    // companion crate's `bevy_morgan_integration::TriggerVolume` shape
+    // (`half_extents: [f32; 3]`, `points: Vec<[f32; 3]>`) — plain
+    // array literals, *not* `Vec3::new(...)`. The companion type's
+    // fields are arrays (see `crates/bevy-morgan-integration/src/components.rs`),
+    // so emitting `Vec3` here would be a type mismatch (E0308) now
+    // that the generator imports the companion type instead of
+    // redefining it locally.
     fn rust_trigger_component(trigger: &TriggerVolume) -> String {
         match trigger {
             TriggerVolume::Box { half_extents, event } => format!(
-                "        TriggerVolume::Box {{ half_extents: Vec3::new({:.3}, {:.3}, {:.3}), event: \"{}\".to_string() }},\n",
+                "        TriggerVolume::Box {{ half_extents: [{:.3}, {:.3}, {:.3}], event: \"{}\".to_string() }},\n",
                 half_extents[0], half_extents[1], half_extents[2],
                 Self::escape_rust_string(event),
             ),
@@ -985,7 +1035,7 @@ impl LevelExporter {
                     .iter()
                     .map(|p| {
                         format!(
-                            "Vec3::new({:.3}, {:.3}, {:.3})",
+                            "[{:.3}, {:.3}, {:.3}]",
                             p[0], p[1], p[2],
                         )
                     })
@@ -1667,6 +1717,39 @@ mod tests {
         o
     }
 
+    /// Assert that `code` imports `type_name` from the companion
+    /// crate (`use bevy_morgan_integration::{..., TypeName, ...};`)
+    /// rather than redefining it as a local `enum`/`struct`.
+    ///
+    /// Regression guard: the generator used to locally redefine
+    /// `SpawnPoint` / `TriggerVolume` inside the generated file. That
+    /// produced a *different* nominal Rust type than
+    /// `bevy_morgan_integration`'s own `SpawnPoint` / `TriggerVolume`
+    /// — the ones `spawn_point_observer` / `trigger_volume_observer`
+    /// (registered by `plugin_init`) are written against. Because
+    /// Rust's `On<Add, T>` observers dispatch on nominal type, a
+    /// locally-redefined enum meant the registered observers could
+    /// never fire on entities spawned from the generated file, even
+    /// though the code compiled and *looked* correct. Asserting both
+    /// "companion import present" and "no local redefinition" catches
+    /// either half of the regression.
+    fn assert_imports_companion_type_not_locally_defined(code: &str, type_name: &str) {
+        let has_companion_import = code.lines().any(|line| {
+            line.trim_start().starts_with("use bevy_morgan_integration::{") && line.contains(type_name)
+        });
+        assert!(
+            has_companion_import,
+            "expected a `use bevy_morgan_integration::{{..., {type_name}, ...}};` line in \
+             generated code so `{type_name}` matches the companion crate's observer types; got:\n{code}"
+        );
+        assert!(
+            !code.contains(&format!("enum {type_name}")),
+            "generated code must not locally redefine `{type_name}` -- doing so creates a \
+             distinct nominal type from bevy_morgan_integration's, so the registered `On<Add, \
+             {type_name}>` observer could never fire; got:\n{code}"
+        );
+    }
+
     #[test]
     fn rust_exporter_emits_box_collider() {
         let mut lvl = sample_level();
@@ -1706,6 +1789,7 @@ mod tests {
         lvl.objects = vec![obj_with_spawn(SpawnPoint::PlayerStart)];
         let code = LevelExporter::generate_rust_code(&lvl).unwrap();
         assert!(code.contains("SpawnPoint::PlayerStart"), "{code}");
+        assert_imports_companion_type_not_locally_defined(&code, "SpawnPoint");
     }
 
     #[test]
@@ -1719,6 +1803,7 @@ mod tests {
             code.contains("SpawnPoint::EnemySpawn { team: \"red\".to_string() }"),
             "{code}"
         );
+        assert_imports_companion_type_not_locally_defined(&code, "SpawnPoint");
     }
 
     #[test]
@@ -1732,6 +1817,7 @@ mod tests {
             code.contains("SpawnPoint::ItemSpawn { item_id: \"key.gold\".to_string() }"),
             "{code}"
         );
+        assert_imports_companion_type_not_locally_defined(&code, "SpawnPoint");
     }
 
     #[test]
@@ -1744,6 +1830,16 @@ mod tests {
         let code = LevelExporter::generate_rust_code(&lvl).unwrap();
         assert!(code.contains("TriggerVolume::Box"), "{code}");
         assert!(code.contains("event: \"level.complete\""), "{code}");
+        // Bugfix regression: `half_extents` on the companion crate's
+        // `TriggerVolume::Box` is `[f32; 3]`, not `Vec3` -- emitting
+        // `Vec3::new(...)` here would be an E0308 type mismatch once
+        // `TriggerVolume` is imported from `bevy_morgan_integration`
+        // instead of being locally redefined.
+        assert!(
+            code.contains("half_extents: [1.000, 1.000, 1.000]"),
+            "expected a plain [f32; 3] array literal for half_extents, not Vec3::new(...); got:\n{code}"
+        );
+        assert_imports_companion_type_not_locally_defined(&code, "TriggerVolume");
     }
 
     #[test]
@@ -1755,10 +1851,15 @@ mod tests {
         })];
         let code = LevelExporter::generate_rust_code(&lvl).unwrap();
         assert!(code.contains("TriggerVolume::Polygon"), "{code}");
-        // Three Vec3::new entries — one per polygon vertex. The
-        // transform / bounds contribute additional Vec3::new calls
-        // so we only assert at-least-3.
-        assert!(code.matches("Vec3::new").count() >= 3, "{code}");
+        // Bugfix regression: `points` on the companion crate's
+        // `TriggerVolume::Polygon` is `Vec<[f32; 3]>`, not
+        // `Vec<Vec3>`. Assert the three polygon vertices are emitted
+        // as plain array literals rather than `Vec3::new(...)` calls.
+        assert!(
+            code.contains("points: vec![[0.000, 0.000, 0.000], [1.000, 0.000, 0.000], [0.500, 1.000, 0.000]]"),
+            "expected [f32; 3] array literals for polygon points, not Vec3::new(...); got:\n{code}"
+        );
+        assert_imports_companion_type_not_locally_defined(&code, "TriggerVolume");
     }
 
     #[test]
@@ -1960,6 +2061,16 @@ mod tests {
         assert!(code.contains("Light::Point"));
         assert!(code.contains("color: [1.000, 0.500, 0.000]"));
         assert!(code.contains("shadows: true"));
+        // Bugfix regression: `Light` has no local definition anywhere
+        // in the generated file (unlike `SpawnPoint`/`TriggerVolume`,
+        // which used to be locally redefined). Without a `use
+        // bevy_morgan_integration::{..., Light, ...};` line, this is
+        // an E0433 unresolved-type compile error in any project that
+        // pastes the generated code.
+        assert!(
+            code.lines().any(|l| l.trim_start().starts_with("use bevy_morgan_integration::{") && l.contains("Light")),
+            "expected `use bevy_morgan_integration::{{..., Light, ...}};` in generated code; got:\n{code}"
+        );
     }
 
     #[test]
@@ -1976,6 +2087,7 @@ mod tests {
         assert!(code.contains("Animation::Play"));
         assert!(code.contains("clip: \"walk.glb\".to_string()"));
         assert!(code.contains("speed: 1.500"));
+        assert_imports_companion_type_not_locally_defined(&code, "Animation");
     }
 
     #[test]
@@ -1991,6 +2103,7 @@ mod tests {
         let code = LevelExporter::generate_rust_code(&lvl).unwrap();
         assert!(code.contains("Audio::Ambient"));
         assert!(code.contains("looping: true"));
+        assert_imports_companion_type_not_locally_defined(&code, "Audio");
     }
 
     #[test]
@@ -2006,6 +2119,44 @@ mod tests {
         assert!(code.contains("Vfx::Billboard"));
         assert!(code.contains("texture: \"vfx/smoke.png\".to_string()"));
         assert!(code.contains("size: [2.000, 2.000]"));
+        assert_imports_companion_type_not_locally_defined(&code, "Vfx");
+    }
+
+    #[test]
+    fn generated_rust_omits_companion_type_import_when_no_typed_markers_present() {
+        // A level with no spawn_point / trigger_volume / light /
+        // animation / audio / vfx fields set on any object should not
+        // emit a `use bevy_morgan_integration::{...};` type-import
+        // line at all -- there's nothing to import.
+        let lvl = sample_level();
+        let code = LevelExporter::generate_rust_code(&lvl).unwrap();
+        assert!(
+            !code
+                .lines()
+                .any(|l| l.trim_start().starts_with("use bevy_morgan_integration::{")),
+            "expected no companion type import for a level with no typed markers; got:\n{code}"
+        );
+    }
+
+    #[test]
+    fn generated_rust_companion_type_import_lists_only_present_markers() {
+        // Only the markers actually present on the level's objects
+        // should appear in the `use bevy_morgan_integration::{...};`
+        // line -- e.g. a level with only a spawn point must not also
+        // import `Light` / `Audio` / etc.
+        let mut lvl = sample_level();
+        lvl.objects = vec![obj_with_spawn(SpawnPoint::PlayerStart)];
+        let code = LevelExporter::generate_rust_code(&lvl).unwrap();
+        let import_line = code
+            .lines()
+            .find(|l| l.trim_start().starts_with("use bevy_morgan_integration::{"))
+            .expect("expected a companion type import line");
+        assert!(import_line.contains("SpawnPoint"), "{import_line}");
+        assert!(!import_line.contains("TriggerVolume"), "{import_line}");
+        assert!(!import_line.contains("Light"), "{import_line}");
+        assert!(!import_line.contains("Animation"), "{import_line}");
+        assert!(!import_line.contains("Audio"), "{import_line}");
+        assert!(!import_line.contains("Vfx"), "{import_line}");
     }
 
     #[test]
