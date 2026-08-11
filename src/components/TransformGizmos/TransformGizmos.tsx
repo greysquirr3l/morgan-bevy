@@ -6,7 +6,7 @@ import { TransformCommand } from '@/utils/commands'
 
 export default function TransformGizmos() {
   const { scene } = useThree()
-  const { selectedObjects, transformMode, updateObjectTransform, executeCommand, sceneObjects } = useEditorStore()
+  const { selectedObjects, transformMode, coordinateSpace, updateObjectTransform, executeCommand, sceneObjects } = useEditorStore()
   const transformControlsRef = useRef<any>(null)
   const initialTransformRef = useRef<{
     position: [number, number, number]
@@ -107,7 +107,7 @@ export default function TransformGizmos() {
       showX={true}
       showY={true}
       showZ={true}
-      space="world"
+      space={coordinateSpace}
       enabled={true}
     />
   )

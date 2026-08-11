@@ -50,6 +50,13 @@ export default function BoxSelection() {
     // active — don't compete with it for the same gesture.
     if (useEditorStore.getState().paintToolActive) return
 
+    // In fly mode, a canvas click is exclusively "lock the pointer
+    // and enter fly-look" (handled by CameraSystem's canvas click
+    // listener). Without this guard, this same pointerdown also
+    // starts a box-selection drag, which fights fly mode for the
+    // click.
+    if (useEditorStore.getState().cameraMode === 'fly') return
+
     // Don't start box selection if clicking on a specific object (let object selection handle it)
     const raycaster = new THREE.Raycaster()
     const mouse = new THREE.Vector2()

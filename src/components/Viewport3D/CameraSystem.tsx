@@ -1,20 +1,33 @@
+import { useEditorStore } from '@/store/editorStore'
 import { CameraControls } from '@react-three/drei'
 import { useFrame, useThree } from '@react-three/fiber'
+import CameraControlsImpl from 'camera-controls'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { OrthographicCamera, PerspectiveCamera, Vector3 } from 'three'
 
 export type CameraMode = 'orbit' | 'fly' | 'orthographic'
+
+// Fixed fly-camera move speed. Was a `useState` that nothing ever
+// called the setter of — exported as a constant so the fly HUD
+// (rendered outside <Canvas>, in Viewport3D.tsx, per the R3F-tree
+// fix below) can display the same number without duplicating it.
+export const FLY_SPEED = 10
 
 interface CameraSystemProps {
   mode: CameraMode
 }
 
 export default function CameraSystem({ mode }: CameraSystemProps) {
-  const { camera, gl } = useThree()
+  const { camera, gl, set } = useThree()
   const controlsRef = useRef<CameraControls>(null)
-  const [flySpeed] = useState(10)
+  const flySpeed = FLY_SPEED
   const [keys, setKeys] = useState<Set<string>>(new Set())
-  const [isMouseLocked, setIsMouseLocked] = useState(false)
+  // Lives in the store, not local state, so the fly HUD — which has
+  // to render as a plain DOM sibling of <Canvas>, not inside it (see
+  // the return statement below) — can read it without prop-drilling
+  // through the Canvas boundary.
+  const isMouseLocked = useEditorStore(state => state.isCameraPointerLocked)
+  const setIsMouseLocked = useEditorStore(state => state.setCameraPointerLocked)
 
   // Camera position and rotation for fly mode
   const flyPosition = useRef(new Vector3(10, 10, 10))
@@ -26,10 +39,18 @@ export default function CameraSystem({ mode }: CameraSystemProps) {
   // fly-camera integration below, so a ref is the right home for it.
   const mouseMovementRef = useRef({ x: 0, y: 0 })
 
-  // Switch between camera types based on mode
+  // Switch between camera types based on mode. Must call `set({
+  // camera })` to actually install the new camera as R3F's active
+  // render camera — constructing the THREE.Camera object alone does
+  // nothing, R3F keeps rendering through whatever `state.camera`
+  // already is. Guarded by `instanceof` (rather than just `[mode]`)
+  // so setting the camera — which changes `camera` and re-triggers
+  // this effect — doesn't loop: the second run sees the camera type
+  // already matches and no-ops.
   useEffect(() => {
     if (mode === 'orthographic') {
-      // Switch to orthographic camera
+      if (camera instanceof OrthographicCamera) return
+
       const orthoCamera = new OrthographicCamera(
         window.innerWidth / -2,
         window.innerWidth / 2,
@@ -41,19 +62,21 @@ export default function CameraSystem({ mode }: CameraSystemProps) {
       orthoCamera.position.set(0, 50, 0)
       orthoCamera.lookAt(0, 0, 0)
       orthoCamera.updateProjectionMatrix()
-    } else {
+      set({ camera: orthoCamera })
+    } else if (!(camera instanceof PerspectiveCamera)) {
       // Ensure we have a perspective camera for orbit and fly modes
-      if (!(camera instanceof PerspectiveCamera)) {
-        const perspCamera = new PerspectiveCamera(
-          75,
-          window.innerWidth / window.innerHeight,
-          0.1,
-          1000
-        )
-        perspCamera.position.set(10, 10, 10)
-      }
+      const perspCamera = new PerspectiveCamera(
+        75,
+        window.innerWidth / window.innerHeight,
+        0.1,
+        1000
+      )
+      perspCamera.position.set(10, 10, 10)
+      perspCamera.lookAt(0, 0, 0)
+      perspCamera.updateProjectionMatrix()
+      set({ camera: perspCamera })
     }
-  }, [mode, camera])
+  }, [mode, camera, set])
 
   // Keyboard event handlers for fly mode
   const handleKeyDown = useCallback(
@@ -99,7 +122,7 @@ export default function CameraSystem({ mode }: CameraSystemProps) {
       gl.domElement.requestPointerLock()
       setIsMouseLocked(true)
     }
-  }, [mode, gl.domElement])
+  }, [mode, gl.domElement, setIsMouseLocked])
 
   // Release the pointer lock when the user exits fly mode via
   // anything OTHER than the canvas click (which only ever sets the
@@ -118,11 +141,11 @@ export default function CameraSystem({ mode }: CameraSystemProps) {
       }
       setIsMouseLocked(false)
     }
-  }, [mode, isMouseLocked, gl.domElement])
+  }, [mode, isMouseLocked, gl.domElement, setIsMouseLocked])
 
   const handlePointerLockChange = useCallback(() => {
     setIsMouseLocked(document.pointerLockElement === gl.domElement)
-  }, [gl.domElement])
+  }, [gl.domElement, setIsMouseLocked])
 
   // Set up event listeners
   useEffect(() => {
@@ -192,6 +215,48 @@ export default function CameraSystem({ mode }: CameraSystemProps) {
     camera.rotation.set(flyRotation.current.pitch, flyRotation.current.yaw, 0, 'YXZ')
   })
 
+  // Shift+left-drag pans the orbit camera instead of rotating it —
+  // matches the "Shift+Mouse: Pan" hint in App.tsx and standard
+  // Blender/Unity-style editor convention. `camera-controls`
+  // defaults `mouseButtons.left` to ROTATE with no built-in modifier
+  // support, so we swap it to TRUCK (pan) for as long as Shift is
+  // held and restore ROTATE on release. Only wired up in orbit mode
+  // — fly/ortho don't use `CameraControls` at all.
+  useEffect(() => {
+    if (mode !== 'orbit') return
+
+    const setLeftAction = (
+      action: typeof CameraControlsImpl.ACTION.ROTATE | typeof CameraControlsImpl.ACTION.TRUCK
+    ) => {
+      if (controlsRef.current) {
+        controlsRef.current.mouseButtons.left = action
+      }
+    }
+
+    const handleShiftKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Shift') setLeftAction(CameraControlsImpl.ACTION.TRUCK)
+    }
+    const handleShiftKeyUp = (event: KeyboardEvent) => {
+      if (event.key === 'Shift') setLeftAction(CameraControlsImpl.ACTION.ROTATE)
+    }
+    // Alt-tabbing away while Shift is held never fires `keyup` — reset
+    // on blur too so the controls don't get stuck permanently panning.
+    const handleBlur = () => setLeftAction(CameraControlsImpl.ACTION.ROTATE)
+
+    window.addEventListener('keydown', handleShiftKeyDown)
+    window.addEventListener('keyup', handleShiftKeyUp)
+    window.addEventListener('blur', handleBlur)
+
+    return () => {
+      window.removeEventListener('keydown', handleShiftKeyDown)
+      window.removeEventListener('keyup', handleShiftKeyUp)
+      window.removeEventListener('blur', handleBlur)
+      // Don't leak the swapped action if we unmount (or the mode
+      // changes away from orbit) while Shift is still held.
+      setLeftAction(CameraControlsImpl.ACTION.ROTATE)
+    }
+  }, [mode])
+
   // Camera mode switching (1 / 2 / 3) and ESC-to-exit-fly are
   // handled centrally by `useKeyboardShortcuts` so the binding
   // table stays the single source of truth. We previously also
@@ -202,31 +267,17 @@ export default function CameraSystem({ mode }: CameraSystemProps) {
   // redundant because the store update is the only signal
   // subscribers care about.
 
+  // Only Three.js-safe JSX below — this component is rendered
+  // inside <Canvas>, so returning a raw DOM element (e.g. the old
+  // fly/ortho HUD `<div>`s) makes R3F's reconciler try to
+  // instantiate it as a THREE object and throw, unmounting the
+  // whole Canvas subtree. The HUDs now live in Viewport3D.tsx as
+  // DOM siblings of <Canvas>, driven by `cameraMode` and
+  // `isCameraPointerLocked` from the store.
   return (
     <>
       {mode === 'orbit' && (
         <CameraControls ref={controlsRef} makeDefault minDistance={1} maxDistance={100} />
-      )}
-
-      {mode === 'fly' && isMouseLocked && (
-        <div className="fixed top-4 left-1/2 transform -translate-x-1/2 bg-black/80 text-white px-4 py-2 rounded text-sm z-50">
-          <div className="text-center">
-            <div className="font-semibold">Fly Camera Mode</div>
-            <div className="text-xs mt-1">
-              WASD: Move • Mouse: Look • Space/C: Up/Down • Shift: Fast • ESC: Exit
-            </div>
-            <div className="text-xs text-gray-300 mt-1">Speed: {flySpeed.toFixed(1)} units/sec</div>
-          </div>
-        </div>
-      )}
-
-      {mode === 'orthographic' && (
-        <div className="fixed top-4 left-1/2 transform -translate-x-1/2 bg-black/80 text-white px-4 py-2 rounded text-sm z-50">
-          <div className="text-center">
-            <div className="font-semibold">Orthographic Top-Down View</div>
-            <div className="text-xs mt-1">Mouse: Pan • Scroll: Zoom • 1: Orbit • 2: Fly</div>
-          </div>
-        </div>
       )}
     </>
   )
