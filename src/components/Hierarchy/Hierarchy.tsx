@@ -181,6 +181,43 @@ export default function Hierarchy({ hideHeader = false }: HierarchyProps) {
     obj.name.toLowerCase().includes(searchTerm.toLowerCase())
   )
 
+  // Audit (Major #12) regression: groups used to be flattened into
+  // the same list as their children — there was no visible tree,
+  // just an unsorted sibling list with zero indentation. The
+  // `parentId` / `children` data on each object was stored but
+  // never read by the UI. Build a proper tree:
+  //   - roots: objects with no `parentId` (or whose parent is
+  //     filtered out by the search box);
+  //   - children: walk `obj.children` recursively with depth
+  //     tracking so each level indents by 16 px.
+  // Cycle guard: if a malformed scene contains a cycle (A.parent =
+  // B, B.children includes A), the visited set prevents an infinite
+  // descent.
+  const renderTree = (): React.ReactNode => {
+    const byId = new Map<string, (typeof filteredObjects)[number]>()
+    for (const obj of filteredObjects) byId.set(obj.id, obj)
+    const visited = new Set<string>()
+    const out: React.ReactNode[] = []
+
+    const descend = (obj: (typeof filteredObjects)[number], level: number): void => {
+      if (visited.has(obj.id)) return
+      visited.add(obj.id)
+      out.push(renderTreeItem(obj, level))
+      // Defensive: some test fixtures / older payloads may not
+      // include `children` at all. Treat undefined as "no
+      // children" rather than blowing up the tree.
+      const childIds = Array.isArray(obj.children) ? obj.children : []
+      for (const childId of childIds) {
+        const child = byId.get(childId)
+        if (child) descend(child, level + 1)
+      }
+    }
+
+    const roots = filteredObjects.filter(o => !o.parentId || !byId.has(o.parentId))
+    for (const root of roots) descend(root, 0)
+    return out
+  }
+
   return (
     <div className="flex flex-col h-full">
       {/* Header - only show if not hiding header */}
@@ -225,7 +262,7 @@ export default function Hierarchy({ hideHeader = false }: HierarchyProps) {
             {searchTerm ? 'No objects match your search' : 'No objects in scene'}
           </div>
         ) : (
-          filteredObjects.map(obj => renderTreeItem(obj))
+          renderTree()
         )}
       </div>
     </div>

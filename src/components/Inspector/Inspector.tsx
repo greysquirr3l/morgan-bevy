@@ -30,9 +30,11 @@ export default function Inspector() {
   const {
     selectedObjects,
     sceneObjects,
+    layers,
     executeCommand,
     updateObjectMaterial,
     updateObjectMesh,
+    updateObjectName,
     updateObjectProperties,
     linkObjectToPreset,
     unlinkObjectFromPreset,
@@ -40,9 +42,11 @@ export default function Inspector() {
     useShallow(s => ({
       selectedObjects: s.selectedObjects,
       sceneObjects: s.sceneObjects,
+      layers: s.layers,
       executeCommand: s.executeCommand,
       updateObjectMaterial: s.updateObjectMaterial,
       updateObjectMesh: s.updateObjectMesh,
+      updateObjectName: s.updateObjectName,
       updateObjectProperties: s.updateObjectProperties,
       linkObjectToPreset: s.linkObjectToPreset,
       unlinkObjectFromPreset: s.unlinkObjectFromPreset,
@@ -63,6 +67,11 @@ export default function Inspector() {
     selectedObjects.forEach(objectId => {
       const obj = sceneObjects.get(objectId)
       if (obj) {
+        // Audit (Major #11): skip locked objects / objects on
+        // locked layers — same gate as the gizmo and Delete.
+        if (obj.locked) return
+        const layer = layers.find(l => l.id === obj.layerId)
+        if (layer?.locked) return
         // Capture old transform for undo
         const oldTransform = {
           position: [...obj.position] as [number, number, number],
@@ -139,10 +148,14 @@ export default function Inspector() {
             value={objectName}
             onChange={e => {
               if (selectedCount === 1 && primaryObject) {
-                // Update object name directly in store
-                useEditorStore.setState((state: any) => {
-                  state.sceneObjects.get(primaryObject.id).name = e.target.value
-                })
+                // Audit (Minor #21): route through the store's
+                // `updateObjectName` action rather than mutating
+                // the (frozen) scene object directly. The previous
+                // `setState` bypass silently failed under immer
+                // auto-freeze and produced an inconsistent view
+                // for any subscriber that destructured the map
+                // value.
+                updateObjectName(primaryObject.id, e.target.value)
               }
             }}
             className="w-full px-2 py-1 text-sm font-semibold bg-editor-bg border border-editor-border rounded focus:outline-none focus:border-editor-accent"

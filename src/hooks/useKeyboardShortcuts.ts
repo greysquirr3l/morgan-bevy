@@ -165,9 +165,20 @@ export function useKeyboardShortcuts() {
         case 'selection.delete':
           if (selectedObjects.length > 0) {
             selectedObjects.forEach(id => {
-              const command = new DeleteObjectCommand(id)
-              command.execute()
-              executeCommand(command)
+              try {
+                // Audit (Major #11): DeleteObjectCommand throws on
+                // locked objects / objects on locked layers. Wrap
+                // each attempt so one locked target doesn't abort
+                // the loop and leave the rest undeleted.
+                const command = new DeleteObjectCommand(id)
+                command.execute()
+                executeCommand(command)
+              } catch (err) {
+                // Silent: the lock is the source of truth. Callers
+                // (ActionsPanel, FileMenu) have the same wrap so
+                // any consistent UX hint can be hoisted here.
+                console.warn('[shortcuts] delete skipped:', (err as Error).message)
+              }
             })
           }
           break

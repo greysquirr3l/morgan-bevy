@@ -25,9 +25,16 @@ export default function ActionsPanel() {
   const deleteSelected = () => {
     if (selectedObjects.length > 0) {
       selectedObjects.forEach((id: ObjectId) => {
-        const command = new DeleteObjectCommand(id)
-        command.execute()
-        executeCommand(command)
+        try {
+          // Audit (Major #11): lock-aware delete — see
+          // DeleteObjectCommand for the enforcement. Wrap so one
+          // locked target doesn't abort the loop.
+          const command = new DeleteObjectCommand(id)
+          command.execute()
+          executeCommand(command)
+        } catch (err) {
+          console.warn('[actions] delete skipped:', (err as Error).message)
+        }
       })
     }
   }

@@ -1,6 +1,8 @@
+import { useEditorStore } from '@/store/editorStore'
 import type { ObjectId } from '@/types/brand'
-import { useRef, useMemo, useEffect } from 'react'
-import { InstancedMesh, Color, Object3D } from 'three'
+import type { ThreeEvent } from '@react-three/fiber'
+import { useCallback, useEffect, useMemo, useRef } from 'react'
+import { Color, InstancedMesh, Object3D } from 'three'
 
 // Interface for instanced object data
 export interface InstancedObjectData {
@@ -12,6 +14,27 @@ export interface InstancedObjectData {
   visible?: boolean
 }
 
+/**
+ * Inverted instance-index → ObjectId map, mirroring
+ * `visibilityMap` but flipped so a click handler can resolve
+ * `e.instanceId` back to the scene object that owns the slot.
+ * Three.js' raycaster hands us `event.instanceId` on
+ * `InstancedMesh` intersections; the mesh itself only carries one
+ * `userData` field for the whole instanced group, not per
+ * instance — so we have to maintain the mapping externally.
+ *
+ * Audit (Major #8) regression: the audit caught that
+ * `InstancedCubes` / `InstancedSpheres` / `InstancedCones` had no
+ * `userData.objectId` AND no `onClick` handler. Anything beyond
+ * the 10-object threshold was untouchable — clicks passed
+ * through to the ground, which then cleared the selection.
+ */
+function invertIndexToIdMap(forward: Map<string, number>): Map<number, string> {
+  const inv = new Map<number, string>()
+  for (const [id, idx] of forward) inv.set(idx, id)
+  return inv
+}
+
 // Hook to manage instanced rendering for identical objects
 export function useInstancedRendering<T extends InstancedObjectData>(
   objects: T[],
@@ -20,7 +43,7 @@ export function useInstancedRendering<T extends InstancedObjectData>(
   const meshRef = useRef<InstancedMesh>(null)
   const tempObject = useMemo(() => new Object3D(), [])
   const tempColor = useMemo(() => new Color(), [])
-  
+
   // Track which instances are visible
   const visibilityMap = useRef<Map<string, number>>(new Map())
   const instanceCount = useRef(0)
@@ -33,22 +56,22 @@ export function useInstancedRendering<T extends InstancedObjectData>(
     visibilityMap.current.clear()
 
     // Update instances based on object data
-    objects.forEach((obj) => {
+    objects.forEach(obj => {
       if (obj.visible !== false && instanceCount.current < maxInstances) {
         // Set transform
         tempObject.position.set(...obj.position)
         tempObject.rotation.set(...obj.rotation)
         tempObject.scale.set(...obj.scale)
         tempObject.updateMatrix()
-        
+
         mesh.setMatrixAt(instanceCount.current, tempObject.matrix)
-        
+
         // Set color if available
         if (obj.color) {
           tempColor.set(obj.color)
           mesh.setColorAt(instanceCount.current, tempColor)
         }
-        
+
         // Track instance mapping
         visibilityMap.current.set(obj.id, instanceCount.current)
         instanceCount.current++
@@ -57,7 +80,7 @@ export function useInstancedRendering<T extends InstancedObjectData>(
 
     // Update instance count
     mesh.count = instanceCount.current
-    
+
     // Mark matrices and colors as needing update
     if (mesh.instanceMatrix) {
       mesh.instanceMatrix.needsUpdate = true
@@ -71,28 +94,68 @@ export function useInstancedRendering<T extends InstancedObjectData>(
     meshRef,
     instanceCount: instanceCount.current,
     getInstanceIndex: (id: string) => visibilityMap.current.get(id),
-    visibilityMap: visibilityMap.current
+    visibilityMap: visibilityMap.current,
   }
 }
 
+/**
+ * Shared click-handler factory for instanced meshes. Resolves
+ * `event.instanceId` (the slot in the per-mesh instance buffer
+ * that was hit by the raycast) back to the owning `ObjectId` via
+ * the index map, then routes through the editor store the same
+ * way `OptimizedSceneObject`'s click handler does — additive
+ * selection with Shift / Ctrl / Meta, single-select otherwise.
+ *
+ * Returning `void` on miss lets the event propagate to the
+ * `Ground` `onClick` (which clears selection) when the user
+ * clicks empty space.
+ */
+function useInstancedClickHandler(visibilityMap: Map<string, number>) {
+  const setSelectedObjects = useEditorStore(s => s.setSelectedObjects)
+  const addToSelection = useEditorStore(s => s.addToSelection)
+  const selectedObjects = useEditorStore(s => s.selectedObjects)
+  return useCallback(
+    (event: ThreeEvent<MouseEvent>) => {
+      event.stopPropagation()
+      const idx = event.instanceId
+      if (idx === undefined) return
+      const objectId = invertIndexToIdMap(visibilityMap).get(idx)
+      if (!objectId) return
+      if (event.shiftKey || event.ctrlKey || event.metaKey) {
+        if (selectedObjects.includes(objectId as ObjectId)) {
+          setSelectedObjects(selectedObjects.filter(id => id !== objectId))
+        } else {
+          addToSelection(objectId as ObjectId)
+        }
+      } else {
+        setSelectedObjects([objectId as ObjectId])
+      }
+    },
+    [visibilityMap, selectedObjects, setSelectedObjects, addToSelection]
+  )
+}
+
 // Component for instanced cubes
-export function InstancedCubes({ 
-  objects, 
+export function InstancedCubes({
+  objects,
   maxInstances = 1000,
-  material 
+  material,
 }: {
   objects: InstancedObjectData[]
   maxInstances?: number
   material?: React.ReactElement
 }) {
-  const { meshRef } = useInstancedRendering(objects, maxInstances)
+  const { meshRef, visibilityMap } = useInstancedRendering(objects, maxInstances)
+  const handleClick = useInstancedClickHandler(visibilityMap)
 
   return (
-    <instancedMesh 
-      ref={meshRef} 
+    <instancedMesh
+      ref={meshRef}
       args={[undefined, undefined, maxInstances]}
       castShadow
       receiveShadow
+      userData={{ instanced: true, kind: 'cube' }}
+      onClick={handleClick}
     >
       <boxGeometry args={[1, 1, 1]} />
       {material || <meshStandardMaterial />}
@@ -101,12 +164,12 @@ export function InstancedCubes({
 }
 
 // Component for instanced spheres
-export function InstancedSpheres({ 
-  objects, 
+export function InstancedSpheres({
+  objects,
   maxInstances = 1000,
   segments = 16,
   rings = 8,
-  material 
+  material,
 }: {
   objects: InstancedObjectData[]
   maxInstances?: number
@@ -114,14 +177,17 @@ export function InstancedSpheres({
   rings?: number
   material?: React.ReactElement
 }) {
-  const { meshRef } = useInstancedRendering(objects, maxInstances)
+  const { meshRef, visibilityMap } = useInstancedRendering(objects, maxInstances)
+  const handleClick = useInstancedClickHandler(visibilityMap)
 
   return (
-    <instancedMesh 
-      ref={meshRef} 
+    <instancedMesh
+      ref={meshRef}
       args={[undefined, undefined, maxInstances]}
       castShadow
       receiveShadow
+      userData={{ instanced: true, kind: 'sphere' }}
+      onClick={handleClick}
     >
       <sphereGeometry args={[0.5, segments, rings]} />
       {material || <meshStandardMaterial />}
@@ -130,25 +196,28 @@ export function InstancedSpheres({
 }
 
 // Component for instanced pyramids/cones
-export function InstancedCones({ 
-  objects, 
+export function InstancedCones({
+  objects,
   maxInstances = 1000,
   segments = 8,
-  material 
+  material,
 }: {
   objects: InstancedObjectData[]
   maxInstances?: number
   segments?: number
   material?: React.ReactElement
 }) {
-  const { meshRef } = useInstancedRendering(objects, maxInstances)
+  const { meshRef, visibilityMap } = useInstancedRendering(objects, maxInstances)
+  const handleClick = useInstancedClickHandler(visibilityMap)
 
   return (
-    <instancedMesh 
-      ref={meshRef} 
+    <instancedMesh
+      ref={meshRef}
       args={[undefined, undefined, maxInstances]}
       castShadow
       receiveShadow
+      userData={{ instanced: true, kind: 'pyramid' }}
+      onClick={handleClick}
     >
       <coneGeometry args={[0.5, 1, segments]} />
       {material || <meshStandardMaterial />}
@@ -157,9 +226,9 @@ export function InstancedCones({
 }
 
 // Manager component that automatically groups objects by type for instanced rendering
-export function InstancedObjectManager({ 
-  objects, 
-  maxInstancesPerType = 1000 
+export function InstancedObjectManager({
+  objects,
+  maxInstancesPerType = 1000,
 }: {
   objects: Array<InstancedObjectData & { meshType: 'cube' | 'sphere' | 'pyramid' }>
   maxInstancesPerType?: number
@@ -168,9 +237,9 @@ export function InstancedObjectManager({
     const groups = {
       cube: [] as typeof objects,
       sphere: [] as typeof objects,
-      pyramid: [] as typeof objects
+      pyramid: [] as typeof objects,
     }
-    
+
     objects.forEach(obj => {
       if (obj.meshType === 'cube') {
         groups.cube.push(obj)
@@ -180,20 +249,17 @@ export function InstancedObjectManager({
         groups.pyramid.push(obj)
       }
     })
-    
+
     return groups
   }, [objects])
 
   return (
     <group>
       {groupedObjects.cube.length > 0 && (
-        <InstancedCubes 
-          objects={groupedObjects.cube}
-          maxInstances={maxInstancesPerType}
-        />
+        <InstancedCubes objects={groupedObjects.cube} maxInstances={maxInstancesPerType} />
       )}
       {groupedObjects.sphere.length > 0 && (
-        <InstancedSpheres 
+        <InstancedSpheres
           objects={groupedObjects.sphere}
           maxInstances={maxInstancesPerType}
           segments={16}
@@ -201,7 +267,7 @@ export function InstancedObjectManager({
         />
       )}
       {groupedObjects.pyramid.length > 0 && (
-        <InstancedCones 
+        <InstancedCones
           objects={groupedObjects.pyramid}
           maxInstances={maxInstancesPerType}
           segments={8}

@@ -1,5 +1,6 @@
 import { Mesh, BoxGeometry, MeshStandardMaterial } from 'three'
 import { useRef, useMemo } from 'react'
+import type { ThreeEvent } from '@react-three/fiber'
 import { useEditorStore } from '@/store/editorStore'
 import type { ObjectId } from '@/types/brand'
 import {
@@ -75,7 +76,7 @@ function OptimizedSceneObject({
   // Early return if culled
   if (!visible || !shouldRender) return null
 
-  const handleClick = (e: any) => {
+  const handleClick = (e: ThreeEvent<MouseEvent>) => {
     e.stopPropagation()
 
     if (e.shiftKey || e.ctrlKey || e.metaKey) {
@@ -88,13 +89,13 @@ function OptimizedSceneObject({
       setSelectedObjects([id])
     }
   }
-  
-  const handlePointerOver = (e: any) => {
+
+  const handlePointerOver = (e: ThreeEvent<PointerEvent>) => {
     e.stopPropagation()
     setHoveredObject(id)
   }
-  
-  const handlePointerOut = (e: any) => {
+
+  const handlePointerOut = (e: ThreeEvent<PointerEvent>) => {
     e.stopPropagation()
     setHoveredObject(null)
   }
@@ -117,25 +118,22 @@ function OptimizedSceneObject({
   
   return (
     <SelectionHighlight
+      ref={meshRef}
       isSelected={isSelected}
       isHovered={isHovered}
       baseColor={baseColor}
+      name={id}
+      position={position}
+      rotation={rotation}
+      scale={scale}
+      castShadow={lodLevel < 2} // Only cast shadows for nearby objects
+      receiveShadow={lodLevel < 3}
+      onClick={handleClick}
+      onPointerOver={handlePointerOver}
+      onPointerOut={handlePointerOut}
+      userData={{ objectId: id, meshType }}
     >
-      <mesh
-        ref={meshRef}
-        name={id}
-        position={position}
-        rotation={rotation}
-        scale={scale}
-        castShadow={lodLevel < 2} // Only cast shadows for nearby objects
-        receiveShadow={lodLevel < 3}
-        onClick={handleClick}
-        onPointerOver={handlePointerOver}
-        onPointerOut={handlePointerOut}
-        userData={{ objectId: id, meshType }}
-      >
-        {renderGeometry()}
-      </mesh>
+      {renderGeometry()}
     </SelectionHighlight>
   )
 }

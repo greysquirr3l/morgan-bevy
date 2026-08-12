@@ -1,5 +1,7 @@
-import { useMemo, useRef, useState } from 'react'
-import { Color, ShaderMaterial } from 'three'
+import { forwardRef, useMemo, useRef, useState } from 'react'
+import type { ReactNode } from 'react'
+import { Color, ShaderMaterial, type Mesh } from 'three'
+import type { ThreeEvent } from '@react-three/fiber'
 
 // Selection outline shader - more efficient than changing materials
 const outlineVertexShader = `
@@ -74,46 +76,120 @@ export function useSelectionHighlight(
   }
 }
 
-// Selection highlighting component with outline
-export function SelectionHighlight({
-  children,
-  isSelected,
-  isHovered,
-  baseColor,
-}: {
-  children: React.ReactNode
+// Selection highlighting component with outline.
+//
+// `children` MUST be bare geometry (e.g. `<boxGeometry />`), matching how
+// `Scene.tsx`'s SceneObject3D composes a mesh: `<mesh ...><boxGeometry />
+// <meshStandardMaterial /></mesh>`. The transform/interaction props below
+// are applied to the actual rendered `<mesh>` elements (main + outline)
+// here, rather than the caller wrapping its own `<mesh>` around
+// `children` — doing that would nest a fully-formed mesh inside this
+// component's outer mesh, leaving the inner (visible, geometry-bearing)
+// mesh without an explicit material and the outer mesh's material
+// attached to a geometry-less, invisible mesh. See T-OptimizedSelection
+// bugfix notes.
+export interface SelectionHighlightProps {
+  children: ReactNode
   isSelected: boolean
   isHovered: boolean
   baseColor?: string
-}) {
-  const { material, needsOutline, outlineMaterial } = useSelectionHighlight(
-    isSelected,
-    isHovered,
-    baseColor
-  )
+  position?: [number, number, number]
+  rotation?: [number, number, number]
+  scale?: [number, number, number]
+  castShadow?: boolean
+  receiveShadow?: boolean
+  onClick?: (event: ThreeEvent<MouseEvent>) => void
+  onPointerOver?: (event: ThreeEvent<PointerEvent>) => void
+  onPointerOut?: (event: ThreeEvent<PointerEvent>) => void
+  userData?: Record<string, unknown>
+  name?: string
+}
 
-  if (needsOutline && outlineMaterial) {
+export const SelectionHighlight = forwardRef<Mesh, SelectionHighlightProps>(
+  function SelectionHighlight(
+    {
+      children,
+      isSelected,
+      isHovered,
+      baseColor,
+      position,
+      rotation,
+      scale,
+      castShadow,
+      receiveShadow,
+      onClick,
+      onPointerOver,
+      onPointerOut,
+      userData,
+      name,
+    },
+    ref
+  ) {
+    const { material, needsOutline, outlineMaterial } = useSelectionHighlight(
+      isSelected,
+      isHovered,
+      baseColor
+    )
+
+    if (needsOutline && outlineMaterial) {
+      return (
+        <group>
+          {/* Main object: real geometry + interaction handlers + base material */}
+          <mesh
+            ref={ref}
+            name={name}
+            position={position}
+            rotation={rotation}
+            scale={scale}
+            castShadow={castShadow}
+            receiveShadow={receiveShadow}
+            onClick={onClick}
+            onPointerOver={onPointerOver}
+            onPointerOut={onPointerOut}
+            userData={userData}
+          >
+            {children}
+            {material}
+          </mesh>
+
+          {/* Outline mesh: visual-only backface shell, lined up via the
+              same transform but not a raycast target (no handlers/userData)
+              so it can't swallow clicks meant for the main mesh or confuse
+              other code that raycasts scene.children for userData.objectId
+              (e.g. BoxSelection.tsx). */}
+          <mesh
+            position={position}
+            rotation={rotation}
+            scale={scale}
+            material={outlineMaterial}
+            raycast={() => null}
+          >
+            {children}
+          </mesh>
+        </group>
+      )
+    }
+
     return (
-      <group>
-        {/* Main object with base material */}
-        <mesh>
-          {children}
-          {material}
-        </mesh>
-
-        {/* Outline mesh */}
-        <mesh material={outlineMaterial}>{children}</mesh>
-      </group>
+      <mesh
+        ref={ref}
+        name={name}
+        position={position}
+        rotation={rotation}
+        scale={scale}
+        castShadow={castShadow}
+        receiveShadow={receiveShadow}
+        onClick={onClick}
+        onPointerOver={onPointerOver}
+        onPointerOut={onPointerOut}
+        userData={userData}
+      >
+        {children}
+        {material}
+      </mesh>
     )
   }
-
-  return (
-    <mesh>
-      {children}
-      {material}
-    </mesh>
-  )
-}
+)
 
 // Efficient multi-object selection manager.
 //
