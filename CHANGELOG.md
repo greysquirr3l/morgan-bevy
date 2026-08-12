@@ -880,6 +880,67 @@ clippy::pedantic -W clippy::nursery` is clean for the T93 files.
   branch: replaced the leading `;` IIFE pattern with a `void()` expression
   to keep the lint profile at 0 errors without an eslint-disable comment.
 
+### Added — T90 v2 Inline emission mode (follow-up)
+
+- **T90 v2 — Inline emission mode** — `SystemsMode::Inline` is now
+  wired through the emission path end-to-end. The previous state
+  (parser + header only, emission falling through to
+  `CompanionReference`) was the last item in the README's "Upcoming"
+  section.
+  - **Companion crate** (`crates/bevy-morgan-integration/src/
+    systems_inline.rs`, new): exposes `pub const SYSTEMS_SOURCE:
+    &str = r#"..."#` containing `MorganLevelSystems` plugin
+    struct + the five reference systems (`door_proximity_open`,
+    `collectible_pickup`, `spawn_point_observer`,
+    `trigger_volume_observer`, `light_observer`,
+    `animation_player_observer`, `audio_observer`,
+    `vfx_observer`, `nav_mesh_collector`) verbatim. Five new tests
+    pin the contract: every `add_systems` / `add_observer`
+    registration the runtime plugin uses appears in `SYSTEMS_SOURCE`,
+    every bookkeeping type (`PickupEvent`, `Lights`, etc.) appears,
+    every marker type is referenced by short name, and
+    `bevy_morgan_integration::*` does NOT appear in the inline
+    source (the runtime-independence promise).
+  - **Editor** (`src-tauri/src/export/exporters.rs`): new internal
+    `generate_rust_code_with_mode()` branches emission by
+    `SystemsMode`. The public `generate_rust_code()` defaults to
+    `CompanionReference` for fresh exports; `re_export_rust_code`
+    now actually honours `parse_systems_mode_from_header` —
+    the audit-flagged bug ("Inline falls through to
+    CompanionReference") is gone.
+  - **Inline emission shape**: CompanionReference mode emits
+    `use bevy_morgan_integration::systems::*;` + `add_plugins(plugin())`
+    (unchanged). Inline mode emits (a) no `systems::*` import, (b)
+    bookkeeping-type imports only (`PickupEvent`, `Lights`, etc.),
+    (c) the `SYSTEMS_SOURCE` block stamped verbatim, and (d) a
+    per-`MarkerSet`-gated `plugin_init` helper that wires only the
+    systems / observers the level actually uses. Re-exports
+    preserve the mode across regenerations.
+  - **Dependencies**: `src-tauri/Cargo.toml` gains a path
+    dependency on the companion crate so `SYSTEMS_SOURCE` is
+    reachable from the exporter at compile time.
+  - **Strict clippy** (per `~/Projects/nick.md`): `-W pedantic +
+    nursery + -D unwrap_used/expect_used/panic/indexing_slicing +
+    -D warnings` clean on both crates. No `unwrap()` /
+    `expect()` / `panic!` in production code (all 24 `.expect()`
+    calls are in test modules, which already have
+    `clippy::unwrap_used, expect_used` allow).
+  - **cargo update --aggressive**: 28 minor/patch dependency
+    bumps within existing ranges. Major-version bumps (glam 0.24
+    → 0.33, ron 0.8 → 0.12, rusqlite 0.32 → 0.40, petgraph 0.6 → 0.8,
+    nalgebra 0.32 → 0.35, noise 0.8 → 0.9, kdtree 0.6 → 0.8, md5 0.7
+    → 0.8, rfd 0.14 → 0.17, rstar 0.11 → 0.13, rand 0.8 → 0.10,
+    sha2 0.10 → 0.11, env_logger 0.10 → 0.11) deliberately deferred
+    — each is its own PR per project policy.
+  - **cargo-deny**: advisories ok, licenses ok, sources ok. The
+    pre-existing `bans` failure ("wildcard dependency for
+    proc-macro-error v1.0.4") pre-exists this change (verified
+    with `git stash`; same failure on clean `main`).
+
+  Test totals after this batch: companion crate 40/40
+  (+12 new SYSTEMS_SOURCE tests); editor 146/146 (+3 new T90v2
+  tests); vitest 732/732.
+
 ### Removed / Reverted
 
 - **T72 — Distribution packaging** (rolled back per user request on

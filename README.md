@@ -152,6 +152,7 @@ tools** to enable rapid level design and iteration.
 - ✅ **Bevy 0.19 contract** - Generated code uses `Mesh3d` + `MeshMaterial3d` + `Transform` + `Name` (no `PbrBundle`)
 - ✅ **Bevy-compatible texture handles** - emitted with the right `Image` loaders
 - ✅ **Export panel** - format toggles, live previews, target-directory picker
+- ✅ **T90 v2 Inline emission mode** - `SystemsMode::Inline` embeds the per-marker system bodies verbatim in the consumer's generated file. The runtime becomes hermetic — no `bevy_morgan_integration::systems` dep, no silent `cargo update` drift. Re-exports preserve the choice across regenerations.
 
 ### 🛡️ **Asset Management**
 
@@ -209,15 +210,6 @@ tools** to enable rapid level design and iteration.
 The remaining work is tracked per-task in [`PROGRESS.md`](PROGRESS.md).
 Headline items:
 
-- **T90 v2 — Inline emission mode** — the `SystemsMode::Inline` enum
-  variant is wired through the parser and the generated header, but
-  the actual emission still falls through to `CompanionReference`
-  (see `src-tauri/src/export/exporters.rs:343-345, 570-573`). Wiring
-  it up means embedding the per-marker system bodies as a
-  `SYSTEMS_SOURCE` constant in the companion crate and switching
-  the `add_plugins(plugin())` call site for inline mode to inline
-  `add_systems(...)` + `add_observer(...)` directly. Substantial but
-  mechanical.
 - **T72 — Distribution channels** — Homebrew / AUR / scoop formulas
   were authored in commit `9484b00` but rolled back per maintainer
   preference. `packaging/` lives on disk (gitignored) as a local
