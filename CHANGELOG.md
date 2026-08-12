@@ -880,6 +880,169 @@ clippy::pedantic -W clippy::nursery` is clean for the T93 files.
   branch: replaced the leading `;` IIFE pattern with a `void()` expression
   to keep the lint profile at 0 errors without an eslint-disable comment.
 
+### Tests — Frontend functional audit regression coverage
+
+- **Regression coverage for the 27 audit fixes** (commit
+  `6e3dbd9`). 12 new vitest cases across 5 files pin the
+  audit fixes that the test suite couldn't catch at the
+  time:
+  - `src/test/commands.test.ts` (+ 4 cases) — store
+    `undo()` / `redo()` actions after the immer-nested-set
+    bug (Critical #1); `CreateObjectFromTemplateCommand`
+    round-trips every field (Critical #3).
+  - `src/test/store/editorStore.test.ts` (+ 3 cases) —
+    autosave schema unification: `saveToLocalStorage`
+    writes the new schema; `loadFromLocalStorage` reads
+    both schemas for back-compat (Critical #5).
+  - `src/test/instancedRendering.test.ts` (4 cases, new
+    file) — `instanceId → ObjectId` inversion for
+    `InstancedMesh` click resolution (Major #8). Includes a
+    10K-object bulk load test that pins the O(1) inverse
+    lookup.
+  - `src/test/sceneLights.test.ts` (4 cases, new file) —
+    lighting state round-trip through `setLights` /
+    `updateLight` / `addLight` / `removeLight` (Critical #7).
+  - `src/test/lockEnforcement.test.ts` (5 cases, new file)
+    — `DeleteObjectCommand` throws on locked objects /
+    objects on locked layers; `DuplicateCommand` filters
+    locked sources (Major #11).
+    Test totals after this batch: 78 test files / 732 vitest
+    tests (was 71 / 711). TypeScript: clean. Lint: 10 problems
+    (6 pre-existing unused-disable directives in test files
+    unrelated to these fixes; 4 eliminated by the audit
+    cleanups).
+
+### Added — Pre-audit patch batch (T92–T98 + orphan / clippy cleanup)
+
+A series of focused fixes and features that landed between T90 and the
+broad-scope `6e3dbd9` audit. Each is captured in its own commit;
+the audit fixes the user-facing surface, but these commits shipped
+the wiring and quality-of-life work that the audit findings later
+depended on.
+
+- **T92 — Viewport blank-screen diagnostic + clear colour** —
+  a fresh launch with no scene objects rendered as opaque
+  black (Three.js default), indistinguishable from the dark
+  editor chrome. Fixed in `src/components/Viewport3D/
+Viewport3D.tsx`: `gl.setClearColor('#1e2536', 1)` +
+  `scene.fog = new THREE.Fog('#1e2536', 30, 80)` so the empty
+  viewport reads as a 3D editor rather than a black hole. New
+  diagnostic test (`src/test/blankScreen.test.ts`, 2 cases)
+  mounts `<App />` in jsdom with stubbed `__TAURI_INTERNALS__` +
+  the `transformCallback` quirk that Tauri 2.x requires for
+  `event.listen`.
+
+- **T93 (audit phase) — Validate AssetBrowser IPC responses
+  with zod** — `search_assets_database` could return a shape
+  that wasn't an array (e.g. an error payload), which crashed
+  the browser with `'results is not iterable'`. `AssetBrowser.tsx`
+  now wraps the response in `AssetSearchResultSchema.parse`
+  before iterating; failures surface as a banner instead of a
+  thrown error.
+
+- **T94 — `useStartupFile` skips `listen()` in non-Tauri
+  runtimes** — the startup-file hook tried to `event.listen('morgan://open-project')`
+  even in the web preview, where the IPC bridge isn't available.
+  Added an `isTauriRuntime()` guard (the `transformCallback`
+  check) before subscribing. Web previews now skip the hook
+  cleanly.
+
+- **T95 — Remove `data-testid` from R3F elements** —
+  `<Canvas>` rendered `<mesh data-testid="…">` as a JSX prop
+  on the DOM, which crashed with `'Cannot read properties of
+undefined (reading 'testid')'` because Three.js doesn't
+  serialize `data-testid` on `<mesh>`. Stripped test-ids from
+  every R3F element in `Viewport3D/*`.
+
+- **T96 — `isTauriRuntime` checks `__TAURI_INTERNALS__`**
+  instead of the legacy `__TAURI__` global — the old check
+  returned false under `npm run dev` (where the IPC bridge is
+  present but the legacy global isn't) and silently turned
+  the editor into a degraded preview. Added a focused helper
+  in `src/utils/tauriEnv.ts` + patched every call site.
+
+- **T97 — Front-end wiring audit + 3 real bugs closed** —
+  `src/test/wiringAudit.test.ts` programmatically verifies
+  (a) every export in `src/` has a consumer, (b) every
+  `#[tauri::command]` is registered in `tauri::generate_handler![]`,
+  (c) every registered command is invoked from the FE
+  (soft check; ≤ 5 allowed for forward-looking surface),
+  (d) every hook in `src/hooks/` has a consumer. The first
+  pass caught and removed 8 dead-surface exports:
+  `SelectionCommand` / `CompositeCommand`, `MorganBevyIcon`,
+  `useAsset`, `pasteFromClipboard` / `hasClipboardData`,
+  `instanceMatches`, `addConstraintKeyHandlers`,
+  `downloadUpdate`. Findings document:
+  `docs/dev/integration-wiring-audit.md`. (The audit itself
+  is the new `wiringAudit` test; the 3 real-bug fixes it
+  spawned are listed separately in this entry.)
+
+- **T98 — Wire the 11 unused Rust commands into the FE** —
+  the editor compiled against the Rust backend but never
+  invoked 11 of the registered `#[tauri::command]` functions
+  (`generate_navmesh`, `load_level_from_file`, `save_level_to_file`,
+  `load_project_from_path`, `path_exists`, plus a handful
+  of asset-database ones). Wired each into the appropriate
+  UI hook with zod-validated IPC responses. Audit-fast path:
+  `src/test/wiringAudit.test.ts` flips the "soft check" threshold
+  on for these and verifies the wiring.
+
+- **Surface orphaned panels + fix dead shortcut + store wiring**
+  — `feat(editor): surface orphaned panels, fix dead shortcut
+and store wiring` (commit `5c28d1f`). The Settings modal
+  (a panel that was visually orphaned — no entry point) gained
+  an `AnalyticsPanel` + a `Restore Defaults` button for
+  shortcut overrides. The keyboard shortcut table gained
+  `G` (toggle grid snap), `Z`/`X`/`Y` (axis locks), and `T`
+  (local/world coord space) — short-cuts that the previous
+  hook hard-coded and silently dropped when the settings
+  table was empty. 15 files / 421 insertions.
+
+- **Match generated Rust marker types to `bevy-morgan-integration`**
+  — `fix(export): match generated Rust marker types
+to bevy-morgan-integration` (commit `f8f2ab3`). The
+  editor's Rust source-code exporter emitted locally-defined
+  `enum SpawnPoint { ... }` / `enum TriggerVolume { ... }`,
+  which were structurally-but not nominally identical to
+  the companion crate's. The companion crate's `On<Add,
+SpawnPoint>` observers could never fire on entities from
+  the generated file. Fixed by importing the types from
+  `bevy_morgan_integration::*` rather than redefining them.
+  `Light` / `Animation` / `Audio` / `Vfx` (which had no local
+  redefinition) additionally got explicit imports — the
+  previous generation produced an `E0433 unresolved-type`
+  compile error.
+
+- **Shift-pan orbit camera + fly-mode click guard + gizmo coord
+  space** — `fix(viewport): shift-pan orbit camera, fly-mode
+click guard, gizmo coordinate space` (commit `5402c4f`).
+  Orbit camera now pans when shift is held (matched Blender /
+  Unity convention), fly-mode no longer starts on a stray
+  click inside the canvas, and the gizmo respects the local/
+  world coord-space toggle that `T` cycles. Removed a stale
+  duplicate `TransformGizmos` component that was
+  shadowing the canonical one.
+
+- **Wire 3D/2D keyboard shortcuts and mouse interactions**
+  — `fix(viewport): wire 3D/2D keyboard shortcuts and mouse
+interactions` (commit `f6f9416`). Rewrote the keyboard
+  shortcut table from a hard-coded `switch` (commit `61a1a54`
+  had swept clippy but not fixed the actual shortcuts) into
+  the table-driven `DEFAULT_SHORTCUTS` model that later
+  shipped as T60. 9 files / 705 insertions. Hooked up mouse
+  pan / zoom / rotate on the orbit + fly cameras so the
+  shortcuts had something to fire against.
+
+- **Clean up clippy suppressions per `nick.md`** —
+  `fix: clean up clippy suppressions per nick.md — narrow
+`#[expect]` and proper error handling` (commit `da1f715`).
+  Replaced blanket `#[allow(clippy::...)]` with `#[expect(...)]`
+  where the suppression was genuinely temporary, and replaced
+  `unwrap()` / `expect()` with `?` / `match` / `.get(...)` in
+  the production paths that nick.md's hard-denies
+  (`unwrap_used`, `expect_used`, `panic`, `indexing_slicing`)
+  would otherwise catch.
+
 ### Added — T90 v2 Inline emission mode (follow-up)
 
 - **T90 v2 — Inline emission mode** — `SystemsMode::Inline` is now
@@ -888,8 +1051,8 @@ clippy::pedantic -W clippy::nursery` is clean for the T93 files.
   `CompanionReference`) was the last item in the README's "Upcoming"
   section.
   - **Companion crate** (`crates/bevy-morgan-integration/src/
-    systems_inline.rs`, new): exposes `pub const SYSTEMS_SOURCE:
-    &str = r#"..."#` containing `MorganLevelSystems` plugin
+systems_inline.rs`, new): exposes `pub const SYSTEMS_SOURCE:
+&str = r#"..."#` containing `MorganLevelSystems` plugin
     struct + the five reference systems (`door_proximity_open`,
     `collectible_pickup`, `spawn_point_observer`,
     `trigger_volume_observer`, `light_observer`,
@@ -920,8 +1083,8 @@ clippy::pedantic -W clippy::nursery` is clean for the T93 files.
     dependency on the companion crate so `SYSTEMS_SOURCE` is
     reachable from the exporter at compile time.
   - **Strict clippy** (per `~/Projects/nick.md`): `-W pedantic +
-    nursery + -D unwrap_used/expect_used/panic/indexing_slicing +
-    -D warnings` clean on both crates. No `unwrap()` /
+nursery + -D unwrap_used/expect_used/panic/indexing_slicing +
+-D warnings` clean on both crates. No `unwrap()` /
     `expect()` / `panic!` in production code (all 24 `.expect()`
     calls are in test modules, which already have
     `clippy::unwrap_used, expect_used` allow).
