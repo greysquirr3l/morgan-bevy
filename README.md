@@ -174,7 +174,7 @@ tools** to enable rapid level design and iteration.
 - ✅ **Theme** - Dark / Light via Tailwind
 - ✅ **In-app help modal** - 4 sections + resources, Escape-to-close (T59)
 - ✅ **Context-aware menus** - File / Edit / View / Generate / Tools / Help
-- ✅ **Keyboard shortcuts** - W/E/R/T/G/F/V/D/C/V/Y/Z, full list in the Help modal
+- ✅ **Keyboard shortcuts** - W/E/R/T/G/F/V/C/X/Y/Z, full list in the Help modal (Help menu → Keyboard Shortcuts)
 - ✅ **Coordinate space** - Local / World toggle (T key)
 
 ### ⚡ **Performance**

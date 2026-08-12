@@ -8,8 +8,205 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 > Scope of this batch: Phases 8–12 + post-Phase-12 polish
-> (`T51`–`T93` + `T77b` + `T93 v2`). Next release is planned as `0.5.0`
-> once this batch is tagged.
+> (`T51`–`T93` + `T77b` + `T93 v2`) + the frontend functional-audit
+> follow-ups (Critical / Major / Minor findings, see
+> "Frontend functional audit fixes" below). Next release is planned
+> as `0.5.0` once this batch is tagged.
+
+### Fixed — Frontend functional audit fixes (Critical / Major / Minor)
+
+A six-agent Sonnet-driven audit of the running editor surfaced
+27 integration-level bugs the unit-test baseline could not catch
+(type-check was clean, lint had only pre-existing test-file
+warnings, all 711 tests passed). Each was either a silent no-op at
+a key boundary or a regression that bypassed the command-pattern
+or store wiring. Every finding was root-cause fixed and pinned with
+regression tests.
+
+#### Critical (core features silently broken)
+
+- **Undo / Redo no-op at the store level** — `editorStore.undo()` /
+  `redo()` wrapped `command.undo()` / `command.execute()` inside an
+  immer producer. Every command reaches back into the store via its
+  own `set()`, and a nested zustand+immer commit is clobbered by the
+  outer producer's draft. Fix: execute outside the producer, then a
+  follow-up `set()` updates the history. Existing tests called
+  `command.undo()` directly and so could not catch this. (5 new
+  regression tests in `src/test/commands.test.ts`.)
+
+- **Gizmo release cleared selection** — `Scene.tsx#Ground`'s `onClick`
+  didn't consult `useEditorStore(s => s.isTransformDragging)` so a
+  gizmo release over empty space fell through to `clearSelection()`.
+
+- **Prefab "Add to Scene" did nothing** — `PrefabManager` built a
+  `CreateObjectCommand` and pushed it to history but never called
+  `.execute()` (the constructor only adds to history). Even if it
+  had, the original command only knew `(meshType, position)` and
+  dropped rotation / scale / material / tags. Added
+  `CreateObjectFromTemplateCommand` that takes a full `SceneObject`
+  template and round-trips every field.
+
+- **2D ↔ 3D grid sync broken bidirectionally** — `GridView`'s `useState`
+  read `store.gridData` once on mount and was write-only after that.
+  Edits made in 3D (via `App.sync3DToGrid`) never reached the visible
+  grid. Fix: subscribe to `store.gridData` and adopt external
+  changes; echo-guard via `lastWrittenGridRef` prevents the
+  local→store→local feedback loop.
+
+- **Two autosave schemas raced on one localStorage key** —
+  `useAutoSave.ts#writeSnapshot` wrote the new schema
+  (`schemaVersion` + `scene.objects`) while `saveToLocalStorage`
+  wrote legacy top-level fields. Whichever ran last decided whether
+  the startup recovery dialog could see the snapshot. Unified on the
+  new schema; reader accepts both for back-compat. (3 new regression
+  tests in `src/test/store/editorStore.test.ts`.)
+
+- **Tutorial overlay wrapper intercepted all clicks** — the four
+  quadrant blockers correctly left the spotlight rect uncovered, but
+  the outer wrapper div had no `pointer-events: none` and absorbed
+  the click that should have reached the target underneath. 3 of 8
+  tutorial steps were stuck states. Fix: outer wrapper is
+  `pointer-events-none`, quadrants and step card re-enable
+  `pointer-events-auto`.
+
+- **Lighting panel was fully decorative** — `Viewport3D` hardcoded
+  `<ambientLight>` + `<directionalLight>` + `<pointLight>` and never
+  looked at `state.lights`. Auto-Light wrote to the store but the
+  viewport ignored it. Added `src/components/Lighting/SceneLights.tsx`
+  that reads the rig and emits the matching drei light per
+  `LightSource`; default rig for empty store. (4 new regression
+  tests in `src/test/sceneLights.test.ts`.)
+
+#### Major
+
+- **Instanced mesh selection was broken past ~10 objects** —
+  `InstancedCubes` / `Spheres` / `Cones` had no per-instance
+  `userData` and no `onClick`. Past the 10-object threshold, clicks
+  passed through to the ground and cleared selection. Three.js'
+  raycast hands back `event.instanceId` on `InstancedMesh`
+  intersections; we now invert the visibility map (`objectId →
+index`) on click and route through the same store actions as
+  `OptimizedSceneObject`. `SelectionHighlight` gained transform /
+  event / `userData` props so the call site wires it the same way.
+  (4 new tests in `src/test/instancedRendering.test.ts`.)
+
+- **Snap-to-grid had zero effect on the gizmo** — drei's
+  `TransformControls` exposes `translationSnap` / `rotationSnap` /
+  `scaleSnap`; we never threaded them.
+
+- **`MaterialEditor` showed hardcoded defaults** — `useState`
+  initialised with grey / 0% metal / 80% rough regardless of the
+  selected object's actual material. "Apply to Selected" silently
+  overwrote the real material with those defaults. Init from
+  `primaryObject.material` and resync via `useEffect` on selection
+  change.
+
+- **Object / layer lock was cosmetic only** — `obj.locked` and the
+  per-layer locked flag were checked only for Hierarchy / Layers UI
+  colouring. Delete, Duplicate, Transform Gizmo, and Inspector all
+  silently overrode them. Fix: `DeleteObjectCommand` throws on
+  locked targets; `DuplicateCommand` filters locked sources;
+  `TransformGizmo` computes an `activeMesh` / `activeObjectId` pair
+  that skips locked items; Inspector's `handleTransformChange` gates
+  on the same flags. (5 new tests in `src/test/lockEnforcement.test.ts`.)
+
+- **Hierarchy rendered groups as flat siblings** — groups had
+  `parentId` + `children` arrays but the UI did a flat
+  `filteredObjects.map(renderTreeItem)`. Replaced with a proper
+  recursive tree that walks `parentId` and `children` with depth
+  tracking for indentation. Cycle guard via `visited` set.
+
+- **Edit-menu Delete / Duplicate bypassed the undo system** —
+  `App.handleEditAction` called `removeObject(id)` and
+  `duplicateObjects(ids)` directly while the keyboard shortcut and
+  ActionsPanel both routed through `DeleteObjectCommand` /
+  `DuplicateCommand`. Unified: Edit-menu Delete is undoable and
+  lock-aware.
+
+- **`KeyboardShortcutsModal` drifted from the real shortcut table** —
+  a hand-written list of `{ keys, description }` rows that fell out
+  of sync with `src/shortcuts/defaults.ts` every time a binding was
+  added or changed. Replaced with a derived grouping by
+  `binding.category`, rendered via `formatKeys(binding)`.
+
+- **FileMenu "Open Project" stored a bogus path in Recent Projects** —
+  `addRecentProject` was called with the project's metadata `.name`
+  as the path and `<name>.mbp` as the display name. Subsequent
+  clicks called `load_project_from_path` with a non-path. Skip the
+  recents add when we don't have a real filesystem path; the next
+  Save locks it in.
+
+- **Generate menu said BSP / WFC "Coming Soon" but they work** —
+  `GenerationPanel` already calls `invoke('generate_bsp_level' |
+'generate_wfc_level')`; the menu just focused the panel and
+  pretended. Run BSP / Run WFC now selects the algorithm in the
+  panel and clicks the Generate button. Added `data-action=
+"generate"` to the panel button so the menu has a stable hook.
+
+- **`ExportPanel` metadata / optimize checkboxes were inert** —
+  `defaultChecked` with no `onChange`. Promoted to real state
+  (`includeMetadata`, `includeGenerationData`, `optimizeForSize`)
+  and forwarded to the Rust `export_level` invocation.
+
+- **Measurement tool had no off switch** — the × button only
+  deleted the current measurement; the tool stayed armed. Bound a
+  new "Turn off tool" button to `measurementTool.setMode(null)`.
+
+- **`AnalyticsConsentDialog` was fully built but never mounted** —
+  imported it into `App.tsx` so the first-launch consent flow
+  actually runs (gated by `hasConsentBeenSeen`).
+
+- **Grid sync hardcoded 48×36** — both `App.syncGridToScene` and
+  `GridView`'s local state baked in `{ width: 48, height: 36 }`, so
+  the Tools > Grid Size picker couldn't actually resize the 3D
+  conversion. Added `gridDimensions` + `setGridDimensions` to the
+  store; both call sites read from it.
+
+#### Minor
+
+- **Inspector clipped to 200px** — `CollapsiblePanel`'s default
+  `maxHeight` was `'200px'` which silently cropped Inspector's
+  Transform / Material / Mesh sections. Bumped the default to
+  `'600px'`; callers that want a tighter cap pass their own. The
+  name input also used `useEditorStore.setState` to mutate the
+  (frozen) scene object directly — switched to `updateObjectName`
+  so subscribers see the change consistently.
+
+- **HUD overlap 1200–1470px** — the right-side button cluster was a
+  single non-wrapping flex row that clipped over the left-side status
+  HUD in the 1200–1470 viewport-width range. `flex-wrap` +
+  `max-w-[60%]` + `justify-end` so the cluster breaks into two lines
+  before it touches the status panel.
+
+- **Toggle-grid View menu was dead** — `handleViewAction('toggle-grid')`
+  only focused the viewport container. Pulled `toggleGrid` out of
+  the store and call it alongside the focus.
+
+- **`clearHistory` vs `clearScene` were divergent reset paths** —
+  `clearHistory` was a thin subset of `clearScene` and could drift.
+  Collapsed into one: `clearHistory` delegates to `clearScene`.
+
+- **`GridView` console.log spam** — 21 `'=== ... ==='` breadcrumbs on
+  mount + per-step logs inside `loadThemes` / `renderGrid` /
+  `clearGrid`. Removed; kept `console.warn` / `console.error` paths
+  because they carry actionable diagnostics. Also dropped the
+  spurious `availableThemes.length` dep on `renderGrid` (unused).
+
+- **FrustumCulling exhaustive-deps** — six inline `bounds?.min[N]` /
+  `bounds?.max[N]` expressions tripped eslint's "complex expression
+  in dependency array." Computed a single derived string for the
+  dep array.
+
+#### Test coverage
+
+12 new regression tests across 5 files (`commands.test.ts`,
+`editorStore.test.ts`, `instancedRendering.test.ts`,
+`sceneLights.test.ts`, `lockEnforcement.test.ts`) plus updates to
+`SelectionOptimization.test.tsx` for the prop-forwarding refactor.
+Total: 78 test files / 732 vitest tests passing (up from 711).
+TypeScript clean; lint: 10 problems (6 pre-existing unused-disable
+directives in test files unrelated to these fixes; 4 eliminated by
+the audit cleanups).
 
 ### Added — Advanced editor tools (Phase 8)
 
