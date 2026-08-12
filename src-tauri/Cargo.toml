@@ -38,6 +38,14 @@ rusqlite = { version = "0.32.1", features = ["bundled", "chrono"] }
 sha2 = "0.10"  # For asset fingerprinting
 rayon = "1.8"  # For parallel asset scanning
 
+# T90 v2: the Rust source-code exporter embeds the companion crate's
+# system bodies verbatim when `SystemsMode::Inline` is selected. The
+# `systems_inline` module exposes `SYSTEMS_SOURCE` as a `&'static str`
+# constant; we `push_str` it into the generated Bevy file at emit
+# time. Path dependency (not a published crate) so the editor and
+# companion crate evolve in lockstep.
+bevy-morgan-integration = { path = "../crates/bevy-morgan-integration" }
+
 # BSP and procedural generation
 petgraph = "0.6"
 noise = "0.8"

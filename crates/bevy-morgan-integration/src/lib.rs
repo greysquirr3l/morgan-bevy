@@ -30,6 +30,7 @@ pub mod loader;
 pub mod markers;
 pub mod plugin;
 pub mod systems;
+pub mod systems_inline;
 
 pub use components::{Collectible, Door, Interactable, NavMeshHint, SpawnPoint, TriggerVolume};
 pub use loader::{level_bounds, load_level, load_level_world, AssetServerLike, HandleId};

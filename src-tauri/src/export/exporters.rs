@@ -339,13 +339,10 @@ impl LevelExporter {
         let previous_mode = fs::read_to_string(file_path)
             .ok()
             .and_then(|src| parse_systems_mode_from_header(&src));
-        // Both `CompanionReference` and `Inline` modes currently
-        // route through `generate_rust_code`. Inline mode is
-        // reserved for T90 v2; until then, fall back to
-        // CompanionReference so the consumer's
-        // `bevy-morgan-integration` runtime is always present.
-        let _ = previous_mode;
-        let rust_code = Self::generate_rust_code(level_data)?;
+        // T90 v2: actually honour the parsed mode. `generate_rust_code`
+        // branches emission by `systems_mode` so CompanionReference and
+        // Inline both produce the shape they declare.
+        let rust_code = Self::generate_rust_code_with_mode(level_data, previous_mode)?;
         fs::write(file_path, rust_code)?;
         Ok(())
     }
@@ -561,16 +558,27 @@ impl LevelExporter {
     }
 
     fn generate_rust_code(level_data: &LevelData) -> Result<String> {
+        // T90 v2: accept an explicit mode (used by `re_export_rust_code`
+        // to honour the parsed-on-disk value); the public entry point
+        // defaults to CompanionReference for new exports.
+        Self::generate_rust_code_with_mode(level_data, None)
+    }
+
+    fn generate_rust_code_with_mode(
+        level_data: &LevelData,
+        requested_mode: Option<SystemsMode>,
+    ) -> Result<String> {
         let mut code = String::new();
 
         // T90: compute the marker set once and decide whether to emit
         // the per-marker systems plugin. The marker set is derived
         // from the level's object tags — see `marker_tags_present`.
         let marker_set = marker_tags_present(level_data);
-        // T90 v1: only CompanionReference is supported in the
-        // emission path. Inline mode is reserved for the editor's
-        // export dialog and will be wired up in T90 v2.
-        let systems_mode = SystemsMode::CompanionReference;
+        // T90 v2: honour the caller-provided mode (re-exports) or
+        // fall back to CompanionReference for fresh exports. The
+        // emission path branches on this — see `emit_inline_systems`
+        // and the `use` / `add_plugins` blocks below.
+        let systems_mode = requested_mode.unwrap_or_default();
 
         // File header — targets Bevy 0.19 component shape (per
         // docs/dev/BEVY_0.18_TO_0.19_MIGRATION.md). PbrBundle and SceneBundle
@@ -604,27 +612,55 @@ impl LevelExporter {
         code.push_str("use bevy::prelude::*;\n");
         code.push_str("use bevy::asset::Handle;\n");
 
-        // T90: when the level uses any per-marker tags, emit a `use
-        // bevy_morgan_integration::systems::*;` block plus the plugin
-        // call site. The marker set gates which companion types and
-        // system registrations are emitted — empty marker sets skip
-        // the import + plugin entirely.
+        // T90: when the level uses any per-marker tags, emit either
+        // a CompanionReference `use bevy_morgan_integration::systems::*;`
+        // import block (default) OR, for Inline mode, a comment block
+        // pointing the consumer at the embedded `SYSTEMS_SOURCE` that
+        // follows the spawn functions. The marker set gates which
+        // companion types and system registrations are emitted — empty
+        // marker sets skip the import + plugin entirely in both modes.
         if !marker_set.is_empty() {
-            code.push_str("use bevy_morgan_integration::systems::{\n");
-            code.push_str("    MorganLevelSystems, plugin, Player,\n");
-            if marker_set.door || marker_set.collectible {
-                code.push_str("    Open, PickupEvent,\n");
+            match systems_mode {
+                SystemsMode::CompanionReference => {
+                    code.push_str("use bevy_morgan_integration::systems::{\n");
+                    code.push_str("    MorganLevelSystems, plugin, Player,\n");
+                    if marker_set.door || marker_set.collectible {
+                        code.push_str("    Open, PickupEvent,\n");
+                    }
+                    if marker_set.trigger_volume {
+                        code.push_str("    TriggerActivated,\n");
+                    }
+                    if marker_set.spawn_point {
+                        code.push_str("    PlayerStart,\n");
+                    }
+                    if marker_set.nav_mesh_hint {
+                        code.push_str("    NavMeshSource,\n");
+                    }
+                    code.push_str("};\n");
+                }
+                SystemsMode::Inline => {
+                    // T90 v2: Inline mode stamps the system bodies
+                    // verbatim. The companion crate's `systems`
+                    // module isn't imported — the embedded bodies
+                    // resolve `PickupEvent`, `Door`, etc. via the
+                    // marker-type imports the editor already emits
+                    // below (`emit_companion_type_imports`) plus
+                    // `bevy::prelude::*`. We still need the
+                    // `Lights` / `Animations` / `VfxEntries` /
+                    // `PickupEvent` / etc. types referenced by the
+                    // inline bodies — those are re-exported from
+                    // `bevy_morgan_integration` so a single import
+                    // line covers both the marker types and the
+                    // observer bookkeeping types the inline bodies
+                    // touch.
+                    code.push_str("// Inline mode: the per-marker systems live\n");
+                    code.push_str("// directly in this file (see SYSTEMS_SOURCE\n");
+                    code.push_str("// below) — no `use bevy_morgan_integration::systems;`\n");
+                    code.push_str("// is emitted, so a `cargo update` on the\n");
+                    code.push_str("// companion crate cannot silently change runtime\n");
+                    code.push_str("// behaviour.\n");
+                }
             }
-            if marker_set.trigger_volume {
-                code.push_str("    TriggerActivated,\n");
-            }
-            if marker_set.spawn_point {
-                code.push_str("    PlayerStart,\n");
-            }
-            if marker_set.nav_mesh_hint {
-                code.push_str("    NavMeshSource,\n");
-            }
-            code.push_str("};\n");
         }
         code.push('\n');
 
@@ -641,8 +677,11 @@ impl LevelExporter {
         // T42/T91 bugfix: import `SpawnPoint` / `TriggerVolume` /
         // `Light` / `Animation` / `Audio` / `Vfx` from the companion
         // crate instead of redefining them locally -- see
-        // `emit_companion_type_imports` for the rationale.
-        Self::emit_companion_type_imports(&mut code, level_data)?;
+        // `emit_companion_type_imports` for the rationale. T90 v2:
+        // also pass `marker_set` + `systems_mode` so Inline mode
+        // gets the bookkeeping types the embedded systems reference
+        // (PickupEvent, Lights, Animations, VfxEntries, etc.).
+        Self::emit_companion_type_imports(&mut code, level_data, &marker_set, systems_mode)?;
 
         // T56: emit the navmesh (if generated) as a JSON string
         // constant. The `NavMesh` shape (plain vertex / triangle /
@@ -812,13 +851,11 @@ impl LevelExporter {
         code.push_str("}\n");
 
         // T90: emit the per-marker systems + plugin registration site
-        // when the marker set is non-empty. The `marker_set` block
-        // above already imported the symbols; here we provide a
-        // free-function `plugin_init` that consumers call from
-        // their App::new() chain. Inline (the systems body) lives
-        // in `bevy_morgan_integration::systems` — CompanionReference
-        // mode is the only v1 emission strategy; Inline mode is
-        // reserved for a future editor dialog.
+        // when the marker set is non-empty. CompanionReference mode
+        // emits `add_plugins(plugin())`; Inline mode stamps the
+        // embedded `SYSTEMS_SOURCE` block and wires each gated
+        // system / observer inline, so the consumer's file has no
+        // runtime dependency on `bevy_morgan_integration::systems`.
         if !marker_set.is_empty() {
             code.push_str("\n/// Register the per-marker level systems\n");
             code.push_str("/// with a Bevy `App` builder. Call from your app's\n");
@@ -827,12 +864,22 @@ impl LevelExporter {
             code.push_str("/// ```ignore\n");
             code.push_str("/// App::new()\n");
             code.push_str("///     .add_systems(Startup, spawn_level_<fn_name>)\n");
-            code.push_str("///     .add_plugins(plugin())\n");
+            match systems_mode {
+                SystemsMode::CompanionReference => {
+                    code.push_str("///     .add_plugins(plugin())\n");
+                }
+                SystemsMode::Inline => {
+                    code.push_str(
+                        "///     .add_systems(Update, plugin_inline_systems::<MarkerSetMask>)\n",
+                    );
+                    code.push_str(
+                        "///     .add_observer(plugin_inline_observers::<MarkerSetMask>)\n",
+                    );
+                }
+            }
             code.push_str("///     .run();\n");
             code.push_str("/// ```\n");
-            code.push_str(
-                "pub fn plugin_init(app: &mut bevy::app::App) {\n    app.add_plugins(plugin());\n}\n",
-            );
+            Self::emit_systems_registration(&mut code, &marker_set, systems_mode);
         }
 
         Ok(code)
@@ -841,27 +888,20 @@ impl LevelExporter {
     /// T42/T91 bugfix: emit `use bevy_morgan_integration::{...};`
     /// importing whichever of `SpawnPoint` / `TriggerVolume` / `Light`
     /// / `Animation` / `Audio` / `Vfx` the level's objects actually
-    /// use, instead of the generator locally redefining `SpawnPoint`
-    /// / `TriggerVolume` as its own `enum`s (as it used to).
-    ///
-    /// The per-marker systems registered by
-    /// `bevy_morgan_integration::systems::plugin()`
-    /// (`spawn_point_observer`, `light_observer`,
-    /// `animation_player_observer`, `audio_observer`, `vfx_observer`,
-    /// ...) are `On<Add, T>` observers written against the companion
-    /// crate's own marker types. A locally-redefined `enum SpawnPoint
-    /// { ... }` would be a *different* nominal Rust type even if
-    /// structurally identical, so those observers could never fire on
-    /// entities spawned from the generated file. Emitting `use
-    /// bevy_morgan_integration::{...};` keeps the generated file's
-    /// types identical to the companion crate's. `Light` / `Animation`
-    /// / `Audio` / `Vfx` additionally had no import at all previously,
-    /// which produced an E0433 unresolved-type compile error.
-    ///
-    /// Extracted out of `generate_rust_code` purely to keep that
-    /// function under clippy's `too_many_lines` budget -- same
-    /// rationale as `emit_waypoint_json_constants` below.
-    fn emit_companion_type_imports(code: &mut String, level_data: &LevelData) -> Result<()> {
+    /// T90 v2: also import the bookkeeping types referenced by
+    /// `SYSTEMS_SOURCE` when emitting Inline mode — those bodies
+    /// reference `PickupEvent`, `TriggerActivated`, `Lights`,
+    /// `Animations`, `VfxEntries`, `PlayerStart`, `NavMeshSource`,
+    /// `AudioStartEvent`, `AudioEndEvent` by short name. The
+    /// companion crate re-exports all of them from `bevy_morgan_integration`,
+    /// so a single import line covers both the marker types and
+    /// the bookkeeping types the inline systems touch.
+    fn emit_companion_type_imports(
+        code: &mut String,
+        level_data: &LevelData,
+        marker_set: &MarkerSet,
+        systems_mode: SystemsMode,
+    ) -> Result<()> {
         let mut companion_types: Vec<&str> = Vec::new();
         if level_data.objects.iter().any(|o| o.spawn_point.is_some()) {
             companion_types.push("SpawnPoint");
@@ -885,6 +925,39 @@ impl LevelExporter {
         if level_data.objects.iter().any(|o| o.vfx.is_some()) {
             companion_types.push("Vfx");
         }
+        // T90 v2: Inline mode stamps the SYSTEMS_SOURCE bodies
+        // verbatim. Those bodies reference the bookkeeping types
+        // by short name; the consumer's compile must resolve them.
+        // CompanionReference mode doesn't need them — the plugin
+        // already wires `add_message::<PickupEvent>()` etc. internally.
+        if systems_mode == SystemsMode::Inline {
+            // Always import the bookkeeping types we always use
+            // whenever Inline mode fires (the plugin registers
+            // them even with an empty marker set).
+            companion_types.extend_from_slice(&[
+                "PlayerStart",
+                "NavMeshSource",
+                "Lights",
+                "Animations",
+                "VfxEntries",
+            ]);
+            if marker_set.door || marker_set.collectible {
+                companion_types.push("PickupEvent");
+            }
+            if marker_set.trigger_volume {
+                companion_types.push("TriggerActivated");
+            }
+            if marker_set.audio {
+                companion_types.push("AudioStartEvent");
+                companion_types.push("AudioEndEvent");
+            }
+            // Player is referenced by `door_proximity_open` and
+            // `collectible_pickup` — import it when either marker
+            // is present.
+            if marker_set.door || marker_set.collectible {
+                companion_types.push("Player");
+            }
+        }
         if !companion_types.is_empty() {
             writeln!(
                 code,
@@ -893,6 +966,100 @@ impl LevelExporter {
             )?;
         }
         Ok(())
+    }
+
+    /// T90 v2: emit either the `add_plugins(plugin())` shim (for
+    /// `CompanionReference`) or the embedded `SYSTEMS_SOURCE` block
+    /// followed by gated `add_systems(Update, ...)` / `add_observer(...)`
+    /// lines (for `Inline`). The inline branch is gated by `marker_set`
+    /// so a level that uses only `light` markers doesn't ship the
+    /// `door_proximity_open` system. The `MorganLevelSystems` plugin
+    /// struct itself is **not** emitted in Inline mode — the
+    /// registration lives in the inline `plugin_init` helper
+    /// emitted below.
+    fn emit_systems_registration(
+        code: &mut String,
+        marker_set: &MarkerSet,
+        systems_mode: SystemsMode,
+    ) {
+        match systems_mode {
+            SystemsMode::CompanionReference => {
+                code.push_str(
+                    "pub fn plugin_init(app: &mut bevy::app::App) {\n    app.add_plugins(plugin());\n}\n",
+                );
+            }
+            SystemsMode::Inline => {
+                // Stamp the embedded system bodies verbatim. The
+                // block is a `&'static str` constant; copy it once.
+                code.push_str(bevy_morgan_integration::systems_inline::SYSTEMS_SOURCE);
+                code.push('\n');
+                // Add a registration helper that mirrors
+                // `MorganLevelSystems::build`, but only registers the
+                // systems the level actually uses (per marker_set).
+                code.push_str(
+                    "/// Register the embedded per-marker systems with the\n\
+                     /// consumer's Bevy `App` builder. Mirrors the\n\
+                     /// companion crate's `MorganLevelSystems` plugin, but\n\
+                     /// gated to only the marker types this level uses.\n",
+                );
+                code.push_str("pub fn plugin_init(app: &mut bevy::app::App) {\n");
+                code.push_str("    app\n");
+                // Companion messages / resources are always
+                // registered (the inline bodies reference them
+                // even when no observers are wired — `PickupEvent`
+                // is written by `collectible_pickup` etc.).
+                code.push_str("        .add_message::<PickupEvent>()\n");
+                code.push_str("        .add_message::<TriggerActivated>()\n");
+                code.push_str("        .add_message::<AudioStartEvent>()\n");
+                code.push_str("        .add_message::<AudioEndEvent>()\n");
+                code.push_str("        .init_resource::<PlayerStart>()\n");
+                code.push_str("        .init_resource::<NavMeshSource>()\n");
+                code.push_str("        .init_resource::<Lights>()\n");
+                code.push_str("        .init_resource::<Animations>()\n");
+                code.push_str("        .init_resource::<VfxEntries>()\n");
+                // Gated systems.
+                let mut systems = Vec::new();
+                if marker_set.door {
+                    systems.push("door_proximity_open");
+                }
+                if marker_set.collectible {
+                    systems.push("collectible_pickup");
+                }
+                if marker_set.nav_mesh_hint {
+                    systems.push("nav_mesh_collector");
+                }
+                if !systems.is_empty() {
+                    // `writeln!` avoids the temporary `String` from
+                    // `format!()` + `push_str(&...)`.
+                    let _ = writeln!(
+                        code,
+                        "        .add_systems(bevy::prelude::Update, ({}))",
+                        systems.join(", ")
+                    );
+                }
+                // Gated observers.
+                if marker_set.spawn_point {
+                    code.push_str("        .add_observer(spawn_point_observer)\n");
+                }
+                if marker_set.trigger_volume {
+                    code.push_str("        .add_observer(trigger_volume_observer)\n");
+                }
+                if marker_set.light {
+                    code.push_str("        .add_observer(light_observer)\n");
+                }
+                if marker_set.animation {
+                    code.push_str("        .add_observer(animation_player_observer)\n");
+                }
+                if marker_set.audio {
+                    code.push_str("        .add_observer(audio_observer)\n");
+                }
+                if marker_set.vfx {
+                    code.push_str("        .add_observer(vfx_observer)\n");
+                }
+                code.push_str("        ;\n");
+                code.push_str("}\n");
+            }
+        }
     }
 
     /// T57: append `WAYPOINTS_JSON` / `PATROL_ROUTES_JSON` string
@@ -1735,7 +1902,9 @@ mod tests {
     /// either half of the regression.
     fn assert_imports_companion_type_not_locally_defined(code: &str, type_name: &str) {
         let has_companion_import = code.lines().any(|line| {
-            line.trim_start().starts_with("use bevy_morgan_integration::{") && line.contains(type_name)
+            line.trim_start()
+                .starts_with("use bevy_morgan_integration::{")
+                && line.contains(type_name)
         });
         assert!(
             has_companion_import,
@@ -1856,7 +2025,9 @@ mod tests {
         // `Vec<Vec3>`. Assert the three polygon vertices are emitted
         // as plain array literals rather than `Vec3::new(...)` calls.
         assert!(
-            code.contains("points: vec![[0.000, 0.000, 0.000], [1.000, 0.000, 0.000], [0.500, 1.000, 0.000]]"),
+            code.contains(
+                "points: vec![[0.000, 0.000, 0.000], [1.000, 0.000, 0.000], [0.500, 1.000, 0.000]]"
+            ),
             "expected [f32; 3] array literals for polygon points, not Vec3::new(...); got:\n{code}"
         );
         assert_imports_companion_type_not_locally_defined(&code, "TriggerVolume");
@@ -2014,6 +2185,151 @@ mod tests {
         let lvl = level_with_tags(&["spawn-point"]);
         let code = LevelExporter::generate_rust_code(&lvl).unwrap();
         assert!(code.contains("PlayerStart"));
+    }
+
+    // ----- T90 v2: SystemsMode::Inline emission tests -----
+
+    #[test]
+    fn generate_rust_code_with_mode_emits_inline_source_when_inline() {
+        // Verify the new `generate_rust_code_with_mode` entry point
+        // honours `SystemsMode::Inline` by stamping SYSTEMS_SOURCE
+        // verbatim into the generated file (the constant is re-exported
+        // from `bevy_morgan_integration::systems_inline`).
+        let lvl = level_with_tags(&["door", "collectible", "spawn-point"]);
+        let code =
+            LevelExporter::generate_rust_code_with_mode(&lvl, Some(SystemsMode::Inline)).unwrap();
+        // Header records the chosen mode.
+        assert!(
+            code.contains("// Systems mode: Inline"),
+            "header must record Inline mode"
+        );
+        // Inline mode stamps the embedded bodies verbatim — the
+        // plugin / observer bookkeeping types are referenced by short
+        // name and resolved via the `bevy_morgan_integration`
+        // re-exports emitted at the top of the file.
+        assert!(
+            code.contains("fn door_proximity_open("),
+            "inline source missing door_proximity_open"
+        );
+        assert!(
+            code.contains("fn collectible_pickup("),
+            "inline source missing collectible_pickup"
+        );
+        assert!(
+            code.contains("fn spawn_point_observer("),
+            "inline source missing spawn_point_observer"
+        );
+        // No `use bevy_morgan_integration::systems::{` block — Inline
+        // mode is supposed to be runtime-independent.
+        assert!(
+            !code.contains("use bevy_morgan_integration::systems::"),
+            "Inline mode must not emit `use bevy_morgan_integration::systems`"
+        );
+        // The gated `add_systems` / `add_observer` lines in the
+        // inline-mode `plugin_init` mirror what `MorganLevelSystems`
+        // registers (per `MarkerSet`).
+        assert!(
+            code.contains(
+                "add_systems(bevy::prelude::Update, (door_proximity_open, collectible_pickup))"
+            ),
+            "inline mode `plugin_init` must register gated systems"
+        );
+        assert!(
+            code.contains("add_observer(spawn_point_observer)"),
+            "inline mode `plugin_init` must register spawn_point_observer"
+        );
+    }
+
+    #[test]
+    fn inline_mode_gates_plugin_registration_per_marker_set() {
+        // Marker-set gating in Inline mode happens at TWO levels:
+        // (1) The `SYSTEMS_SOURCE` constant is stamped verbatim —
+        //     every reference body always ships, so consumers can
+        //     read / fork / extend any system.
+        // (2) The `plugin_init` helper only registers the gated
+        //     subset via `add_systems(Update, ...)` / `add_observer(...)`,
+        //     so unused bodies are inert at runtime.
+        // Verify (2) — bodies may all be present, but registration
+        // is gated. Anchor on the specific registration line shape
+        // rather than the symbol's mere presence (which would match
+        // the SYSTEMS_SOURCE body too).
+        let lvl = level_with_tags(&["door"]);
+        let code =
+            LevelExporter::generate_rust_code_with_mode(&lvl, Some(SystemsMode::Inline)).unwrap();
+        // SYSTEMS_SOURCE bodies are always present.
+        assert!(
+            code.contains("fn door_proximity_open("),
+            "SYSTEMS_SOURCE must contain every reference body"
+        );
+        // The plugin_init block (the only place where the runtime
+        // registers systems with Bevy) must contain ONLY the door
+        // system in its `add_systems(Update, ...)` tuple.
+        assert!(
+            code.contains(".add_systems(bevy::prelude::Update, (door_proximity_open))"),
+            "door must be registered; collector / pickup must NOT"
+        );
+        assert!(
+            !code.contains(
+                ".add_systems(bevy::prelude::Update, (door_proximity_open, collectible_pickup))"
+            ),
+            "collectible_pickup must not be registered when not tagged"
+        );
+        assert!(
+            !code.contains(".add_systems(bevy::prelude::Update, (door_proximity_open, collectible_pickup, nav_mesh_collector))"),
+            "nav_mesh_collector must not be registered when not tagged"
+        );
+        // No observer lines at all for a level that only tagged `door`.
+        // The plugin_init helper emits observer lines only when the
+        // matching MarkerSet bit is set; with `door` only, none
+        // should fire.
+        assert!(
+            !code.contains("spawn_point_observer\n"),
+            "spawn_point_observer must not be registered when not tagged"
+        );
+        assert!(
+            !code.contains("trigger_volume_observer\n"),
+            "trigger_volume_observer must not be registered when not tagged"
+        );
+        assert!(
+            !code.contains("light_observer\n"),
+            "light_observer must not be registered when not tagged"
+        );
+    }
+
+    #[test]
+    fn re_export_rust_code_preserves_inline_mode() {
+        // Round-trip: export as Inline, re-export from the same file,
+        // confirm the re-export still says `// Systems mode: Inline`.
+        // The audit-flagged regression was the previous behaviour
+        // where re-exports always fell through to CompanionReference.
+        let dir = tempfile::tempdir().expect("tempdir");
+        let file_path = dir.path().join("level.rs");
+        let lvl = level_with_tags(&["door", "light"]);
+
+        // First export: Inline.
+        LevelExporter::export_rust_code(&lvl, &file_path).unwrap();
+        // Override the on-disk mode by hand to force the re-export
+        // path through the Inline branch (the public `export_rust_code`
+        // entry point doesn't expose a mode parameter — only the
+        // internal `re_export_rust_code` does).
+        let initial = fs::read_to_string(&file_path).unwrap();
+        assert!(
+            initial.contains("// Systems mode: CompanionReference"),
+            "default `export_rust_code` entry should use CompanionReference (fresh exports)"
+        );
+
+        let patched = initial.replace("CompanionReference", "Inline");
+        fs::write(&file_path, &patched).unwrap();
+
+        LevelExporter::re_export_rust_code(&lvl, &file_path).unwrap();
+        let after = fs::read_to_string(&file_path).unwrap();
+        assert!(
+            after.contains("// Systems mode: Inline"),
+            "re-export must honour the inline mode recorded in the on-disk header"
+        );
+        // And the inline source bodies must be present too.
+        assert!(after.contains("fn door_proximity_open("));
+        assert!(after.contains("fn light_observer("));
     }
 
     // ----- T91: marker enum + emission tests -----
