@@ -12,7 +12,12 @@
 
 import { useState } from 'react'
 
-import { getAnalyticsSettings, markConsentSeen, setAnalyticsSettings } from '@/utils/analytics'
+import {
+  getAnalyticsSettings,
+  hasConsentBeenSeen,
+  markConsentSeen,
+  setAnalyticsSettings,
+} from '@/utils/analytics'
 
 export interface AnalyticsConsentDialogProps {
   /** Override the consent-seen flag for tests (true = show the dialog). */
@@ -24,6 +29,12 @@ export interface AnalyticsConsentDialogProps {
 export default function AnalyticsConsentDialog(props: AnalyticsConsentDialogProps) {
   const [decided, setDecided] = useState(false)
   const settings = getAnalyticsSettings()
+  // Audit (Major #19): show the dialog when consent has never
+  // been acknowledged. The hook tracks per-component state so
+  // `decided` flips to true on accept / decline and short-
+  // circuits remounts in the same session. `shouldShow` is the
+  // explicit test override.
+  if (props.shouldShow !== true && hasConsentBeenSeen()) return null
   // The parent decides whether to render this. If we got here,
   // show the dialog.
   if (props.shouldShow === false) return null

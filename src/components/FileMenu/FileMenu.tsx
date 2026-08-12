@@ -297,20 +297,15 @@ export default function FileMenu({ isOpen, onClose, position, onManualSave }: Fi
       const raw = await invoke<unknown>('load_project')
       const projectData = ProjectDataSchema.parse(raw)
       applyProjectDataToStore(projectData, undefined)
-      // The Rust side returns the parsed JSON, not the path — but the
-      // save_project command returned the path. For "Open" we don't
-      // currently get the path back, so we add a synthetic recent
-      // entry derived from the project metadata name (the user can
-      // re-save to lock the path into recents).
-      const fallbackName =
-        (projectData.metadata as { name?: string } | undefined)?.name ??
-        `${(projectData.metadata as { name?: string } | undefined)?.name ?? 'project'}.mbp`
-      setRecentProjects(
-        addRecentProject(
-          (projectData.metadata as { name?: string } | undefined)?.name ?? 'in-memory',
-          fallbackName
-        )
-      )
+      // Audit (Major #15) regression: this used to add a
+      // synthetic recent entry derived from the project's
+      // metadata *name* (e.g. "My Cool Level"), which is NOT a
+      // filesystem path. Subsequent clicks on that recent entry
+      // would call `load_project_from_path` with that string and
+      // the Rust side would fail — the user saw a permanently-
+      // broken Recent Projects entry every time they opened a
+      // file. Skip the recents add entirely when we don't have a
+      // real path; the next "Save" will lock the path in.
       onClose()
     } catch (error) {
       console.error('Load failed:', error)

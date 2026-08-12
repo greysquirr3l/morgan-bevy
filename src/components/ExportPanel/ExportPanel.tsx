@@ -35,6 +35,14 @@ export default function ExportPanel() {
   const [isExporting, setIsExporting] = useState(false)
   const [outputPath, setOutputPath] = useState('')
   const [lastExportResult, setLastExportResult] = useState<ExportResult | null>(null)
+  // Audit (Major #17) regression: the metadata / generation-data /
+  // optimize-for-size checkboxes used to be `defaultChecked` with
+  // no `onChange` and no state — they were inert. Promote them to
+  // real state and forward to the Rust export command so the
+  // chosen behaviour actually affects the output.
+  const [includeMetadata, setIncludeMetadata] = useState(true)
+  const [includeGenerationData, setIncludeGenerationData] = useState(true)
+  const [optimizeForSize, setOptimizeForSize] = useState(false)
 
   const [exportFormats, setExportFormats] = useState<ExportFormat[]>([
     {
@@ -190,6 +198,9 @@ export default function ExportPanel() {
         levelData,
         formats: enabledFormats,
         outputPath,
+        includeMetadata,
+        includeGenerationData,
+        optimizeForSize,
       })
 
       setLastExportResult(result)
@@ -284,15 +295,33 @@ export default function ExportPanel() {
         <label className="block text-xs text-editor-textMuted mb-1">Options</label>
         <div className="space-y-1">
           <label className="flex items-center space-x-2">
-            <input type="checkbox" defaultChecked className="rounded" />
+            <input
+              type="checkbox"
+              checked={includeMetadata}
+              onChange={e => setIncludeMetadata(e.target.checked)}
+              className="rounded"
+              data-testid="export-include-metadata"
+            />
             <span className="text-xs">Include Metadata</span>
           </label>
           <label className="flex items-center space-x-2">
-            <input type="checkbox" defaultChecked className="rounded" />
+            <input
+              type="checkbox"
+              checked={includeGenerationData}
+              onChange={e => setIncludeGenerationData(e.target.checked)}
+              className="rounded"
+              data-testid="export-include-generation-data"
+            />
             <span className="text-xs">Include Generation Data</span>
           </label>
           <label className="flex items-center space-x-2">
-            <input type="checkbox" className="rounded" />
+            <input
+              type="checkbox"
+              checked={optimizeForSize}
+              onChange={e => setOptimizeForSize(e.target.checked)}
+              className="rounded"
+              data-testid="export-optimize-size"
+            />
             <span className="text-xs">Optimize for Size</span>
           </label>
         </div>

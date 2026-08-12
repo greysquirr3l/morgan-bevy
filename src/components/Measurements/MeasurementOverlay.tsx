@@ -8,6 +8,7 @@
 
 import { X } from 'lucide-react'
 
+import { formatMeasurement, type Measurement, type MeasurementConfig } from '@/types/measurements'
 import {
   distance,
   midpoint,
@@ -15,11 +16,6 @@ import {
   polygonCentroid,
   polylineLength,
 } from '@/utils/measurements'
-import {
-  formatMeasurement,
-  type Measurement,
-  type MeasurementConfig,
-} from '@/types/measurements'
 
 export interface MeasurementOverlayProps {
   /** The most-recent measurement to display. */
@@ -28,10 +24,15 @@ export interface MeasurementOverlayProps {
   config: MeasurementConfig
   /** Remove a measurement by id. */
   onRemove?: (id: string) => void
+  /** Audit (Major #18): turn the tool off entirely. Bound to
+   *  `setMode(null)` from the parent so the × button has a
+   *  visible on-canvas escape, not just per-measurement
+   *  deletion. */
+  onTurnOff?: () => void
 }
 
 export default function MeasurementOverlay(props: MeasurementOverlayProps) {
-  const { measurement, config, onRemove } = props
+  const { measurement, config, onRemove, onTurnOff } = props
   if (!measurement || measurement.points.length === 0) return null
 
   // Compute the displayed value depending on the mode.
@@ -86,8 +87,19 @@ export default function MeasurementOverlay(props: MeasurementOverlayProps) {
         {primaryValue}
       </div>
       <div className="mt-2 text-[10px] text-editor-textMuted font-mono">
-        anchor: ({anchorPoint[0].toFixed(2)}, {anchorPoint[1].toFixed(2)}, {anchorPoint[2].toFixed(2)})
+        anchor: ({anchorPoint[0].toFixed(2)}, {anchorPoint[1].toFixed(2)},{' '}
+        {anchorPoint[2].toFixed(2)})
       </div>
+      {onTurnOff && (
+        <button
+          type="button"
+          onClick={onTurnOff}
+          className="mt-2 w-full text-[10px] text-editor-textMuted hover:text-red-400 border border-editor-border rounded px-1 py-0.5"
+          data-testid="measurement-turn-off"
+        >
+          Turn off tool
+        </button>
+      )}
     </div>
   )
 }

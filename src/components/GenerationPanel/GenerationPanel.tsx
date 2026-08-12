@@ -335,6 +335,7 @@ export default function GenerationPanel(_props: GenerationPanelProps) {
           onClick={handleGenerate}
           disabled={isGenerating}
           data-tutorial-target="generation-generate-button"
+          data-action="generate"
           className={`flex-1 flex items-center justify-center space-x-1 px-3 py-1 text-xs rounded ${
             isGenerating
               ? 'bg-gray-600 text-gray-400 cursor-not-allowed'

@@ -1,5 +1,32 @@
+import { DEFAULT_SHORTCUTS, type ShortcutBinding } from '@/shortcuts/defaults'
 import { Camera, Copy, Eye, FileText, Keyboard, Layers, Mouse, Move, Search, X } from 'lucide-react'
 import React, { useEffect, useState } from 'react'
+
+/**
+ * Build the human-readable list of keys shown in the UI. Modifiers
+ * come first (Ctrl / Meta / Alt / Shift) so the rendered chip
+ * reads "Ctrl + A" rather than "A + Ctrl", which matches what the
+ * user sees in the menu bar.
+ */
+function formatKeys(binding: ShortcutBinding): string[] {
+  const parts: string[] = []
+  if (binding.modifiers.includes('ctrl')) parts.push('Ctrl')
+  if (binding.modifiers.includes('meta')) parts.push('Cmd')
+  if (binding.modifiers.includes('alt')) parts.push('Alt')
+  if (binding.modifiers.includes('shift')) parts.push('Shift')
+  parts.push(capitalize(binding.key))
+  return parts
+}
+
+function capitalize(key: string): string {
+  if (key === 'escape') return 'Esc'
+  if (key === 'arrowup') return '↑'
+  if (key === 'arrowdown') return '↓'
+  if (key === 'arrowleft') return '←'
+  if (key === 'arrowright') return '→'
+  if (key.length === 1) return key.toUpperCase()
+  return key.charAt(0).toUpperCase() + key.slice(1)
+}
 
 interface ShortcutGroup {
   title: string
@@ -20,108 +47,43 @@ export default function KeyboardShortcutsModal({ isOpen, onClose }: KeyboardShor
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedCategory, setSelectedCategory] = useState<string>('all')
 
-  const shortcutGroups: ShortcutGroup[] = [
-    {
-      title: 'Transform & Selection',
-      icon: <Move className="w-4 h-4" />,
-      shortcuts: [
-        { keys: ['Q'], description: 'Select mode - click to pick, no transform gizmo' },
-        { keys: ['W'], description: 'Translate mode - Move objects in 3D space' },
-        { keys: ['E'], description: 'Rotate mode - Rotate objects around axes' },
-        { keys: ['R'], description: 'Scale mode - Resize objects uniformly or per-axis' },
-        { keys: ['T'], description: 'Toggle local/world coordinate space' },
-        { keys: ['G'], description: 'Toggle grid snapping and visual overlay' },
-        { keys: ['X'], description: 'Lock to X-axis during transform' },
-        { keys: ['Y'], description: 'Lock to Y-axis during transform' },
-        { keys: ['Z'], description: 'Lock to Z-axis during transform' },
-        { keys: ['V'], description: 'Toggle 2D grid / 3D viewport view' },
-        { keys: ['Home'], description: 'Reset camera to default position' },
-        { keys: ['Esc'], description: 'Clear selection (or exit fly camera when active)' },
-        { keys: ['Delete'], description: 'Delete selected objects' },
-        { keys: ['Backspace'], description: 'Delete selected objects (alternative)' },
-      ],
-    },
-    {
-      title: 'Camera Controls',
-      icon: <Camera className="w-4 h-4" />,
-      shortcuts: [
-        { keys: ['1'], description: 'Orbit camera mode - Standard 3D navigation' },
-        { keys: ['2'], description: 'Fly camera mode - WASD + mouse look' },
-        { keys: ['3'], description: 'Orthographic top-down view - 2D precision' },
-        { keys: ['F'], description: 'Frame selected objects - Focus camera on selection' },
-        { keys: ['Alt', 'F'], description: 'Frame all objects - Show entire scene' },
-        { keys: ['Home'], description: 'Reset camera to default position' },
-        { keys: ['Shift', 'Left Mouse'], description: 'Pan camera (orbit mode)' },
-        { keys: ['Right Mouse'], description: 'Pan camera (orbit mode, alternative)' },
-        { keys: ['Middle Mouse'], description: 'Zoom camera (orbit mode)' },
-        { keys: ['Scroll Wheel'], description: 'Zoom camera in/out' },
-      ],
-    },
-    {
-      title: 'Fly Camera (Mode 2)',
-      icon: <Mouse className="w-4 h-4" />,
-      shortcuts: [
-        { keys: ['W'], description: 'Move forward' },
-        { keys: ['A'], description: 'Strafe left' },
-        { keys: ['S'], description: 'Move backward' },
-        { keys: ['D'], description: 'Strafe right' },
-        { keys: ['Space'], description: 'Move up' },
-        { keys: ['C'], description: 'Move down' },
-        { keys: ['Shift'], description: 'Fast movement (hold while moving)' },
-        { keys: ['Mouse'], description: 'Look around (pointer lock mode)' },
-        { keys: ['Esc'], description: 'Exit fly mode back to orbit' },
-      ],
-    },
-    {
-      title: 'Selection & Editing',
-      icon: <Eye className="w-4 h-4" />,
-      shortcuts: [
-        { keys: ['Click'], description: 'Select single object' },
-        { keys: ['Ctrl', 'Click'], description: 'Add object to selection' },
-        { keys: ['Drag'], description: 'Box selection - drag rectangle to select multiple' },
-        { keys: ['Ctrl', 'A'], description: 'Select all objects' },
-        { keys: ['Ctrl', 'G'], description: 'Group selected objects' },
-        { keys: ['Ctrl', 'Shift', 'G'], description: 'Ungroup selected objects' },
-        { keys: ['H'], description: 'Hide selected objects' },
-        { keys: ['Shift', 'H'], description: 'Unhide all objects' },
-      ],
-    },
-    {
-      title: 'Copy & Paste',
-      icon: <Copy className="w-4 h-4" />,
-      shortcuts: [
-        { keys: ['Ctrl', 'C'], description: 'Copy selected objects to clipboard' },
-        { keys: ['Ctrl', 'V'], description: 'Paste objects from clipboard' },
-        { keys: ['Ctrl', 'D'], description: 'Duplicate selected objects with offset' },
-        { keys: ['Ctrl', 'Z'], description: 'Undo last operation' },
-        { keys: ['Ctrl', 'Y'], description: 'Redo previously undone operation' },
-        { keys: ['Ctrl', 'Shift', 'Z'], description: 'Redo (alternative shortcut)' },
-      ],
-    },
-    {
-      title: 'File Operations',
-      icon: <FileText className="w-4 h-4" />,
-      shortcuts: [
-        { keys: ['Ctrl', 'N'], description: 'New project - Clear scene and start fresh' },
-        { keys: ['Ctrl', 'O'], description: 'Open project file' },
-        { keys: ['Ctrl', 'S'], description: 'Save current project' },
-        { keys: ['Ctrl', 'E'], description: 'Export level in multiple formats' },
-      ],
-    },
-    {
-      title: 'View & Layout',
-      icon: <Layers className="w-4 h-4" />,
-      shortcuts: [
-        { keys: ['V'], description: 'Toggle between 3D viewport and 2D grid view' },
-        { keys: ['Home'], description: 'Reset camera to default position' },
-      ],
-    },
-    {
-      title: 'Tools & Modes',
-      icon: <Keyboard className="w-4 h-4" />,
-      shortcuts: [{ keys: ['P'], description: 'Paint tool - Apply materials to surfaces' }],
-    },
-  ]
+  // Audit (Major #14) regression: this used to be a hand-written
+  // list of  rows. Every time
+  //  grew or changed a binding, the
+  // modal drifted silently — missing actions, wrong key combos,
+  // duplicates. Derive the modal's groups from
+  // (the single source of truth that the hook already consumes)
+  // and group by . Each binding has a
+  // that becomes the description;  renders the chip
+  // from  + .
+  const shortcutGroups: ShortcutGroup[] = (() => {
+    const byCategory = new Map<string, ShortcutBinding[]>()
+    for (const binding of DEFAULT_SHORTCUTS) {
+      const cat = binding.category ?? 'Other'
+      if (!byCategory.has(cat)) byCategory.set(cat, [])
+      byCategory.get(cat)!.push(binding)
+    }
+    const iconFor = (cat: string): React.ReactNode => {
+      if (cat === 'Transform') return <Move className="w-4 h-4" />
+      if (cat === 'Camera') return <Camera className="w-4 h-4" />
+      if (cat === 'View') return <Eye className="w-4 h-4" />
+      if (cat === 'Selection') return <Layers className="w-4 h-4" />
+      if (cat === 'Tools') return <Keyboard className="w-4 h-4" />
+      if (cat === 'Constraint') return <Copy className="w-4 h-4" />
+      if (cat === 'File') return <FileText className="w-4 h-4" />
+      if (cat === 'Help') return <Search className="w-4 h-4" />
+      return <Mouse className="w-4 h-4" />
+    }
+    return Array.from(byCategory.entries()).map(([cat, items]) => ({
+      title: cat,
+      icon: iconFor(cat),
+      shortcuts: items.map(binding => ({
+        keys: formatKeys(binding),
+        description: binding.label,
+        action: binding.action,
+      })),
+    }))
+  })()
 
   // Filter shortcuts based on search query and category
   const filteredGroups = shortcutGroups

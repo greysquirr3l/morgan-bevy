@@ -1,4 +1,5 @@
 // Material editor component for PBR material properties
+import { useEditorStore } from '@/store/editorStore'
 import { MaterialId, type ObjectId } from '@/types/brand'
 import {
   DEFAULT_PRESETS,
@@ -138,14 +139,56 @@ export default function MaterialEditor({
   onLinkPreset,
   onUnlinkPreset,
 }: MaterialEditorProps) {
-  const [material, setMaterial] = useState({
-    baseColor: '#808080',
-    metallic: 0.0,
-    roughness: 0.8,
-    emissive: '#000000',
-    emissiveIntensity: 0.0,
-    texture: null as string | null,
+  const sceneObjects = useEditorStore(s => s.sceneObjects)
+  const primaryObject = selectedObjects.length > 0 ? sceneObjects.get(selectedObjects[0]!) : null
+
+  // Audit (Major #10) regression: the initial `useState` used
+  // hardcoded defaults (grey, 0% metal, 80% rough) regardless of
+  // what the user had selected. Crank the roughness to 0.1 and
+  // "Apply to Selected" would silently overwrite the real material
+  // with those defaults. Initialize from the primary selected
+  // object's material when one exists; otherwise fall back to the
+  // grey defaults so the panel still renders for an empty
+  // selection.
+  const [material, setMaterial] = useState(() => {
+    const m = primaryObject?.material
+    if (!m) {
+      return {
+        baseColor: '#808080',
+        metallic: 0.0,
+        roughness: 0.8,
+        emissive: '#000000',
+        emissiveIntensity: 0.0,
+        texture: null as string | null,
+      }
+    }
+    return {
+      baseColor: m.baseColor,
+      metallic: m.metallic,
+      roughness: m.roughness,
+      emissive: m.emissive ?? '#000000',
+      emissiveIntensity: m.emissiveIntensity ?? 0.0,
+      texture: m.texture ?? null,
+    }
   })
+
+  // Sync the editor's local state whenever the selection (or its
+  // material) changes from outside — e.g. user picks a different
+  // object, or paints a preset onto the current one. Without this
+  // the editor keeps showing the first selection's values forever
+  // even after the user clicks a different object.
+  useEffect(() => {
+    const m = primaryObject?.material
+    if (!m) return
+    setMaterial({
+      baseColor: m.baseColor,
+      metallic: m.metallic,
+      roughness: m.roughness,
+      emissive: m.emissive ?? '#000000',
+      emissiveIntensity: m.emissiveIntensity ?? 0.0,
+      texture: m.texture ?? null,
+    })
+  }, [primaryObject?.id, primaryObject?.material])
 
   const [isExpanded, setIsExpanded] = useState(false)
   const [showPresetLibrary, setShowPresetLibrary] = useState(false)
