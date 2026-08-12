@@ -10,7 +10,7 @@
  */
 import { useEditorStore, type SceneObject } from '@/store/editorStore'
 import { LayerId, ObjectId } from '@/types/brand'
-import { LoadCommand, TransformCommand } from '@/utils/commands'
+import { CreateObjectFromTemplateCommand, LoadCommand, TransformCommand } from '@/utils/commands'
 import { beforeEach, describe, expect, it } from 'vitest'
 
 function makeObject(id: ObjectId, name: string = id): SceneObject {
@@ -181,5 +181,138 @@ describe('undo/redo structural sharing + freeze (T79)', () => {
     expect(() => {
       obj!.name = 'mutated'
     }).toThrow()
+  })
+})
+
+/**
+ * Regression for the audit-flagged Critical #1: the store's own
+ * `undo()` / `redo()` actions previously called `command.undo()` /
+ * `command.execute()` from INSIDE the producer. Every command reaches
+ * back into the store via its own `set()`, and a nested zustand+immer
+ * commit gets clobbered by the outer producer's draft commit. The
+ * command was popped from history but the scene mutation was silently
+ * overwritten. None of the existing tests caught this because they
+ * call `command.undo()` / `command.execute()` directly, bypassing the
+ * store actions entirely — same shape of test would have passed
+ * before and after the fix.
+ */
+describe('store undo()/redo() actions (regression for Critical #1)', () => {
+  beforeEach(() => {
+    useEditorStore.setState({
+      sceneObjects: new Map(),
+      selectedObjects: [],
+      undoHistory: [],
+      redoHistory: [],
+    })
+  })
+
+  it('undo() restores a deleted object via the store action (TransformCommand)', () => {
+    const target = ObjectId('store_undo_target')
+    useEditorStore.setState(state => {
+      state.sceneObjects.set(target, makeObject(target))
+    })
+
+    const cmd = new TransformCommand(
+      target,
+      { position: [0, 0, 0], rotation: [0, 0, 0], scale: [1, 1, 1] },
+      { position: [7, 0, 0], rotation: [0, 0, 0], scale: [1, 1, 1] }
+    )
+    cmd.execute()
+    useEditorStore.getState().executeCommand(cmd)
+
+    expect(useEditorStore.getState().sceneObjects.get(target)?.position).toEqual([7, 0, 0])
+    expect(useEditorStore.getState().undoHistory.length).toBe(1)
+
+    useEditorStore.getState().undo()
+
+    // Before the fix, the position stayed at [7, 0, 0] because the
+    // outer producer's draft clobbered `updateObjectTransform`'s
+    // commit.
+    expect(useEditorStore.getState().sceneObjects.get(target)?.position).toEqual([0, 0, 0])
+    expect(useEditorStore.getState().redoHistory.length).toBe(1)
+    expect(useEditorStore.getState().undoHistory.length).toBe(0)
+  })
+
+  it('redo() re-applies the change via the store action', () => {
+    const target = ObjectId('store_redo_target')
+    useEditorStore.setState(state => {
+      state.sceneObjects.set(target, makeObject(target))
+    })
+
+    const cmd = new TransformCommand(
+      target,
+      { position: [0, 0, 0], rotation: [0, 0, 0], scale: [1, 1, 1] },
+      { position: [4, 0, 0], rotation: [0, 0, 0], scale: [1, 1, 1] }
+    )
+    cmd.execute()
+    useEditorStore.getState().executeCommand(cmd)
+
+    useEditorStore.getState().undo()
+    expect(useEditorStore.getState().sceneObjects.get(target)?.position).toEqual([0, 0, 0])
+
+    useEditorStore.getState().redo()
+    expect(useEditorStore.getState().sceneObjects.get(target)?.position).toEqual([4, 0, 0])
+    expect(useEditorStore.getState().undoHistory.length).toBe(1)
+    expect(useEditorStore.getState().redoHistory.length).toBe(0)
+  })
+
+  it('undo() is a no-op when history is empty', () => {
+    expect(() => useEditorStore.getState().undo()).not.toThrow()
+    expect(() => useEditorStore.getState().redo()).not.toThrow()
+  })
+})
+
+/**
+ * Regression for Critical #3 (prefab round-trip drops rotation /
+ * scale / material / tags). `CreateObjectFromTemplateCommand` exists
+ * specifically so a prefab instantiation can hand a full
+ * `SceneObject` template to the store and have every field
+ * preserved — `CreateObjectCommand`'s (meshType, position) shape was
+ * lossy by design.
+ */
+describe('CreateObjectFromTemplateCommand (regression for Critical #3)', () => {
+  beforeEach(() => {
+    useEditorStore.setState({
+      sceneObjects: new Map(),
+      selectedObjects: [],
+      undoHistory: [],
+      redoHistory: [],
+    })
+  })
+
+  it('execute() inserts every field on the template (rotation / scale / material / tags)', () => {
+    const template: SceneObject = makeObject(ObjectId('ignored'), 'Round Cube')
+    template.meshType = 'cube'
+    template.position = [1, 2, 3]
+    template.rotation = [Math.PI / 2, 0, 0]
+    template.scale = [2, 0.5, 1]
+    template.material = { baseColor: '#ff0000', metallic: 0.7, roughness: 0.2 }
+    template.tags = ['wall', 'hazard']
+    template.layerId = LayerId('walls')
+
+    const cmd = new CreateObjectFromTemplateCommand(template)
+    cmd.execute()
+
+    const stored = useEditorStore.getState().sceneObjects.get(cmd.objectId)
+    expect(stored).toBeDefined()
+    expect(stored?.position).toEqual([1, 2, 3])
+    expect(stored?.rotation).toEqual([Math.PI / 2, 0, 0])
+    expect(stored?.scale).toEqual([2, 0.5, 1])
+    expect(stored?.material).toEqual({ baseColor: '#ff0000', metallic: 0.7, roughness: 0.2 })
+    expect(stored?.tags).toEqual(['wall', 'hazard'])
+    expect(stored?.layerId).toBe(LayerId('walls'))
+    expect(stored?.name).toBe('Round Cube')
+  })
+
+  it('undo() removes the inserted object via the store action', () => {
+    const template: SceneObject = makeObject(ObjectId('ignored'), 'Round Sphere')
+    template.meshType = 'sphere'
+    const cmd = new CreateObjectFromTemplateCommand(template)
+    cmd.execute()
+    useEditorStore.getState().executeCommand(cmd)
+
+    expect(useEditorStore.getState().sceneObjects.has(cmd.objectId)).toBe(true)
+    useEditorStore.getState().undo()
+    expect(useEditorStore.getState().sceneObjects.has(cmd.objectId)).toBe(false)
   })
 })

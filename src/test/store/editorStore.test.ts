@@ -299,4 +299,122 @@ describe('EditorStore', () => {
       expect(state.sceneObjects.has(ObjectId(malformedId))).toBe(false)
     })
   })
+
+  // Regression for audit Critical #5: two writers raced on the same
+  // `morgan-bevy.autosave` key with incompatible shapes. Whichever
+  // ran last decided whether the startup recovery dialog could see
+  // the snapshot. The fix unifies the schema (`{ schemaVersion,
+  // savedAt, scene: { objects, layers, activeLayer, selectedObjects } }`)
+  // and keeps the legacy top-level fields as a fallback so older
+  // payloads still load.
+  describe('Autosave schema unification (regression for Critical #5)', () => {
+    afterEach(() => localStorage.removeItem('morgan-bevy.autosave'))
+
+    it('saveToLocalStorage writes the new-schema payload (scene.objects)', () => {
+      useEditorStore.setState({
+        sceneObjects: new Map([
+          [
+            ObjectId('round_trip_a'),
+            {
+              id: ObjectId('round_trip_a'),
+              name: 'Round Trip',
+              type: 'mesh',
+              position: [0, 0, 0],
+              rotation: [0, 0, 0],
+              scale: [1, 1, 1],
+              visible: true,
+              locked: false,
+              layerId: LayerId('default'),
+              children: [],
+            },
+          ],
+        ]),
+      })
+      useEditorStore.getState().saveToLocalStorage()
+      const raw = localStorage.getItem('morgan-bevy.autosave')
+      expect(raw).not.toBeNull()
+      const parsed = JSON.parse(raw!)
+      // New-schema keys present (so useAutoSave.ts's writeSnapshot
+      // and saveToLocalStorage are shape-compatible).
+      expect(parsed.schemaVersion).toBe(1)
+      expect(typeof parsed.savedAt).toBe('string')
+      expect(Array.isArray(parsed.scene.objects)).toBe(true)
+      expect(parsed.scene.objects[0][0]).toBe('round_trip_a')
+    })
+
+    it('loadFromLocalStorage reads new-schema payloads written by useAutoSave', () => {
+      // Simulate what useAutoSave.ts#writeSnapshot writes.
+      const payload = {
+        schemaVersion: 1,
+        savedAt: new Date().toISOString(),
+        scene: {
+          objects: [
+            [
+              'rt_b',
+              {
+                id: 'rt_b',
+                name: 'From New Schema',
+                type: 'mesh',
+                position: [5, 0, 0],
+                rotation: [0, 0, 0],
+                scale: [1, 1, 1],
+                visible: true,
+                locked: false,
+                layerId: 'default',
+                children: [],
+              },
+            ],
+          ],
+          layers: [],
+          activeLayer: 'default',
+          selectedObjects: ['rt_b'],
+        },
+      }
+      localStorage.setItem('morgan-bevy.autosave', JSON.stringify(payload))
+
+      useEditorStore.setState({
+        sceneObjects: new Map(),
+        selectedObjects: [],
+      })
+      const loaded = useEditorStore.getState().loadFromLocalStorage()
+      expect(loaded).toBe(true)
+      expect(useEditorStore.getState().sceneObjects.has(ObjectId('rt_b'))).toBe(true)
+      expect(useEditorStore.getState().selectedObjects).toEqual([ObjectId('rt_b')])
+    })
+
+    it('loadFromLocalStorage still accepts the legacy top-level schema', () => {
+      // Pre-fix payload (the kind useAutoSave.ts no longer writes,
+      // but may still exist in users' localStorage from a previous
+      // version of the app).
+      const legacy = {
+        timestamp: new Date().toISOString(),
+        gridData: [],
+        sceneObjects: [
+          [
+            'legacy_obj',
+            {
+              id: 'legacy_obj',
+              name: 'Legacy Object',
+              type: 'mesh',
+              position: [1, 0, 0],
+              rotation: [0, 0, 0],
+              scale: [1, 1, 1],
+              visible: true,
+              locked: false,
+              layerId: 'default',
+              children: [],
+            },
+          ],
+        ],
+        viewportMode: '3d',
+      }
+      localStorage.setItem('morgan-bevy.autosave', JSON.stringify(legacy))
+
+      useEditorStore.setState({ sceneObjects: new Map() })
+      const loaded = useEditorStore.getState().loadFromLocalStorage()
+      expect(loaded).toBe(true)
+      expect(useEditorStore.getState().sceneObjects.has(ObjectId('legacy_obj'))).toBe(true)
+      expect(useEditorStore.getState().viewportMode).toBe('3d')
+    })
+  })
 })
