@@ -50,10 +50,9 @@
 - **Not a multiplayer / MMO / networked tool.** No collaboration,
   no cloud sync, no live cursors. Single-user, local-first.
 - **Not finished.** The surface area is broad (BSP, WFC, paint,
-  navmesh, AI waypoints, export to 5 formats, multi-window UI,
-  theme system, etc.) and several editor features are still
-  rough-edged — see [`PROGRESS.md`](PROGRESS.md) for what shipped
-  and what remains.
+  navmesh, AI waypoints, export to 5 formats, theme system, etc.) and
+  several editor features are still rough-edged — see
+  [`PROGRESS.md`](PROGRESS.md) for what shipped and what remains.
 
 ## Why Morgan?
 
@@ -142,7 +141,7 @@ tools** to enable rapid level design and iteration.
 
 - ✅ **BSP Algorithm** - Binary Space Partitioning with theme-driven room templates
 - ✅ **WFC Integration** - Wave Function Collapse with backtracking, deterministic seeds
-- ✅ **Theme System** - Office, Dungeon, Castle, Sci-Fi presets (`docs/dev/themes.md`)
+- ✅ **Theme System** - Office, Dungeon, Castle, Sci-Fi generation themes; Office / Dungeon / Sci-Fi lighting presets. See [`PROGRESS.md`](PROGRESS.md) (T24 for generation themes, T55 for lighting presets).
 - ✅ **Seed Management** - Reproducible generation; seed echoed in export metadata
 - ✅ **Generation Panel** - GUI for parameters, live preview, regenerate, lock seed
 
@@ -229,7 +228,7 @@ we make; see [`docs/dev/bevy-compat.md`](docs/dev/bevy-compat.md).
 | Layer                | Technology                                                                                                | Purpose                                                |
 | -------------------- | --------------------------------------------------------------------------------------------------------- | ------------------------------------------------------ |
 | **Desktop App**      | [Tauri](https://tauri.app/) 2.11.5                                                                        | Cross-platform native shell (Rust + system webview)    |
-| **Frontend**         | [React](https://reactjs.org/) 18 + [TypeScript](https://www.typescriptlang.org/) 5.9                      | Strict-mode UI; zod-validated Tauri IPC                |
+| **Frontend**         | [React](https://reactjs.org/) 18 + [TypeScript](https://www.typescriptlang.org/) 5.x                      | Strict-mode UI; zod-validated Tauri IPC                |
 | **3D Rendering**     | [Three.js](https://threejs.org/) 0.168 + [React Three Fiber](https://github.com/pmndrs/react-three-fiber) | WebGL viewport with LOD / frustum culling / instancing |
 | **State Management** | [Zustand](https://zustand-demo.pmnd.rs/) 5.0.8 + [Immer](https://immerjs.github.io/immer/)                | Per-frame data stays in `useRef`, never the store      |
 | **Database**         | [SQLite](https://www.sqlite.org/) + [rusqlite](https://github.com/rusqlite/rusqlite)                      | Asset database with schema-versioned migrations        |
@@ -237,7 +236,7 @@ we make; see [`docs/dev/bevy-compat.md`](docs/dev/bevy-compat.md).
 | **Export Targets**   | JSON, RON, Rust source, GLTF, binary FBX 7.7                                                              | Each emits a manifest alongside the data               |
 | **Styling**          | [Tailwind CSS](https://tailwindcss.com/) 3 + CSS variables for theme tokens                               | Dark / Light                                           |
 | **Build System**     | [Vite](https://vitejs.dev/) 5 + [Cargo](https://doc.rust-lang.org/cargo/)                                 | Hot-reload dev server; release build via `tauri build` |
-| **Quality Gates**    | Vitest · ESLint · Cargo Clippy (pedantic + nursery) · cargo-deny                                          | All six preflight checks run in CI                     |
+| **Quality Gates**    | TypeScript strict · ESLint · Vitest · Cargo test · Cargo Clippy (pedantic + nursery) · cargo-deny         | All six preflight checks run in CI                     |
 
 The Bevy 0.19 export contract is the only stability promise we make;
 see [`docs/dev/bevy-compat.md`](docs/dev/bevy-compat.md).
@@ -289,18 +288,18 @@ npm run tauri build
 
 ## 📋 Development Roadmap
 
-| Phase        | Timeline       | Status                    | Features                                                      |
-| ------------ | -------------- | ------------------------- | ------------------------------------------------------------- |
-| **Phase 1**  | ✅ Complete    | **Foundation**            | 3D Editor, Transform Gizmos, Basic Asset Management           |
-| **Phase 2**  | ✅ Complete    | **UI & Workflow**         | Resizable Panels, Camera Controls, Professional UI            |
-| **Phase 3**  | ✅ Complete    | **Asset Database**        | SQLite Database, Advanced Asset Browser, Search & Collections |
-| **Phase 4**  | ✅ Complete    | **Advanced Editing**      | Box Selection, Undo/Redo, Enhanced UI                         |
-| **Phase 5**  | ✅ Complete    | **Procedural Generation** | BSP, WFC, Theme System, Seed Management                       |
-| **Phase 6**  | ✅ Complete    | **Export & Integration**  | JSON / RON / Rust / GLTF / FBX + Bevy 0.19 contract           |
-| **Phase 7**  | ✅ Complete    | **Performance**           | LOD, frustum culling, instancing, 60 FPS @ 10K+ objects       |
-| **Phase 8**  | 🔄 In Progress | **Advanced Tools**        | Snap points, surface snapping, lighting, paint                |
-| **Phase 9**  | 🔄 In Progress | **Polish**                | Examples, docs, in-app help, marketing                        |
-| **Phase 10** | 🔄 In Progress | **Distribution**          | cargo-deny (✅), CI matrix, release pipeline, auto-updater    |
+| Phase        | Timeline    | Status                    | Features                                                      |
+| ------------ | ----------- | ------------------------- | ------------------------------------------------------------- |
+| **Phase 1**  | ✅ Complete | **Foundation**            | 3D Editor, Transform Gizmos, Basic Asset Management           |
+| **Phase 2**  | ✅ Complete | **UI & Workflow**         | Resizable Panels, Camera Controls, Professional UI            |
+| **Phase 3**  | ✅ Complete | **Asset Database**        | SQLite Database, Advanced Asset Browser, Search & Collections |
+| **Phase 4**  | ✅ Complete | **Advanced Editing**      | Box Selection, Undo/Redo, Enhanced UI                         |
+| **Phase 5**  | ✅ Complete | **Procedural Generation** | BSP, WFC, Theme System, Seed Management                       |
+| **Phase 6**  | ✅ Complete | **Export & Integration**  | JSON / RON / Rust / GLTF / FBX + Bevy 0.19 contract           |
+| **Phase 7**  | ✅ Complete | **Performance**           | LOD, frustum culling, instancing, 60 FPS @ 10K+ objects       |
+| **Phase 8**  | ✅ Complete | **Advanced Tools**        | Snap points, surface snapping, lighting, paint                |
+| **Phase 9**  | ✅ Complete | **Polish**                | Examples, docs, in-app help, marketing                        |
+| **Phase 10** | ✅ Complete | **Distribution**          | cargo-deny, CI matrix, release pipeline, auto-updater         |
 
 See [`PROGRESS.md`](PROGRESS.md) for the per-task status table.
 
@@ -333,9 +332,8 @@ To regenerate locally, run the editor, capture each scene via
 **🚀 Morgan is open to contributors — first-time and seasoned alike.**
 The codebase is small, the gates (`just preflight` = lint + test +
 audit) all run in under a minute, and the maintainer is reachable
-on GitHub. If you've ever wanted a real `cargo clippy -- -W pedantic`
-
-- `vitest` + Tauri project to cut your teeth on, this is it.
+on GitHub. If you've ever wanted a real `cargo clippy -- -W pedantic
+-W nursery` + Tauri project to cut your teeth on, this is it.
 
 ### How to get started
 
