@@ -21,23 +21,23 @@
  * records the skip so the tutorial doesn't need to be dismissed
  * again.
  */
+import { X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { X } from 'lucide-react'
 
 import {
   advanceTutorialStep,
   getTutorial,
-  resumeOrStartTutorial,
   restartTutorial,
+  resumeOrStartTutorial,
   skipTutorial,
   type TutorialStatus,
   type TutorialStep,
 } from '@/state/tutorial'
 
+import { getSpotlightRect, type SpotlightRect } from './spotlightGeometry'
 import { useFocusTrap } from './useFocusTrap'
 import { useTutorialStepValidation } from './useTutorialStepValidation'
-import { getSpotlightRect, type SpotlightRect } from './spotlightGeometry'
 
 interface TutorialOverlayProps {
   /** `null` renders nothing. Set to a tutorial id to open it. */
@@ -159,8 +159,19 @@ export default function TutorialOverlay({ tutorialId, onClose }: TutorialOverlay
   const targetMissing = rect === null
 
   return createPortal(
+    // Audit (Critical #6) regression: this outer div used to default
+    // to `pointer-events: auto` for the whole viewport, so even though
+    // the four quadrant blockers deliberately left the spotlight
+    // rectangle uncovered, the wrapper itself was still on top of
+    // every target and silently absorbed the click. The target's own
+    // click handler never fired, so step-validation never advanced
+    // — 3 of 8 tutorial steps stuck permanently. Flip the wrapper to
+    // `pointer-events: none` and re-enable `pointer-events: auto` on
+    // the elements that DO need to receive input (the quadrants
+    // block clicks, the step card owns its own buttons, the missing-
+    // target backdrop catches input as before).
     <div
-      className="fixed inset-0 z-[10000]"
+      className="fixed inset-0 z-[10000] pointer-events-none"
       role="dialog"
       aria-modal="true"
       aria-label={`${tutorial.title} tutorial`}
@@ -169,21 +180,23 @@ export default function TutorialOverlay({ tutorialId, onClose }: TutorialOverlay
       {rect ? (
         <>
           {/* Blocking quadrants — the rect itself is left open so
-              the real target underneath stays clickable. */}
+              the real target underneath stays clickable. The four
+              blockers each re-enable pointer events to absorb
+              clicks outside the spotlight. */}
           <div
-            className="fixed bg-black/60"
+            className="fixed bg-black/60 pointer-events-auto"
             style={{ top: 0, left: 0, right: 0, height: rect.top }}
           />
           <div
-            className="fixed bg-black/60"
+            className="fixed bg-black/60 pointer-events-auto"
             style={{ top: rect.top + rect.height, left: 0, right: 0, bottom: 0 }}
           />
           <div
-            className="fixed bg-black/60"
+            className="fixed bg-black/60 pointer-events-auto"
             style={{ top: rect.top, left: 0, width: rect.left, height: rect.height }}
           />
           <div
-            className="fixed bg-black/60"
+            className="fixed bg-black/60 pointer-events-auto"
             style={{
               top: rect.top,
               left: rect.left + rect.width,
@@ -197,13 +210,17 @@ export default function TutorialOverlay({ tutorialId, onClose }: TutorialOverlay
           />
         </>
       ) : (
-        <div className="fixed inset-0 bg-black/60" />
+        // When the target can't be located, fall back to a full-
+        // screen backdrop with `pointer-events: auto` so the user
+        // can't poke at the app behind it (the "Next" button in the
+        // step card is the only escape).
+        <div className="fixed inset-0 bg-black/60 pointer-events-auto" />
       )}
 
       {/* Step card */}
       <div
         ref={cardRef}
-        className="fixed bottom-8 left-1/2 -translate-x-1/2 bg-editor-panel border border-editor-border rounded-lg shadow-2xl p-5 max-w-md w-full mx-4 space-y-3"
+        className="fixed bottom-8 left-1/2 -translate-x-1/2 bg-editor-panel border border-editor-border rounded-lg shadow-2xl p-5 max-w-md w-full mx-4 space-y-3 pointer-events-auto"
         data-testid="tutorial-step-card"
       >
         <div className="flex items-start justify-between">
@@ -224,8 +241,8 @@ export default function TutorialOverlay({ tutorialId, onClose }: TutorialOverlay
         <p className="text-sm text-editor-textMuted">{step.body}</p>
         {targetMissing && (
           <p className="text-xs text-yellow-500" role="status">
-            Couldn&apos;t find this step&apos;s target on screen right now — click Next to
-            continue anyway.
+            Couldn&apos;t find this step&apos;s target on screen right now — click Next to continue
+            anyway.
           </p>
         )}
         <div className="flex items-center justify-between pt-2 border-t border-editor-border">
@@ -253,8 +270,9 @@ export default function TutorialOverlay({ tutorialId, onClose }: TutorialOverlay
           </div>
         </div>
         <div className="text-xs text-editor-textMuted pt-1">
-          Press <kbd className="px-1 py-0.5 bg-editor-bg rounded border border-editor-border">Esc</kbd>{' '}
-          to pause.
+          Press{' '}
+          <kbd className="px-1 py-0.5 bg-editor-bg rounded border border-editor-border">Esc</kbd> to
+          pause.
         </div>
       </div>
     </div>,

@@ -7,6 +7,25 @@ interface GridViewProps {
   className?: string
 }
 
+/**
+ * Stable, length-prefixed fingerprint of a 2D tile grid. We compare
+ * against `JSON.stringify` for the obvious reason — the grid is a
+ * `string[][]`, so equality is row-major. This exists so the
+ * GridView can tell its own writes apart from external writes
+ * (sync3DToGrid, file loads) without dragging immer into the
+ * subscriber.
+ */
+function fingerprintGrid(grid: string[][]): string {
+  let out = ''
+  for (const row of grid) {
+    out += String(row.length)
+    out += '|'
+    for (const cell of row) out += cell ?? '\u0000'
+    out += ';'
+  }
+  return out
+}
+
 interface TileDefinition {
   tile_type: string
   name: string
@@ -47,6 +66,11 @@ const GridView = React.forwardRef<GridViewRef, GridViewProps>(({ className = '' 
   const [isDrawing, setIsDrawing] = useState(false)
   const [selectedTile, setSelectedTile] = useState<string>('floor')
   const [gridSize, setGridSize] = useState({ width: 48, height: 36 })
+  // Audit (Major #20): seed the local grid size from the store
+  // so a configurable grid (48×36 by default) actually flows
+  // through 2D ↔ 3D sync. The local `gridSize` stays as a UI
+  // override (the width / height picker) and writes back to the
+  // store on change.
   const [cellSize, setCellSize] = useState(16)
   const [showGrid, setShowGrid] = useState(true)
   // Human-readable legend for the currently-selected theme; surfaced
@@ -68,18 +92,68 @@ const GridView = React.forwardRef<GridViewRef, GridViewProps>(({ className = '' 
   // Access editor state for view mode and theme
   const { selectedTheme, setSelectedTheme, setGridData: setStoreGridData } = useEditorStore()
 
-  // Sync grid data to store whenever it changes
+  // Sync grid data to store whenever it changes locally (user paint,
+  // paste, fill, resize).
   useEffect(() => {
     setStoreGridData(gridData)
   }, [gridData, setStoreGridData])
 
+  // Audit (Critical #4) regression: GridView used to be a write-only
+  // consumer of `store.gridData` — it pushed its local state up on
+  // every paint but never re-read it. Edits made in the 3D viewport
+  // that flowed back through `App.tsx#sync3DToGrid` were
+  // invisible until a full page reload: `useState<string[][]>([])`
+  // captures the initial value once, then is treated as the source
+  // of truth forever.
+  //
+  // Subscribe to the store and adopt external changes to `gridData`.
+  // `useEditorStore` doesn't enable `subscribeWithSelector` middleware,
+  // so the vanilla subscribe signature only gives us `(state, prevState)`
+  // and we filter inside the listener. To avoid a feedback loop with
+  // the writer above, compare against a fingerprint of the last value
+  // we pushed — an echo from our own write is a no-op.
+  useEffect(() => {
+    return useEditorStore.subscribe((state, prevState) => {
+      const storeGridData = state.gridData
+      const prevStoreGridData = prevState.gridData
+      if (storeGridData === prevStoreGridData) return
+      // Depth-equal against what we last wrote; if it matches, the
+      // change came from us (a paint, fill, paste) and we already
+      // applied it locally. Without this guard every paint round-
+      // trips: setGridData -> writer effect -> store -> subscriber
+      // -> setGridData.
+      if (lastWrittenGridRef.current !== null) {
+        if (fingerprintGrid(lastWrittenGridRef.current) === fingerprintGrid(storeGridData)) {
+          lastWrittenGridRef.current = null
+          return
+        }
+      }
+      setGridData(storeGridData.map(row => [...row]))
+    })
+  }, [])
+
+  // Fingerprint of the last value this component pushed to the
+  // store. Cleared by the subscriber above after it consumes one
+  // matching echo. Lets us distinguish "I wrote this" from
+  // "someone else (sync3DToGrid, file load) wrote this" without
+  // needing a generation counter or a global flag.
+  const lastWrittenGridRef = useRef<string[][] | null>(null)
+  useEffect(() => {
+    // Track each local write so the subscriber above can match it.
+    lastWrittenGridRef.current = gridData
+    // The writer effect below will push this value to the store,
+    // and the subscriber will see the echo and skip it.
+  }, [gridData])
+
   // Initialize grid and load themes
   useEffect(() => {
-    console.log('=== GridView useEffect START ===')
-    console.log('GridView useEffect running - initializing grid and loading themes')
+    // Audit (Minor #25): remove the `console.log('=== ... ===')`
+    // breadcrumbs that fired on every mount and the per-step
+    // `console.log` spam inside `loadThemes`. Keep the
+    // `console.warn` / `console.error` paths — those carry
+    // actionable diagnostics the user needs.
     initializeGrid()
     loadThemes()
-    console.log('=== GridView useEffect END ===')
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []) // Remove gridSize dependency to prevent re-initialization
 
@@ -157,15 +231,10 @@ const GridView = React.forwardRef<GridViewRef, GridViewProps>(({ className = '' 
   }
 
   const loadThemes = useCallback(async () => {
-    console.log('=== loadThemes START ===')
-    console.log('loadThemes called, selectedTheme from store:', selectedTheme)
     try {
-      console.log('Attempting to invoke get_available_themes')
       const themes: Theme[] = await invoke('get_available_themes')
-      console.log('Successfully loaded themes:', themes)
       setAvailableThemes(themes)
       if (themes.length > 0 && !selectedTheme) {
-        console.log('Setting first theme as selected:', themes[0])
         setSelectedTheme(themes[0])
       }
       // T97: hydrate each lightweight theme with the full Rust
@@ -174,7 +243,6 @@ const GridView = React.forwardRef<GridViewRef, GridViewProps>(({ className = '' 
       // inspector / palette tooltip want the full thing.
       void hydrateThemesWithRustShape(themes.map(t => t.id))
     } catch (error) {
-      console.log('=== FALLBACK THEME CREATION ===')
       console.error('Failed to load themes, using fallback:', error)
       // Fallback to a basic theme for development
       const fallbackTheme: Theme = {
@@ -214,16 +282,11 @@ const GridView = React.forwardRef<GridViewRef, GridViewProps>(({ className = '' 
           },
         },
       }
-      console.log('Created fallback theme:', fallbackTheme)
       setAvailableThemes([fallbackTheme])
-      console.log('Setting fallback theme as selected')
       setSelectedTheme(fallbackTheme)
 
       // Force a re-render by logging the theme state
-      setTimeout(() => {
-        console.log('After fallback - selectedTheme:', selectedTheme)
-        console.log('After fallback - availableThemes:', availableThemes)
-      }, 100)
+      setTimeout(() => {}, 100)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
@@ -509,18 +572,8 @@ const GridView = React.forwardRef<GridViewRef, GridViewProps>(({ className = '' 
 
   // Render the grid
   const renderGrid = useCallback(() => {
-    console.log('=== RENDER GRID CALLED ===')
-    console.log('renderGrid - selectedTheme:', selectedTheme)
-    console.log('renderGrid - availableThemes length:', availableThemes.length)
-
     const canvas = canvasRef.current
     if (!canvas || !selectedTheme) {
-      console.log(
-        'renderGrid - Early return: canvas exists?',
-        !!canvas,
-        'selectedTheme exists?',
-        !!selectedTheme
-      )
       return
     }
 
@@ -595,7 +648,7 @@ const GridView = React.forwardRef<GridViewRef, GridViewProps>(({ className = '' 
       ctx.strokeRect(minX, minY, maxX - minX, maxY - minY)
       ctx.setLineDash([])
     }
-  }, [gridData, selectedTheme, gridSize, cellSize, showGrid, selection, availableThemes.length])
+  }, [gridData, selectedTheme, gridSize, cellSize, showGrid, selection])
 
   useEffect(() => {
     renderGrid()
@@ -670,10 +723,6 @@ const GridView = React.forwardRef<GridViewRef, GridViewProps>(({ className = '' 
       }
     },
     clearGrid: () => {
-      console.log('=== CLEAR GRID CALLED ===')
-      console.log('Before clear - selectedTheme:', selectedTheme)
-      console.log('Before clear - availableThemes:', availableThemes)
-
       // Create a completely fresh empty grid
       const newGrid = Array(gridSize.height)
         .fill(null)
@@ -682,10 +731,6 @@ const GridView = React.forwardRef<GridViewRef, GridViewProps>(({ className = '' 
       setSelection(null)
       // Also clear the store
       setStoreGridData(newGrid)
-
-      console.log('After clear - selectedTheme:', selectedTheme)
-      console.log('After clear - availableThemes:', availableThemes)
-      console.log('=== CLEAR GRID COMPLETE ===')
     },
     getGridData: () => gridData, // Expose current grid data
   }))
@@ -768,7 +813,16 @@ const GridView = React.forwardRef<GridViewRef, GridViewProps>(({ className = '' 
           <input
             type="number"
             value={gridSize.width}
-            onChange={e => setGridSize(prev => ({ ...prev, width: Number(e.target.value) }))}
+            onChange={e => {
+              const width = Number(e.target.value)
+              setGridSize(prev => ({ ...prev, width }))
+              // Audit (Major #20): push the new dimension to the
+              // store so App.tsx#syncGridToScene picks it up.
+              useEditorStore.getState().setGridDimensions({
+                width,
+                height: gridSize.height,
+              })
+            }}
             className="bg-editor-bg text-editor-text border border-editor-border rounded px-2 py-1 w-16 text-xs"
             min="10"
             max="100"
@@ -777,7 +831,14 @@ const GridView = React.forwardRef<GridViewRef, GridViewProps>(({ className = '' 
           <input
             type="number"
             value={gridSize.height}
-            onChange={e => setGridSize(prev => ({ ...prev, height: Number(e.target.value) }))}
+            onChange={e => {
+              const height = Number(e.target.value)
+              setGridSize(prev => ({ ...prev, height }))
+              useEditorStore.getState().setGridDimensions({
+                width: gridSize.width,
+                height,
+              })
+            }}
             className="bg-editor-bg text-editor-text border border-editor-border rounded px-2 py-1 w-16 text-xs"
             min="10"
             max="100"
@@ -802,7 +863,6 @@ const GridView = React.forwardRef<GridViewRef, GridViewProps>(({ className = '' 
             ) : (
               getTileList().map(([tileKey, tileDef]) => {
                 const tile = tileDef as TileDefinition
-                console.log('Rendering tile button:', tileKey, tile)
                 return (
                   <button
                     key={tileKey}

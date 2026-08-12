@@ -9,6 +9,7 @@ import { Grid, Stats } from '@react-three/drei'
 import { Canvas } from '@react-three/fiber'
 import React, { forwardRef, useCallback, useImperativeHandle, useMemo, useState } from 'react'
 import * as THREE from 'three'
+import SceneLights from '../Lighting/SceneLights'
 import MeasurementOverlay from '../Measurements/MeasurementOverlay'
 import MeasurementToolViewport from '../Measurements/MeasurementToolViewport'
 import { PaintSettingsPanel, PaintToolViewport } from '../PaintTool'
@@ -255,7 +256,9 @@ export default forwardRef<CameraControlsRef, object>(function Viewport3D(_props,
             <div className="text-xs mt-1">
               WASD: Move • Mouse: Look • Space/C: Up/Down • Shift: Fast • ESC: Exit
             </div>
-            <div className="text-xs text-gray-300 mt-1">Speed: {FLY_SPEED.toFixed(1)} units/sec</div>
+            <div className="text-xs text-gray-300 mt-1">
+              Speed: {FLY_SPEED.toFixed(1)} units/sec
+            </div>
           </div>
         </div>
       )}
@@ -300,20 +303,12 @@ export default forwardRef<CameraControlsRef, object>(function Viewport3D(_props,
           setQualityInfo={setQualityInfo}
         />
 
-        {/* Lighting */}
-        <ambientLight intensity={0.4} />
-        <directionalLight
-          position={[10, 10, 5]}
-          castShadow
-          shadow-mapSize-width={2048}
-          shadow-mapSize-height={2048}
-          shadow-camera-far={50}
-          shadow-camera-left={-10}
-          shadow-camera-right={10}
-          shadow-camera-top={10}
-          shadow-camera-bottom={-10}
-        />
-        <pointLight position={[-10, -10, -10]} intensity={0.2} />
+        {/* Lighting — driven by `state.lights` (was hardcoded
+            ambient + directional + fill point before the audit fix;
+            the lighting panel could change the store but the viewport
+            never re-rendered). SceneLights falls back to a sensible
+            default rig when the user hasn't placed anything yet. */}
+        <SceneLights />
 
         {/* Camera Controls */}
         {/* Camera Controls */}
@@ -375,6 +370,13 @@ export default forwardRef<CameraControlsRef, object>(function Viewport3D(_props,
         measurement={measurementTool.current}
         config={measurementTool.config}
         onRemove={measurementTool.removeById}
+        // Audit (Major #18): give the overlay an explicit
+        // "Turn off tool" button. Previously the only escape was
+        // pressing the M shortcut again — the × button only
+        // deleted the current measurement and the tool stayed
+        // armed. Bind to `setMode(null)` so the user has a
+        // visible on-canvas off switch.
+        onTurnOff={() => measurementTool.setMode(null)}
       />
 
       {/* Viewport UI Overlay */}
@@ -386,7 +388,13 @@ export default forwardRef<CameraControlsRef, object>(function Viewport3D(_props,
       </div>
 
       {/* Performance Controls */}
-      <div className="absolute top-2 right-2 flex space-x-2">
+      {/* Audit (Minor #22): the previous layout was a single
+          non-wrapping flex row, so the right-side button cluster
+          clipped over the left-side status HUD in the ~1200-1470
+          viewport-width range. Allow wrap + constrain the row
+          width so the cluster breaks into two lines before it
+          touches the status panel. */}
+      <div className="absolute top-2 right-2 flex flex-wrap gap-2 max-w-[60%] justify-end">
         <button
           className={`px-2 py-1 text-xs rounded ${
             useOptimizedRendering

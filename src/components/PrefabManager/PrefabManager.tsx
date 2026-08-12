@@ -1,6 +1,6 @@
-import { useEditorStore } from '@/store/editorStore'
+import { useEditorStore, type SceneObject } from '@/store/editorStore'
 import type { PrefabId } from '@/types/brand'
-import { CreateObjectCommand } from '@/utils/commands'
+import { CreateObjectFromTemplateCommand } from '@/utils/commands'
 import {
   applyBreakPrefab,
   bootstrapStarterPrefabsIfNeeded,
@@ -49,14 +49,61 @@ export default function PrefabManager() {
   // T19: instantiate via the typed helper, which clears ids and
   // tags every spawned object with `prefabInstanceId` so future
   // edits to the source prefab can propagate.
+  //
+  // Audit (Critical #3) regression: this used to construct a
+  // `CreateObjectCommand(meshType, position)` and push it to
+  // history WITHOUT calling `.execute()`. `executeCommand` only
+  // adds to history — see `editorStore.executeCommand`'s comment.
+  // Result: "Add to Scene" silently created zero objects. Even
+  // fixed, that command dropped rotation / scale / material /
+  // tags, so the round-trip was visibly broken (unrotated
+  // untextured copies of the prefab). Use the template-aware
+  // command instead and EXECUTE before pushing to history.
   const instantiatePrefab = (prefab: Prefab) => {
     const spawnOffset: [number, number, number] = [2, 0, 0]
     const instantiated = instantiatePrefabObjects(prefab, spawnOffset)
-    for (const objTemplate of instantiated) {
-      if (objTemplate.meshType) {
-        const command = new CreateObjectCommand(objTemplate.meshType, objTemplate.position)
-        executeCommand(command)
+    const activeLayer = useEditorStore.getState().activeLayer
+    const currentSize = useEditorStore.getState().sceneObjects.size
+    for (let i = 0; i < instantiated.length; i++) {
+      const objTemplate = instantiated[i]
+      if (!objTemplate.meshType) continue
+      // Build a full SceneObject from the PrefabObject template
+      // — rotation, scale, material, tags, visibility, layer all
+      // survive the round-trip. `id` and `prefabInstanceId` are
+      // stamped by the command's constructor.
+      const template: SceneObject = {
+        id: '' as SceneObject['id'], // overwritten by the command
+        name: objTemplate.name,
+        type: objTemplate.type,
+        position: objTemplate.position,
+        rotation: objTemplate.rotation,
+        scale: objTemplate.scale,
+        visible: objTemplate.visible,
+        locked: objTemplate.locked,
+        layerId: objTemplate.layerId ?? activeLayer,
+        children: [],
+        meshType: objTemplate.meshType,
+        material: objTemplate.material
+          ? {
+              baseColor: objTemplate.material.baseColor,
+              metallic: objTemplate.material.metallic,
+              roughness: objTemplate.material.roughness,
+              ...(objTemplate.material.texture !== undefined
+                ? { texture: objTemplate.material.texture }
+                : {}),
+            }
+          : undefined,
+        prefabInstanceId: prefab.id,
+        tags: [],
       }
+      const command = new CreateObjectFromTemplateCommand({
+        ...template,
+        name: `${template.name}_${currentSize + i + 1}`,
+      })
+      // Execute FIRST so the object actually exists, THEN push to
+      // history so undo removes it.
+      command.execute()
+      executeCommand(command)
     }
   }
 

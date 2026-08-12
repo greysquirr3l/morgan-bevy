@@ -140,16 +140,70 @@ export class CreateObjectCommand implements Command {
   }
 }
 
+/**
+ * Audit (Major #3) regression: the previous `CreateObjectCommand`
+ * only knew about `meshType` + `position`. Instantiating a prefab
+ * via that command dropped every other field (rotation, scale,
+ * material, tags, name, layerId, visibility) — the prefab system
+ * looked like it worked in the library but produced untextured,
+ * un-rotated, identically-scaled cubes in the scene. This command
+ * takes a full `SceneObject` template (rotation, scale, material,
+ * tags, etc.) and inserts it via `addObjectDirect`, preserving the
+ * snapshot verbatim so undo restores exactly what was placed.
+ */
+export class CreateObjectFromTemplateCommand implements Command {
+  public objectId: ObjectId
+  private template: SceneObject
+  public description: string
+
+  constructor(template: SceneObject) {
+    this.template = { ...template }
+    // The id is minted here, not in `addObjectDirect`, because
+    // `addObjectDirect` writes whatever id is on the input — the
+    // canonical id-generation site for new objects is the store,
+    // but it delegates id minting to callers when an external
+    // template (e.g. a prefab object) is being inserted.
+    this.objectId = ObjectId(`${template.meshType ?? 'mesh'}_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`)
+    this.template.id = this.objectId
+    this.description = `Create ${template.name}`
+  }
+
+  execute(): void {
+    const { addObjectDirect } = useEditorStore.getState()
+    addObjectDirect(this.template)
+  }
+
+  undo(): void {
+    const { removeObject } = useEditorStore.getState()
+    removeObject(this.objectId)
+  }
+}
+
 // Delete object command
 export class DeleteObjectCommand implements Command {
   private objectData: SceneObject
   public description: string
 
   constructor(objectId: ObjectId) {
-    const { sceneObjects } = useEditorStore.getState()
+    const { sceneObjects, layers } = useEditorStore.getState()
     const data = sceneObjects.get(objectId)
     if (!data) {
       throw new Error(`DeleteObjectCommand: object ${objectId} not found`)
+    }
+    // Audit (Major #11) regression: the `locked` flag on objects
+    // and layers was checked only for cosmetic display (Hierarchy
+    // eye icon, layer name colour). Delete-on-keypress / Delete in
+    // the ActionsPanel / Edit-menu > Delete all silently
+    // overwrote it. Bail out of the command's construction so the
+    // caller can no-op the action — `Delete` becomes a no-op
+    // against locked targets rather than a "wait, where did that
+    // go?" footgun.
+    const layer = layers.find(l => l.id === data.layerId)
+    if (data.locked) {
+      throw new Error(`DeleteObjectCommand: object ${objectId} is locked`)
+    }
+    if (layer?.locked) {
+      throw new Error(`DeleteObjectCommand: object ${objectId} is on a locked layer`)
     }
     this.objectData = data
     this.description = `Delete ${this.objectData.name}`
@@ -176,8 +230,22 @@ export class DuplicateCommand implements Command {
   public description: string
 
   constructor(sourceIds: ObjectId[]) {
-    this.sourceIds = sourceIds
-    this.description = `Duplicate ${sourceIds.length} object(s)`
+    // Audit (Major #11) regression: `Duplicate` (Ctrl+D) used to
+    // copy every selected object, including locked ones. Filter
+    // locked objects + objects on locked layers out of the source
+    // set so the resulting duplicate count matches what the user
+    // can actually edit.
+    const { sceneObjects, layers } = useEditorStore.getState()
+    const filtered = sourceIds.filter(id => {
+      const obj = sceneObjects.get(id)
+      if (!obj) return false
+      if (obj.locked) return false
+      const layer = layers.find(l => l.id === obj.layerId)
+      if (layer?.locked) return false
+      return true
+    })
+    this.sourceIds = filtered
+    this.description = `Duplicate ${filtered.length} object(s)`
   }
 
   execute(): void {

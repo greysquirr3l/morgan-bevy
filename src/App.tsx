@@ -35,8 +35,10 @@ import {
   type ToolsAction,
   type ViewAction,
 } from '@/types/menuActions'
+import { DeleteObjectCommand, DuplicateCommand } from '@/utils/commands'
 import { PanelLeft, PanelRight } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
+import AnalyticsConsentDialog from './components/AnalyticsConsentDialog'
 import HelpModal from './components/HelpModal'
 import Inspector from './components/Inspector/Inspector'
 import TutorialOverlay from './components/Tutorial'
@@ -187,7 +189,9 @@ function useViewportSync() {
 
     // Add objects for all non-empty tiles
     let objectsCreated = 0
-    const gridSize = { width: 48, height: 36 }
+    // Audit (Major #20): read the configurable grid dimensions
+    // from the store instead of hardcoding 48×36.
+    const gridSize = useEditorStore.getState().gridDimensions
 
     gridData.forEach((row, y) => {
       row.forEach((tileType, x) => {
@@ -263,20 +267,23 @@ function useViewportSync() {
     // })
 
     // Only sync if we have valid scene data
+    // Audit (Major #20): pull the grid dimensions from the
+    // store instead of hardcoding 48×36.
+    const { width: gridWidth, height: gridHeight } = useEditorStore.getState().gridDimensions
     if (sceneObjects.size === 0) {
       // debugLogger.log('SYNC_3D_TO_GRID', 'No scene objects, creating empty grid')
       // If no scene objects, create empty grid (don't load backup if user chose fresh start)
-      const emptyGrid = Array(36)
+      const emptyGrid = Array(gridHeight)
         .fill(null)
-        .map(() => Array(48).fill('empty'))
+        .map(() => Array(gridWidth).fill('empty'))
       setGridData(emptyGrid)
       return
     }
 
     // Create empty grid
-    const newGrid = Array(36)
+    const newGrid = Array(gridHeight)
       .fill(null)
-      .map(() => Array(48).fill('empty'))
+      .map(() => Array(gridWidth).fill('empty'))
 
     // Convert 3D objects back to grid tiles
     let tilesConverted = 0
@@ -293,7 +300,7 @@ function useViewportSync() {
       const { x, y } = obj.metadata.gridPosition
       const tileType = obj.metadata.tileType
 
-      if (x >= 0 && x < 48 && y >= 0 && y < 36) {
+      if (x >= 0 && x < gridWidth && y >= 0 && y < gridHeight) {
         newGrid[y][x] = tileType
         tilesConverted++
       } else {
@@ -414,6 +421,7 @@ function AppContent() {
     setGridSize,
     coordinateSpace,
     toggleCoordinateSpace,
+    toggleGrid,
     viewportMode,
     setViewportMode,
     undo,
@@ -429,8 +437,7 @@ function AppContent() {
     selectedObjects,
     setSelectedObjects,
     clearSelection,
-    removeObject,
-    duplicateObjects,
+    executeCommand,
   } = useEditorStore()
   const sceneObjects = useSceneObjects()
 
@@ -534,10 +541,34 @@ function AppContent() {
         clearSelection()
         break
       case 'delete':
-        selectedObjects.forEach(id => removeObject(id))
+        // Audit (Major #13) regression: this used to call
+        // `removeObject(id)` directly, bypassing the undo
+        // command system. The keyboard-shortcut Delete and the
+        // ActionsPanel Delete both used `DeleteObjectCommand` —
+        // the Edit-menu Delete silently diverged, so Ctrl+Z
+        // wouldn't bring the object back. Route through the
+        // command so all three call sites share the undo stack.
+        // Lock-aware (audit Major #11): the constructor throws
+        // for locked targets; we wrap so a single locked target
+        // doesn't abort the loop.
+        selectedObjects.forEach(id => {
+          try {
+            const command = new DeleteObjectCommand(id)
+            command.execute()
+            executeCommand(command)
+          } catch (err) {
+            console.warn('[edit] delete skipped:', (err as Error).message)
+          }
+        })
         break
       case 'duplicate':
-        duplicateObjects(selectedObjects)
+        // Same audit as `delete` — use DuplicateCommand so the
+        // duplicate is undoable and locked sources are filtered.
+        if (selectedObjects.length > 0) {
+          const command = new DuplicateCommand(selectedObjects)
+          command.execute()
+          executeCommand(command)
+        }
         break
       default:
         assertNeverAction(action, EDIT_ACTIONS)
@@ -560,8 +591,12 @@ function AppContent() {
         if (panels.rightVisible) toggleRightPanel()
         break
       case 'toggle-grid':
-        // Focus the viewport and toggle grid
-        void (document.querySelector('.viewport-container') as HTMLElement | null)?.focus()
+        // Audit (Minor #23): this used to only focus the
+        // viewport container without flipping the grid flag. The
+        // menu item claimed to toggle the grid but did nothing
+        // visible. Hook it into `toggleGrid` like the keyboard
+        // shortcut does.
+        toggleGrid()
         break
       case 'reset-camera':
         cameraControlsRef.current?.resetView()
@@ -582,18 +617,41 @@ function AppContent() {
   }
 
   const handleGenerateAction = (action: GenerateAction) => {
-    // All current Generate actions route through the generation panel
-    // — keep this switch so adding new variants is an exhaustiveness
-    // check.
     switch (action) {
       case 'run-bsp':
       case 'run-wfc':
       case 'reroll-seed':
       case 'focus-generation':
-        // Focus the Generation Panel
+        // Audit (Major #16) regression: BSP / WFC were labelled
+        // "Coming Soon" in the menu even though `GenerationPanel`
+        // already calls `invoke('generate_bsp_level' | 'generate_wfc_level')`.
+        // The menu just focused the panel and pretended. Focus the
+        // panel AND dispatch a click on the corresponding run
+        // button so the actual Rust command fires.
         const generationPanel = document.querySelector('[data-panel="generation"]')
         if (generationPanel) {
           generationPanel.scrollIntoView({ behavior: 'smooth' })
+        }
+        if (action === 'run-bsp' || action === 'run-wfc') {
+          const algorithm = action === 'run-bsp' ? 'BSP' : 'WFC'
+          // Find the algorithm <select> in the generation panel and
+          // pick the matching value, then click the panel's "Generate"
+          // button. The select has no test id / stable data attr,
+          // so fall back to setting the underlying React state via
+          // a `change` event with the right value.
+          const algoSelects = document.querySelectorAll('[data-panel="generation"] select')
+          for (const sel of Array.from(algoSelects)) {
+            const option = (sel as HTMLSelectElement).querySelector(`option[value="${algorithm}"]`)
+            if (option) {
+              (sel as HTMLSelectElement).value = algorithm
+              sel.dispatchEvent(new Event('change', { bubbles: true }))
+              break
+            }
+          }
+          const generateBtn = document.querySelector(
+            '[data-panel="generation"] button[data-action="generate"]'
+          ) as HTMLButtonElement | null
+          generateBtn?.click()
         }
         break
       default:
@@ -662,18 +720,36 @@ function AppContent() {
       const saved = localStorage.getItem('morgan-bevy.autosave')
       if (saved) {
         const saveData = JSON.parse(saved)
-        const saveDate = new Date(saveData.timestamp)
+        // Audit (Critical #5) regression: this used to read only
+        // `saveData.timestamp` / `saveData.gridData` /
+        // `saveData.sceneObjects`, which are the LEGACY schema
+        // keys. `useAutoSave` had already moved to writing
+        // `{ savedAt, scene: { objects, ... } }`, so depending on
+        // which writer last touched `morgan-bevy.autosave`, the
+        // dialog either appeared (old shape) or silently never did
+        // (new shape — these checks all returned undefined).
+        //
+        // Accept both schemas: prefer the new `savedAt` +
+        // `scene.objects` and fall back to the legacy `timestamp`
+        // + top-level `gridData` / `sceneObjects`.
+        const savedAt = saveData.savedAt ?? saveData.timestamp
+        const newSceneObjects = saveData.scene?.objects
+        const legacySceneObjects = saveData.sceneObjects
+        const hasSceneContent =
+          (Array.isArray(newSceneObjects) && newSceneObjects.length > 0) ||
+          (Array.isArray(legacySceneObjects) && legacySceneObjects.length > 0) ||
+          (legacySceneObjects &&
+            typeof legacySceneObjects === 'object' &&
+            Object.keys(legacySceneObjects).length > 0) ||
+          (Array.isArray(saveData.gridData) && saveData.gridData.length > 0)
+        if (!savedAt || !hasSceneContent) return
+        const saveDate = new Date(savedAt)
+        if (Number.isNaN(saveDate.getTime())) return
         const now = new Date()
         const hoursSinceLastSave = (now.getTime() - saveDate.getTime()) / (1000 * 60 * 60)
 
         // Show recovery dialog if there's recent auto-saved data (within 24 hours)
-        if (
-          hoursSinceLastSave < 24 &&
-          (saveData.gridData?.length > 0 ||
-            (saveData.sceneObjects instanceof Array
-              ? saveData.sceneObjects.length
-              : Object.keys(saveData.sceneObjects || {}).length) > 0)
-        ) {
+        if (hoursSinceLastSave < 24) {
           setShowRecoveryDialog(true)
         }
       }
@@ -966,17 +1042,25 @@ function AppContent() {
                 <CollapsiblePanel title="Actions" enableScrollbarlessScrolling={true}>
                   <ActionsPanel />
                 </CollapsiblePanel>
+                <CollapsiblePanel title="Hierarchy" enableScrollbarlessScrolling={true}>
+                  <Hierarchy hideHeader={true} />
+                </CollapsiblePanel>
                 <CollapsiblePanel title="Assets" enableScrollbarlessScrolling={true}>
                   <AssetBrowser hideHeader={true} />
                 </CollapsiblePanel>
-                <CollapsiblePanel title="Prefabs" enableScrollbarlessScrolling={true}>
+                <CollapsiblePanel
+                  title="Prefabs"
+                  enableScrollbarlessScrolling={true}
+                  defaultExpanded={false}
+                >
                   <PrefabManager />
                 </CollapsiblePanel>
-                <CollapsiblePanel title="Layers" enableScrollbarlessScrolling={true}>
+                <CollapsiblePanel
+                  title="Layers"
+                  enableScrollbarlessScrolling={true}
+                  defaultExpanded={false}
+                >
                   <Layers hideHeader={true} />
-                </CollapsiblePanel>
-                <CollapsiblePanel title="Hierarchy" enableScrollbarlessScrolling={true}>
-                  <Hierarchy hideHeader={true} />
                 </CollapsiblePanel>
               </div>
             </div>
@@ -1111,6 +1195,7 @@ function AppContent() {
                   title="Export System"
                   maxHeight="350px"
                   enableScrollbarlessScrolling={true}
+                  defaultExpanded={false}
                 >
                   <ExportPanel />
                 </CollapsiblePanel>
@@ -1118,6 +1203,7 @@ function AppContent() {
                   title="Performance Test"
                   maxHeight="400px"
                   enableScrollbarlessScrolling={true}
+                  defaultExpanded={false}
                 >
                   <PerformanceTestPanel />
                 </CollapsiblePanel>
@@ -1255,16 +1341,16 @@ function AppContent() {
                   Open Generation Panel
                 </button>
                 <button
-                  className="w-full text-left px-4 py-2 text-sm hover:bg-editor-hover text-gray-500"
-                  disabled
+                  className="w-full text-left px-4 py-2 text-sm hover:bg-editor-hover"
+                  onClick={() => handleGenerateAction('run-bsp')}
                 >
-                  BSP Algorithm (Coming Soon)
+                  Run BSP Algorithm
                 </button>
                 <button
-                  className="w-full text-left px-4 py-2 text-sm hover:bg-editor-hover text-gray-500"
-                  disabled
+                  className="w-full text-left px-4 py-2 text-sm hover:bg-editor-hover"
+                  onClick={() => handleGenerateAction('run-wfc')}
                 >
-                  WFC Algorithm (Coming Soon)
+                  Run WFC Algorithm
                 </button>
               </div>
             )}
@@ -1397,6 +1483,12 @@ function AppContent() {
 
       {/* Keyboard Shortcuts Modal */}
       <KeyboardShortcutsModal isOpen={keyboardShortcutsOpen} onClose={closeKeyboardShortcuts} />
+
+      {/* Audit (Major #19): AnalyticsConsentDialog was fully
+          built + tested but never mounted anywhere. Wire it up so
+          the first-launch consent flow actually runs (one-shot via
+          `hasConsentBeenSeen`). */}
+      <AnalyticsConsentDialog />
 
       {/* Help Modal */}
       <HelpModal isOpen={helpOpen} onClose={() => setHelpOpen(false)} />

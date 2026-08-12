@@ -5,9 +5,20 @@ import { BoxGeometry, Mesh, MeshStandardMaterial } from 'three'
 
 // Ground plane
 function Ground() {
-  const { clearSelection } = useEditorStore()
+  const { clearSelection, isTransformDragging } = useEditorStore()
 
   const handleClick = () => {
+    // The gizmo (TransformControls) issues a click on the canvas
+    // when the user releases over empty space — not only when the
+    // pointer was on the ground itself. Clear-on-click was firing in
+    // that case too, silently deselecting the object the user had
+    // just finished dragging. `setTransformDragging(true)` is set on
+    // gizmo `mouseDown` and cleared on `mouseUp`; mirror that guard
+    // here so dragging-and-releasing on empty space keeps the
+    // selection. BoxSelection already gates its own pointerdown on
+    // this same flag — keeping the three selection-clearing paths in
+    // sync is the whole point.
+    if (isTransformDragging) return
     // Clear selection when clicking on ground
     clearSelection()
   }

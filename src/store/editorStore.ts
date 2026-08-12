@@ -1,3 +1,4 @@
+import { AUTOSAVE_KEY } from '@/hooks/useAutoSave'
 import { deserializeMap, serializeMap } from '@/store/mapSerialization'
 import { AssetId, isObjectId, LayerId, MaterialId, ObjectId, PrefabId } from '@/types/brand'
 import type { AnimationMarker, AudioMarker, LightMarker, VfxMarker } from '@/types/markers'
@@ -160,6 +161,13 @@ export interface EditorState {
   // Grid data for 2D/3D sync
   gridData: string[][]
   selectedTheme: SelectedTheme | null
+  // Audit (Major #20): the 48×36 grid size was hardcoded in both
+  // `App.tsx#syncGridToScene` and `GridView`'s local state, so a
+  // configurable grid (Tools > Grid Size, or a future Settings
+  // panel entry) couldn't actually change the 3D-side conversion
+  // or the canvas resize. Centralise here as the single source of
+  // truth — both components read this slice.
+  gridDimensions: { width: number; height: number }
 
   // Transform
   transformMode: 'select' | 'translate' | 'rotate' | 'scale'
@@ -187,6 +195,16 @@ export interface EditorState {
   // rendered as a DOM sibling of <Canvas> in Viewport3D.tsx, outside
   // the R3F tree where CameraSystem actually tracks the lock.
   isCameraPointerLocked: boolean
+
+  // Whether a TransformControls gizmo handle (move/rotate/scale) is
+  // currently being dragged. Lives in the store (not component state)
+  // because BoxSelection.tsx — a sibling of TransformGizmos.tsx, both
+  // children of Viewport3D — needs to know a gizmo grab already
+  // claimed the current pointer drag, so it doesn't also start a
+  // box-selection drag on the same gesture (which would stomp the
+  // selection on pointerup). See TransformGizmos.tsx's mouseDown/mouseUp
+  // listeners on the underlying three-stdlib TransformControls instance.
+  isTransformDragging: boolean
 
   // Layers
   activeLayer: LayerId
@@ -266,7 +284,9 @@ export interface EditorState {
   setViewportMode: (mode: '3d' | '2d') => void
   setCameraMode: (mode: 'orbit' | 'fly' | 'orthographic') => void
   setCameraPointerLocked: (locked: boolean) => void
+  setTransformDragging: (dragging: boolean) => void
   setGridData: (data: string[][]) => void
+  setGridDimensions: (dims: { width: number; height: number }) => void
   setSelectedTheme: (theme: SelectedTheme | null) => void
   toggleGrid: () => void
   toggleStats: () => void
@@ -404,6 +424,7 @@ export const useEditorStore = create<EditorState>()(
     selectedObjects: [] as ObjectId[],
     hoveredObject: null as ObjectId | null,
     gridData: [] as string[][],
+    gridDimensions: { width: 48, height: 36 } as { width: number; height: number },
     selectedTheme: null as SelectedTheme | null,
     transformMode: 'select',
     coordinateSpace: 'world',
@@ -416,6 +437,7 @@ export const useEditorStore = create<EditorState>()(
     viewportMode: '3d' as '3d' | '2d',
     cameraMode: 'orbit',
     isCameraPointerLocked: false,
+    isTransformDragging: false,
     activeLayer: LayerId('default'),
     layers: [
       { id: LayerId('default'), name: 'Default', visible: true, locked: false, color: '#ffffff' },
@@ -593,9 +615,19 @@ export const useEditorStore = create<EditorState>()(
         state.isCameraPointerLocked = locked
       }),
 
+    setTransformDragging: (dragging: boolean) =>
+      set(state => {
+        state.isTransformDragging = dragging
+      }),
+
     setGridData: (data: string[][]) =>
       set(state => {
         state.gridData = data
+      }),
+
+    setGridDimensions: (dims: { width: number; height: number }) =>
+      set(state => {
+        state.gridDimensions = dims
       }),
 
     setSelectedTheme: (theme: SelectedTheme | null) =>
@@ -1172,23 +1204,38 @@ export const useEditorStore = create<EditorState>()(
         }
       }),
 
-    undo: () =>
+    // Undo / redo MUST execute the command OUTSIDE the outer `set()`
+    // producer: every `Command.undo()` / `Command.execute()` reaches
+    // back into the store via its own `set()` (e.g. `TransformCommand`
+    // calls `updateObjectTransform`). With zustand + immer, a nested
+    // `set()` commits first to a fresh draft and then the outer
+    // producer's draft commits last, silently overwriting the inner
+    // commit's `sceneObjects` / material / etc. The previous
+    // implementation had exactly this bug — Ctrl+Z would pop the
+    // command and disable the button, but the object never
+    // reappeared.
+    undo: () => {
+      const snapshot = useEditorStore.getState()
+      if (snapshot.undoHistory.length === 0) return
+      const last = snapshot.undoHistory[snapshot.undoHistory.length - 1]
+      // Execute FIRST (commits via its own set()), THEN update history.
+      last.undo()
       set(state => {
-        if (state.undoHistory.length > 0) {
-          const command = state.undoHistory.pop()!
-          command.undo()
-          state.redoHistory.push(command)
-        }
-      }),
+        state.undoHistory.pop()
+        state.redoHistory.push(last)
+      })
+    },
 
-    redo: () =>
+    redo: () => {
+      const snapshot = useEditorStore.getState()
+      if (snapshot.redoHistory.length === 0) return
+      const next = snapshot.redoHistory[snapshot.redoHistory.length - 1]
+      next.execute()
       set(state => {
-        if (state.redoHistory.length > 0) {
-          const command = state.redoHistory.pop()!
-          command.execute()
-          state.undoHistory.push(command)
-        }
-      }),
+        state.redoHistory.pop()
+        state.undoHistory.push(next)
+      })
+    },
 
     canUndo: (): boolean => {
       const state = useEditorStore.getState()
@@ -1200,35 +1247,53 @@ export const useEditorStore = create<EditorState>()(
       return state.redoHistory.length > 0
     },
 
-    // T-scene-new: the single source of truth for "start a fresh
-    // scene." Originally this only cleared undo/redo history; the
-    // `scene.new` shortcut duplicated the rest of the reset (scene
-    // objects, selection, active layer) inline via `setState`. Folded
-    // that logic in here so there's one implementation instead of two
-    // that can drift apart.
-    clearHistory: () =>
-      set(state => {
-        state.sceneObjects = new Map()
-        state.selectedObjects = []
-        state.undoHistory = []
-        state.redoHistory = []
-        state.activeLayer = LayerId('default')
-      }),
+    // Audit (Minor #24): `clearHistory` used to be a thin subset
+    // of `clearScene` (just undo/redo + scene map + selection +
+    // active layer) and the two could drift apart. Collapse them
+    // — `clearHistory` now calls `clearScene` so there's one
+    // reset path. The undo/redo reset that the name implies is
+    // still performed by `clearScene` (which clears both
+    // `undoHistory` and `redoHistory` as part of its reset).
+    clearHistory: () => {
+      useEditorStore.getState().clearScene()
+    },
 
     // Auto-save functionality
     saveToLocalStorage: () => {
       const state = useEditorStore.getState()
-      // Map → Array of [id, obj] pairs for JSON serialization. JSON.stringify
-      // doesn't natively serialize Map (it serializes as `{}`).
+      // Audit (Critical #5) regression: this used to write the
+      // legacy schema `{ gridData, selectedTheme, sceneObjects,
+      // viewportMode, timestamp }` while `useAutoSave.ts` was
+      // already writing the new schema `{ schemaVersion, savedAt,
+      // scene: { objects, layers, activeLayer, selectedObjects } }`
+      // to the SAME `morgan-bevy.autosave` key. The two writers
+      // raced: depending on which one ran last, the startup recovery
+      // dialog either saw the new shape (and silently bailed because
+      // it only checked the old keys) or the old shape (which
+      // couldn't include layers / activeLayer / selectedObjects).
+      //
+      // Write the new schema here so both writers are compatible.
+      // `loadFromLocalStorage` and the recovery dialog in App.tsx
+      // learn to read either schema.
       const saveData = {
+        schemaVersion: 1,
+        savedAt: new Date().toISOString(),
+        scene: {
+          objects: serializeMap(state.sceneObjects),
+          layers: state.layers,
+          activeLayer: state.activeLayer,
+          selectedObjects: state.selectedObjects,
+        },
+        // Preserve the legacy top-level fields so older readers
+        // (and the manual File > Save indicator) still see them.
+        // The recovery dialog prefers the new `scene.objects`
+        // shape and only falls back to these when absent.
         gridData: state.gridData,
         selectedTheme: state.selectedTheme,
-        sceneObjects: serializeMap(state.sceneObjects),
         viewportMode: state.viewportMode,
-        timestamp: new Date().toISOString(),
       }
       try {
-        localStorage.setItem('morgan-bevy.autosave', JSON.stringify(saveData))
+        localStorage.setItem(AUTOSAVE_KEY, JSON.stringify(saveData))
       } catch (error) {
         console.error('Failed to auto-save to localStorage:', error)
       }
@@ -1249,23 +1314,47 @@ export const useEditorStore = create<EditorState>()(
 
     loadFromLocalStorage: () => {
       try {
-        const saved = localStorage.getItem('morgan-bevy.autosave')
+        const saved = localStorage.getItem(AUTOSAVE_KEY)
         if (saved) {
           const saveData = JSON.parse(saved)
 
           set(state => {
+            // New schema (audit Critical #5): everything lives under
+            // `scene`. Object entries are `Array<[id, T]>` because the
+            // store keeps sceneObjects as a `Map`.
+            if (saveData.scene && typeof saveData.scene === 'object') {
+              if (Array.isArray(saveData.scene.objects)) {
+                state.sceneObjects = deserializeMap<ObjectId, SceneObject>(
+                  saveData.scene.objects,
+                  isObjectId
+                )
+              }
+              if (Array.isArray(saveData.scene.layers)) {
+                state.layers = saveData.scene.layers
+              }
+              if (saveData.scene.activeLayer !== undefined) {
+                state.activeLayer = LayerId(saveData.scene.activeLayer)
+              }
+              if (Array.isArray(saveData.scene.selectedObjects)) {
+                state.selectedObjects = saveData.scene.selectedObjects
+              }
+            }
+            // Legacy schema fields (still emitted by `saveToLocalStorage`
+            // for back-compat with the recovery dialog):
             if (saveData.gridData) {
               state.gridData = saveData.gridData
             }
             if (saveData.selectedTheme) {
               state.selectedTheme = saveData.selectedTheme
             }
-            if (saveData.sceneObjects) {
-              // Backwards-compat: a previous version may have stored
-              // sceneObjects as a Record<string, T>; new versions store
-              // Array<[id, T]> (Map entries). `deserializeMap` normalizes
-              // both shapes and drops (rather than throws on) any entry
-              // whose id fails validation.
+            if (saveData.sceneObjects && !saveData.scene) {
+              // Pre-fix payloads: sceneObjects lived at the top
+              // level. Backwards-compat: a previous version may have
+              // stored sceneObjects as a Record<string, T>; new
+              // versions store Array<[id, T]> (Map entries).
+              // `deserializeMap` normalizes both shapes and drops
+              // (rather than throws on) any entry whose id fails
+              // validation.
               state.sceneObjects = deserializeMap<ObjectId, SceneObject>(
                 saveData.sceneObjects,
                 isObjectId
