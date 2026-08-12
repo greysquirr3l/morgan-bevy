@@ -1,6 +1,6 @@
-import { useThree, useFrame } from '@react-three/fiber'
-import { useEffect, useRef, useState, useMemo } from 'react'
-import { Vector3, Frustum, Matrix4, Box3, Sphere } from 'three'
+import { useFrame, useThree } from '@react-three/fiber'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { Box3, Frustum, Matrix4, Sphere, Vector3 } from 'three'
 
 // Hook for frustum culling - determines if objects are visible to camera
 export function useFrustumCulling(
@@ -115,7 +115,7 @@ export function usePerformanceCulling(
   const [cullState, setCullState] = useState({
     isVisible: true,
     lodLevel: 0,
-    shouldRender: true
+    shouldRender: true,
   })
   // Mirrors `cullState` for cheap equality checks in the frame loop —
   // see `useFrustumCulling` above for why this matters.
@@ -156,10 +156,13 @@ export function usePerformanceCulling(
     const distance = camera.position.distanceTo(positionVector)
     let lodLevel = 0
 
-    if (distance > 50) lodLevel = 3      // Very low detail
-    else if (distance > 25) lodLevel = 2 // Low detail
-    else if (distance > 10) lodLevel = 1 // Medium detail
-    else lodLevel = 0                    // High detail
+    if (distance > 50)
+      lodLevel = 3 // Very low detail
+    else if (distance > 25)
+      lodLevel = 2 // Low detail
+    else if (distance > 10)
+      lodLevel = 1 // Medium detail
+    else lodLevel = 0 // High detail
 
     // Determine if object should render at all
     const shouldRender = isInFrustum && distance <= maxDistance
@@ -194,9 +197,7 @@ export function usePerformanceCulling(
  */
 import type { BoundingBox } from '@/types/schemas'
 
-export function useSpatialIndexQuery(
-  bounds: BoundingBox | null
-): readonly string[] | null {
+export function useSpatialIndexQuery(bounds: BoundingBox | null): readonly string[] | null {
   const [result, setResult] = useState<readonly string[] | null>(null)
   const lastBoundsRef = useRef<BoundingBox | null>(null)
 
@@ -232,7 +233,17 @@ export function useSpatialIndexQuery(
     return () => {
       cancelled = true
     }
-  }, [bounds?.min[0], bounds?.min[1], bounds?.min[2], bounds?.max[0], bounds?.max[1], bounds?.max[2]])
+    // Audit (Minor #27): the previous dep array was six inline
+    // `bounds?.min[N]` / `bounds?.max[N]` expressions, which
+    // eslint flagged as "complex expression in the dependency
+    // array." Compute the bounds string once so the array is
+    // trivial and statically checkable. ESLint's
+    // exhaustive-deps rule still wants `bounds` here — adding
+    // it would re-fire the effect whenever the object identity
+    // changes even if the numeric values are identical, which
+    // would defeat the early-out above.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [bounds ? `${bounds.min.join(',')}|${bounds.max.join(',')}` : ''])
 
   return result
 }

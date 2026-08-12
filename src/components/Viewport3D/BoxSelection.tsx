@@ -57,6 +57,17 @@ export default function BoxSelection() {
     // click.
     if (useEditorStore.getState().cameraMode === 'fly') return
 
+    // If a TransformControls gizmo handle grab already claimed this
+    // drag (three-stdlib's TransformControls registers its own raw
+    // pointerdown listener on this same canvas, independently of R3F,
+    // and — because TransformGizmos renders before BoxSelection in
+    // Viewport3D.tsx — runs first and synchronously fires 'mouseDown'
+    // before this handler sees the event), don't also start a
+    // box-selection drag. Without this guard, the resulting drag gets
+    // interpreted as a selection-box on pointerup and stomps over the
+    // object the gizmo just moved, leaving it deselected.
+    if (useEditorStore.getState().isTransformDragging) return
+
     // Don't start box selection if clicking on a specific object (let object selection handle it)
     const raycaster = new THREE.Raycaster()
     const mouse = new THREE.Vector2()
@@ -75,7 +86,6 @@ export default function BoxSelection() {
     
     const startX = event.clientX - rect.left
     const startY = event.clientY - rect.top
-    
     startSelection(startX, startY)
 
     // Prevent default to avoid any other interactions

@@ -1,5 +1,5 @@
-import { useState, ReactNode, useRef, useEffect } from 'react'
 import { ChevronDown, ChevronUp } from 'lucide-react'
+import { ReactNode, useEffect, useRef, useState } from 'react'
 
 interface CollapsiblePanelProps {
   title: string
@@ -10,13 +10,19 @@ interface CollapsiblePanelProps {
   enableScrollbarlessScrolling?: boolean
 }
 
-export default function CollapsiblePanel({ 
-  title, 
-  children, 
-  defaultExpanded = true, 
+export default function CollapsiblePanel({
+  title,
+  children,
+  defaultExpanded = true,
   className = '',
-  maxHeight = '200px',
-  enableScrollbarlessScrolling = false
+  // Audit (Minor #21): Inspector wraps a multi-section panel
+  // (transform / material / mesh / markers / ...) and was
+  // silently clipped to 200px tall. Bump the default to a more
+  // useful ceiling for tall content like Inspector; callers
+  // that want a tighter cap (Export, Performance Test) pass
+  // their own `maxHeight` explicitly.
+  maxHeight = '600px',
+  enableScrollbarlessScrolling = false,
 }: CollapsiblePanelProps) {
   const [isExpanded, setIsExpanded] = useState(defaultExpanded)
   const scrollRef = useRef<HTMLDivElement>(null)
@@ -75,8 +81,11 @@ export default function CollapsiblePanel({
   if (!isExpanded) {
     return (
       <div className={`bg-editor-panel border-b border-editor-border ${className}`}>
-        <div className="px-4 py-2 flex justify-between items-center hover:bg-editor-border/50 cursor-pointer" onClick={() => setIsExpanded(true)}>
-        <div className="text-sm font-semibold text-editor-accent">{title}</div>
+        <div
+          className="px-4 py-2 flex justify-between items-center hover:bg-editor-border/50 cursor-pointer"
+          onClick={() => setIsExpanded(true)}
+        >
+          <div className="text-sm font-semibold text-editor-accent">{title}</div>
           <ChevronDown className="w-4 h-4 text-editor-textMuted" />
         </div>
       </div>
@@ -85,16 +94,19 @@ export default function CollapsiblePanel({
 
   return (
     <div className={`bg-editor-panel border-b border-editor-border ${className}`}>
-      <div className="px-4 py-2 flex justify-between items-center hover:bg-editor-border/50 cursor-pointer" onClick={() => setIsExpanded(false)}>
+      <div
+        className="px-4 py-2 flex justify-between items-center hover:bg-editor-border/50 cursor-pointer"
+        onClick={() => setIsExpanded(false)}
+      >
         <div className="text-sm font-semibold text-editor-accent">{title}</div>
         <ChevronUp className="w-4 h-4 text-editor-textMuted" />
       </div>
-      <div 
+      <div
         ref={scrollRef}
         className={`${enableScrollbarlessScrolling ? 'cursor-grab' : 'overflow-y-auto scrollbar-hide'} ${isScrolling ? 'cursor-grabbing' : ''}`}
-        style={{ 
+        style={{
           maxHeight,
-          overflowY: enableScrollbarlessScrolling ? 'hidden' : 'auto'
+          overflowY: enableScrollbarlessScrolling ? 'hidden' : 'auto',
         }}
       >
         {children}
