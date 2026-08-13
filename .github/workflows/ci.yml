@@ -84,6 +84,16 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
+    # The clippy step below uses bash trailing-backslash line
+    # continuations and the cargo-deny step runs a `#!/usr/bin/env
+    # bash` script. GitHub Actions defaults `run:` steps on
+    # windows-latest to pwsh, which understands neither, so both
+    # steps failed to parse on Windows. windows-latest runners ship
+    # Git Bash, so `shell: bash` here is enough to make every `run:`
+    # step in this job behave the same across all three OSes.
+    defaults:
+      run:
+        shell: bash
     steps:
       - name: Checkout
         uses: actions/checkout@v4

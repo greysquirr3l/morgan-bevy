@@ -656,27 +656,31 @@ use import::{run_import, ImportResult, ImportSettings};
 /// `.morgana/imports/` cache directory.
 #[tauri::command]
 pub async fn import_assets(
+    app_handle: tauri::AppHandle,
     sources: Vec<String>,
     settings: ImportSettings,
     cache_dir: Option<String>,
 ) -> Result<ImportResult, String> {
     let cache = match cache_dir {
         Some(p) => PathBuf::from(p),
-        None => default_import_cache_dir()?,
+        None => default_import_cache_dir(&app_handle)?,
     };
     let paths: Vec<PathBuf> = sources.into_iter().map(PathBuf::from).collect();
     Ok(run_import(&paths, &settings, &cache, None::<fn(&str)>))
 }
 
-fn default_import_cache_dir() -> Result<PathBuf, String> {
-    let app_data = std::env::var("MORGANA_APP_DATA")
-        .ok()
-        .map(PathBuf::from)
-        .or_else(|| {
-            std::env::var("HOME")
-                .ok()
-                .map(|h| PathBuf::from(h).join(".morgana").join("imports"))
-        })
-        .ok_or_else(|| "could not resolve app data directory".to_string())?;
-    Ok(app_data)
+/// Windows sets no `HOME` env var (cmd.exe/pwsh don't define it), so
+/// the previous `HOME`-based fallback silently failed there — see
+/// `generate_thumbnails` / `cleanup_thumbnails` above for the same
+/// `app_data_dir()` pattern this now matches. `MORGANA_APP_DATA`
+/// remains a documented override for tests/CI.
+fn default_import_cache_dir(app_handle: &tauri::AppHandle) -> Result<PathBuf, String> {
+    if let Ok(p) = std::env::var("MORGANA_APP_DATA") {
+        return Ok(PathBuf::from(p).join(".morgana").join("imports"));
+    }
+    app_handle
+        .path()
+        .app_data_dir()
+        .map(|p| p.join(".morgana").join("imports"))
+        .map_err(|e| format!("could not resolve app data directory: {e}"))
 }

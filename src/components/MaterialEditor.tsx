@@ -634,7 +634,7 @@ export default function MaterialEditor({
           <div className="space-y-2">
             <div className="flex space-x-2">
               <div className="flex-1 px-2 py-1 text-xs bg-editor-bg border border-editor-border rounded text-editor-textMuted">
-                {material.texture ? material.texture.split('/').pop() : 'No texture'}
+                {material.texture ? material.texture.split(/[\\/]/).pop() : 'No texture'}
               </div>
               <button
                 onClick={browseForTexture}

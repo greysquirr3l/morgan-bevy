@@ -407,7 +407,7 @@ export default function ExportPanel() {
                 <div className="font-medium">{file.format}</div>
                 <div className="text-xs opacity-75">
                   {file.success
-                    ? `${file.file_path.split('/').pop()} (${formatFileSize(file.file_size)})`
+                    ? `${file.file_path.split(/[\\/]/).pop()} (${formatFileSize(file.file_size)})`
                     : 'Export failed'}
                 </div>
               </div>
