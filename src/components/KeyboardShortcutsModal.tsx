@@ -95,9 +95,7 @@ export default function KeyboardShortcutsModal({ isOpen, onClose }: KeyboardShor
           shortcut.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
           shortcut.keys.some(key => key.toLowerCase().includes(searchQuery.toLowerCase()))
 
-        const matchesCategory =
-          selectedCategory === 'all' ||
-          group.title.toLowerCase().includes(selectedCategory.toLowerCase())
+        const matchesCategory = selectedCategory === 'all' || group.title === selectedCategory
 
         return matchesSearch && matchesCategory
       }),
@@ -118,7 +116,15 @@ export default function KeyboardShortcutsModal({ isOpen, onClose }: KeyboardShor
 
   if (!isOpen) return null
 
-  const categories = ['all', 'transform', 'camera', 'selection', 'file', 'view', 'tools']
+  // Audit follow-up: this used to be a separate hand-written array
+  // (`['all', 'transform', 'camera', 'selection', 'file', 'view',
+  // 'tools']`) that drifted out of sync with the real categories in
+  // `defaults.ts` (e.g. it listed "file" — no shortcut is actually
+  // categorized "File" anymore, it's "Scene" — and omitted
+  // "Clipboard" entirely). Derive the dropdown options from the same
+  // `shortcutGroups` the list itself renders so the two can never
+  // drift apart again.
+  const categories = ['all', ...shortcutGroups.map(group => group.title)]
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
@@ -163,9 +169,7 @@ export default function KeyboardShortcutsModal({ isOpen, onClose }: KeyboardShor
             >
               {categories.map(category => (
                 <option key={category} value={category}>
-                  {category === 'all'
-                    ? 'All Categories'
-                    : category.charAt(0).toUpperCase() + category.slice(1)}
+                  {category === 'all' ? 'All Categories' : category}
                 </option>
               ))}
             </select>

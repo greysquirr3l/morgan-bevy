@@ -112,22 +112,81 @@ export default function BoxSelection() {
       // Only perform selection if drag was significant (minimum 5 pixels)
       if (Math.abs(maxX - minX) > 5 || Math.abs(maxY - minY) > 5) {
         const newSelectedObjects: ObjectId[] = []
-        
+
+        // Build a per-meshType lookup of candidate scene objects so
+        // InstancedMesh instances (see below) can be resolved back to
+        // their real ObjectId by matching position. InstancedMesh
+        // instances don't carry a per-instance userData.objectId — the
+        // mesh itself only has one shared userData ({instanced: true,
+        // kind: 'cube'|'sphere'|'pyramid'}, set by InstancedRendering.tsx)
+        // — so unlike regular meshes we can't just read
+        // object.userData.objectId off the intersected object.
+        const sceneObjectsSnapshot = useEditorStore.getState().sceneObjects
+        const candidatesByKind: Record<
+          'cube' | 'sphere' | 'pyramid',
+          Array<{ id: ObjectId; position: [number, number, number] }>
+        > = { cube: [], sphere: [], pyramid: [] }
+        sceneObjectsSnapshot.forEach(obj => {
+          if (obj.type === 'mesh' && obj.meshType && obj.visible) {
+            candidatesByKind[obj.meshType].push({ id: obj.id, position: obj.position })
+          }
+        })
+
+        const EPS = 0.01
+        const resolveInstanceObjectId = (
+          kind: 'cube' | 'sphere' | 'pyramid',
+          pos: THREE.Vector3
+        ): ObjectId | null => {
+          for (const candidate of candidatesByKind[kind]) {
+            if (
+              Math.abs(candidate.position[0] - pos.x) < EPS &&
+              Math.abs(candidate.position[1] - pos.y) < EPS &&
+              Math.abs(candidate.position[2] - pos.z) < EPS
+            ) {
+              return candidate.id
+            }
+          }
+          return null
+        }
+
+        const tryAddToSelection = (screenPos: THREE.Vector3, id: ObjectId | null) => {
+          if (!id) return
+          const x = (screenPos.x * 0.5 + 0.5) * size.width
+          const y = (screenPos.y * -0.5 + 0.5) * size.height
+          if (x >= minX && x <= maxX && y >= minY && y <= maxY && screenPos.z < 1 && !newSelectedObjects.includes(id)) {
+            newSelectedObjects.push(id)
+          }
+        }
+
         // Check all selectable objects in the scene
         scene.traverse((object) => {
+          if (object instanceof THREE.InstancedMesh) {
+            const kind = object.userData?.kind as 'cube' | 'sphere' | 'pyramid' | undefined
+            if (!kind || !object.visible) return
+
+            const instanceMatrix = new THREE.Matrix4()
+            const worldMatrix = new THREE.Matrix4()
+            const worldPos = new THREE.Vector3()
+
+            for (let i = 0; i < object.count; i++) {
+              object.getMatrixAt(i, instanceMatrix)
+              worldMatrix.multiplyMatrices(object.matrixWorld, instanceMatrix)
+              worldPos.setFromMatrixPosition(worldMatrix)
+
+              const screenPos = worldPos.clone().project(camera)
+              const objectId = resolveInstanceObjectId(kind, worldPos)
+              tryAddToSelection(screenPos, objectId)
+            }
+            return
+          }
+
           if (object.userData?.objectId && object.visible) {
             // Project object to screen space
             const worldPos = new THREE.Vector3()
             object.getWorldPosition(worldPos)
-            
+
             const screenPos = worldPos.clone().project(camera)
-            const x = (screenPos.x * 0.5 + 0.5) * size.width
-            const y = (screenPos.y * -0.5 + 0.5) * size.height
-            
-            // Check if object is within selection box
-            if (x >= minX && x <= maxX && y >= minY && y <= maxY && screenPos.z < 1) {
-              newSelectedObjects.push(object.userData.objectId)
-            }
+            tryAddToSelection(screenPos, object.userData.objectId as ObjectId)
           }
         })
         

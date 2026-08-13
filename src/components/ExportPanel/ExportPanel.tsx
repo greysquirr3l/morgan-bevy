@@ -1,6 +1,10 @@
 import { useEditorStore } from '@/store/editorStore'
 import { loadLevelFromFile, saveLevelToFile } from '@/types/levelBridge'
-import { buildLevelExportPayload, levelExportPayloadToLevelData } from '@/utils/exportPayload'
+import {
+  applyExportOptions,
+  buildLevelExportPayload,
+  levelExportPayloadToLevelData,
+} from '@/utils/exportPayload'
 import { invoke } from '@tauri-apps/api/core'
 import { open } from '@tauri-apps/plugin-dialog'
 import { Box, Code, Download, FileText, FolderOpen } from 'lucide-react'
@@ -31,7 +35,7 @@ interface ExportResult {
 }
 
 export default function ExportPanel() {
-  const { sceneObjects, waypoints, patrolRoutes } = useEditorStore()
+  const { sceneObjects, waypoints, patrolRoutes, lights } = useEditorStore()
   const [isExporting, setIsExporting] = useState(false)
   const [outputPath, setOutputPath] = useState('')
   const [lastExportResult, setLastExportResult] = useState<ExportResult | null>(null)
@@ -130,6 +134,7 @@ export default function ExportPanel() {
       const exported = buildLevelExportPayload(sceneObjects.values(), {
         waypoints,
         patrolRoutes,
+        lights,
       })
       const levelData = levelExportPayloadToLevelData(exported)
       const path = window.prompt(
@@ -191,16 +196,34 @@ export default function ExportPanel() {
       // along via spread-when-present so absent markers omit the
       // key entirely (matches Rust `skip_serializing_if`).
       // T57: waypoints / patrol routes ride along as level-level
-      // arrays alongside the per-object markers.
-      const levelData = buildLevelExportPayload(sceneObjects.values(), { waypoints, patrolRoutes })
+      // arrays alongside the per-object markers. T55: the global
+      // lighting rig rides along the same way — previously missing
+      // entirely, so a scene's lighting never round-tripped into
+      // any export.
+      const builtPayload = buildLevelExportPayload(sceneObjects.values(), {
+        waypoints,
+        patrolRoutes,
+        lights,
+      })
+
+      // Audit fix: the Rust `export_level` command only accepts
+      // `level_data, formats, output_path` — `includeMetadata` /
+      // `includeGenerationData` / `optimizeForSize` below would be
+      // silently dropped by serde if forwarded as extra invoke()
+      // args (not authorized to change the Rust command signature).
+      // So the checkboxes are made real by filtering the payload
+      // itself on the frontend first; see `applyExportOptions` for
+      // exactly what each flag does.
+      const levelData = applyExportOptions(builtPayload, {
+        includeMetadata,
+        includeGenerationData,
+        optimizeForSize,
+      })
 
       const result: ExportResult = await invoke('export_level', {
         levelData,
         formats: enabledFormats,
         outputPath,
-        includeMetadata,
-        includeGenerationData,
-        optimizeForSize,
       })
 
       setLastExportResult(result)

@@ -16,9 +16,17 @@ import {
 
 // Ground plane (unchanged)
 function Ground() {
-  const { clearSelection } = useEditorStore()
-  
+  const { clearSelection, isTransformDragging } = useEditorStore()
+
   const handleClick = () => {
+    // The gizmo (TransformControls) issues a click on the canvas
+    // when the user releases over empty space — not only when the
+    // pointer was on the ground itself. Clear-on-click was firing in
+    // that case too, silently deselecting the object the user had
+    // just finished dragging. Mirrors the same guard in Scene.tsx's
+    // Ground.handleClick, which is the renderer used when
+    // useOptimizedRendering is off; this is the default-on renderer.
+    if (isTransformDragging) return
     clearSelection()
   }
 

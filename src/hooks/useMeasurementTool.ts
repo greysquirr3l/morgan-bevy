@@ -154,6 +154,13 @@ export function useMeasurementTool(
 
   const removeById = useCallback((id: string) => {
     setMeasurements(list => list.filter(m => m.id !== id))
+    // Bug fix: the overlay only ever displays `current` (the
+    // in-progress/most-recent measurement), never the `measurements`
+    // history array directly. Filtering just the history left
+    // `current` untouched, so clicking the overlay's × never
+    // dismissed what was actually on screen. Clear `current` too
+    // when it's the one being removed.
+    setCurrent(prev => (prev.id === id ? EMPTY_MEASUREMENT : prev))
   }, [])
 
   return {

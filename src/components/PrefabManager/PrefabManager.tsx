@@ -66,7 +66,12 @@ export default function PrefabManager() {
     const currentSize = useEditorStore.getState().sceneObjects.size
     for (let i = 0; i < instantiated.length; i++) {
       const objTemplate = instantiated[i]
-      if (!objTemplate.meshType) continue
+      // Audit follow-up: this used to `continue` (skip entirely)
+      // when the template object had no `meshType` — which silently
+      // dropped every light/group object in a prefab, since only
+      // mesh objects carry a `meshType`. `meshType` is optional on
+      // `SceneObject` precisely so non-mesh types can omit it; build
+      // and create the object for every template regardless of type.
       // Build a full SceneObject from the PrefabObject template
       // — rotation, scale, material, tags, visibility, layer all
       // survive the round-trip. `id` and `prefabInstanceId` are

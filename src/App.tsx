@@ -205,12 +205,21 @@ function useViewportSync() {
             y - gridSize.height / 2,
           ]
 
+          // Fix (still-broken #1): `tileDefinition.mesh` is `null`
+          // in the client-side fallback theme (used whenever Tauri's
+          // `get_available_themes` isn't reachable — e.g. a plain
+          // dev-server browser tab). Dereferencing `.mesh_type`
+          // unconditionally crashed this effect before any objects
+          // were created, leaving the Hierarchy empty with a
+          // TypeError in the console. Optional-chain every access so
+          // a null/missing mesh definition just falls back to 'cube'
+          // instead of throwing.
           let meshType: 'cube' | 'sphere' | 'pyramid' = 'cube'
-          if (tileDefinition.mesh.mesh_type === 'sphere') {
+          if (tileDefinition.mesh?.mesh_type === 'sphere') {
             meshType = 'sphere'
           } else if (
-            tileDefinition.mesh.mesh_type === 'pyramid' ||
-            tileDefinition.mesh.mesh_type === 'cone'
+            tileDefinition.mesh?.mesh_type === 'pyramid' ||
+            tileDefinition.mesh?.mesh_type === 'cone'
           ) {
             meshType = 'pyramid'
           }
@@ -715,10 +724,23 @@ function AppContent() {
   }
 
   useEffect(() => {
-    // Check for auto-saved data on startup
-    try {
-      const saved = localStorage.getItem('morgan-bevy.autosave')
-      if (saved) {
+    // Investigate (item 5) regression: the recovery-data check below
+    // used to live inline in this effect with bare `return`
+    // statements for its early-exit cases (no saved data / no
+    // recoverable scene content / unparseable timestamp). A bare
+    // `return` inside a `try` block still returns from the WHOLE
+    // enclosing function — so those early exits skipped
+    // `window.addEventListener` AND `setIsReady(true)` entirely.
+    // Any autosave blob that existed but was missing `savedAt` /
+    // scene content, or had a corrupt timestamp, permanently stuck
+    // the app on "Loading Morgan-Bevy...". Moving the check into its
+    // own function scopes those `return`s to just the check, so a
+    // stale/legacy/corrupt localStorage blob can never block
+    // startup — `setIsReady(true)` below always runs.
+    const checkForRecoverableSave = () => {
+      try {
+        const saved = localStorage.getItem('morgan-bevy.autosave')
+        if (!saved) return
         const saveData = JSON.parse(saved)
         // Audit (Critical #5) regression: this used to read only
         // `saveData.timestamp` / `saveData.gridData` /
@@ -752,10 +774,11 @@ function AppContent() {
         if (hoursSinceLastSave < 24) {
           setShowRecoveryDialog(true)
         }
+      } catch (error) {
+        console.error('Error checking for auto-saved data:', error)
       }
-    } catch (error) {
-      console.error('Error checking for auto-saved data:', error)
     }
+    checkForRecoverableSave()
 
     // Auto-save before window closes
     const handleBeforeUnload = () => {

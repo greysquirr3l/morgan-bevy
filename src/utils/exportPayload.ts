@@ -33,6 +33,25 @@ export interface LayerShape {
   name: string
 }
 
+// The global lighting-rig entry type (T55, `EditorState.lights` /
+// `setLights`) isn't exported from the store either — it's defined
+// inline on `EditorState.lights` and the `setLights`/`addLight`
+// params. Same "structural type is enough" approach as `LayerShape`
+// above. This is the *scene-level* lighting rig (Lighting panel /
+// Auto-Light), distinct from the per-object `SceneObject['light']`
+// marker handled by `spreadIfPresent` below.
+export interface LightRigEntry {
+  id: string
+  kind: 'ambient' | 'directional' | 'point' | 'spot'
+  position: [number, number, number]
+  color: [number, number, number]
+  intensity: number
+  angle?: number
+  castShadow: boolean
+  shadowQuality: 'off' | 'hard' | 'soft' | 'ultra'
+  name?: string
+}
+
 // ─── Marker carry-over helper ────────────────────────────────────────────────
 
 /**
@@ -98,6 +117,41 @@ function toPatrolRouteExport(route: PatrolRoute): PatrolRouteExport {
   }
 }
 
+// ─── T55/audit fix: global lighting-rig wire-format conversion ───────────────
+//
+// `state.lights` (the Lighting panel / Auto-Light rig) never made it
+// into any export payload — only the unrelated per-object
+// `SceneObject.light` marker did (via `spreadIfPresent` below). This
+// converts a rig entry to snake_case, mirroring the
+// `toWaypointExport` / `toPatrolRouteExport` convention used
+// elsewhere in this file for level-level (not per-object) arrays.
+
+export interface LightRigExport {
+  id: string
+  kind: 'ambient' | 'directional' | 'point' | 'spot'
+  position: [number, number, number]
+  color: [number, number, number]
+  intensity: number
+  angle?: number
+  cast_shadow: boolean
+  shadow_quality: 'off' | 'hard' | 'soft' | 'ultra'
+  name?: string
+}
+
+function toLightRigExport(light: LightRigEntry): LightRigExport {
+  return {
+    id: light.id,
+    kind: light.kind,
+    position: light.position,
+    color: light.color,
+    intensity: light.intensity,
+    ...(light.angle !== undefined ? { angle: light.angle } : {}),
+    cast_shadow: light.castShadow,
+    shadow_quality: light.shadowQuality,
+    ...(light.name !== undefined ? { name: light.name } : {}),
+  }
+}
+
 // ─── Tauri export_level payload (ExportPanel.tsx) ────────────────────────────
 
 export interface LevelExportPayload {
@@ -110,6 +164,13 @@ export interface LevelExportPayload {
   bounds: { min: [number, number, number]; max: [number, number, number] }
   waypoints: WaypointExport[]
   patrol_routes: PatrolRouteExport[]
+  /**
+   * The global lighting rig (T55 Lighting panel / Auto-Light),
+   * distinct from the per-object `light` marker spread onto each
+   * entry of `objects` below. Previously missing entirely — a
+   * scene's lighting setup never round-tripped into any export.
+   */
+  lights: LightRigExport[]
 }
 
 /**
@@ -117,7 +178,8 @@ export interface LevelExportPayload {
  * (ExportPanel.tsx). The four marker fields are spread-conditionally
  * so absent markers omit the key entirely. `waypoints` / `routes`
  * (T57) are level-level, not per-object, so they ride along as
- * top-level arrays alongside `objects`.
+ * top-level arrays alongside `objects`. `lights` (T55 rig) rides
+ * along the same way.
  */
 export function buildLevelExportPayload(
   sceneObjects: Iterable<SceneObject>,
@@ -126,6 +188,7 @@ export function buildLevelExportPayload(
     name?: string
     waypoints?: readonly Waypoint[]
     patrolRoutes?: readonly PatrolRoute[]
+    lights?: readonly LightRigEntry[]
   } = {}
 ): LevelExportPayload {
   const id = options.id ?? `level-${Date.now()}`
@@ -135,6 +198,7 @@ export function buildLevelExportPayload(
     name,
     waypoints: (options.waypoints ?? []).map(toWaypointExport),
     patrol_routes: (options.patrolRoutes ?? []).map(toPatrolRouteExport),
+    lights: (options.lights ?? []).map(toLightRigExport),
     objects: Array.from(sceneObjects).map(obj => ({
       id: obj.id,
       name: obj.name,
@@ -176,6 +240,8 @@ export interface FileMenuLevelExportPayload {
   bounds: { min: [number, number, number]; max: [number, number, number] }
   waypoints: WaypointExport[]
   patrol_routes: PatrolRouteExport[]
+  /** Global lighting rig (T55) — see `LevelExportPayload.lights`. */
+  lights: LightRigExport[]
 }
 
 /**
@@ -184,7 +250,8 @@ export interface FileMenuLevelExportPayload {
  * than `export_level` — material is a full object, not a string id,
  * and metadata is per-object visibility / lock / collision / walkable.
  * Markers ride along here too; `waypoints` / `patrol_routes` (T57)
- * ride along as level-level top-level arrays, same as above.
+ * and `lights` (T55 rig) ride along as level-level top-level arrays,
+ * same as above.
  */
 export function buildFileMenuLevelExportPayload(
   sceneObjects: Iterable<SceneObject>,
@@ -193,6 +260,7 @@ export function buildFileMenuLevelExportPayload(
     name?: string
     waypoints?: readonly Waypoint[]
     patrolRoutes?: readonly PatrolRoute[]
+    lights?: readonly LightRigEntry[]
   } = {}
 ): FileMenuLevelExportPayload {
   const id = options.id ?? `level_${Date.now()}`
@@ -202,6 +270,7 @@ export function buildFileMenuLevelExportPayload(
     name,
     waypoints: (options.waypoints ?? []).map(toWaypointExport),
     patrol_routes: (options.patrolRoutes ?? []).map(toPatrolRouteExport),
+    lights: (options.lights ?? []).map(toLightRigExport),
     objects: Array.from(sceneObjects).map(obj => ({
       id: obj.id,
       name: obj.name,
@@ -362,4 +431,104 @@ export function levelExportPayloadToLevelData(
       ...(obj.marker ? { marker: obj.marker } : {}),
     })),
   }
+}
+
+// ─── Audit fix: ExportPanel "Include Metadata" / "Include Generation
+// Data" / "Optimize for Size" checkboxes ─────────────────────────────
+//
+// These checkboxes have real UI state (`ExportPanel.tsx`) but the
+// Rust `export_level` command signature is
+// `(level_data, formats, output_path)` — the three flags, passed
+// alongside as extra `invoke()` args, are silently ignored by serde
+// on the Rust side (not authorized to change the Rust command here).
+// So the only way to make them do anything is to filter/transform
+// the payload itself on the frontend, before it's handed to
+// `invoke`.
+//
+// What's safe to strip is constrained by the Rust `GameObject` /
+// `LevelData` structs (`src-tauri/src/main.rs`):
+//   - `metadata: HashMap<String, serde_json::Value>` and
+//     `tags: Vec<String>` have NO `#[serde(default)]` — the key
+//     must stay present (contents can be emptied, the key can't be
+//     omitted) or Deserialize on `level_data` fails with
+//     "missing field".
+//   - `generation_seed` / `generation_params` are `Option<T>` but
+//     also lack `#[serde(default)]` on this struct — `null` is
+//     fine, omitting the key is not.
+//   - `waypoints` / `patrol_routes` DO carry
+//     `#[serde(default, skip_serializing_if = ...)]` — omitting an
+//     empty array is safe and is exactly what that attribute is
+//     for. `lights` (this file's new field, not yet a matching Rust
+//     field at all) is treated the same way for consistency.
+//
+// Given those constraints, the three flags are defined as:
+//   - `includeMetadata=false` -> every object's `metadata` becomes
+//     `{}` (key stays, contents cleared).
+//   - `includeGenerationData=false` -> the provenance-ish
+//     `metadata.created_at` timestamp is dropped from every object,
+//     and the top-level `generation_seed` / `generation_params`
+//     are forced to `null` (already `null` in the current builders,
+//     but this keeps the flag meaningful once real generation
+//     provenance is threaded through).
+//   - `optimizeForSize=true` -> the redundant `metadata.mesh_type`
+//     key is dropped (it duplicates the top-level `mesh` field),
+//     and `waypoints` / `patrol_routes` / `lights` are omitted
+//     entirely when they're empty arrays, instead of sending `[]`.
+
+export interface ExportOptionFlags {
+  includeMetadata: boolean
+  includeGenerationData: boolean
+  optimizeForSize: boolean
+}
+
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
+}
+
+/**
+ * Apply the ExportPanel's three checkboxes to an already-built
+ * `LevelExportPayload` (or the structurally-similar
+ * `FileMenuLevelExportPayload`), entirely on the frontend — see the
+ * module comment above for why this can't be done on the Rust side.
+ * Returns a new object; does not mutate `payload`.
+ */
+export function applyExportOptions<T extends { objects: Array<Record<string, unknown>> }>(
+  payload: T,
+  options: ExportOptionFlags
+): T {
+  const objects = payload.objects.map(obj => {
+    const metadata: Record<string, unknown> = isPlainObject(obj.metadata)
+      ? { ...obj.metadata }
+      : {}
+
+    if (!options.includeMetadata) {
+      // Clear entirely — the key itself must stay (Rust requires
+      // `metadata` present, just not any particular contents).
+      for (const key of Object.keys(metadata)) delete metadata[key]
+    } else if (!options.includeGenerationData) {
+      delete metadata.created_at
+    }
+
+    if (options.optimizeForSize) {
+      delete metadata.mesh_type
+    }
+
+    return { ...obj, metadata }
+  })
+
+  const result: Record<string, unknown> = { ...payload, objects }
+
+  if (!options.includeGenerationData) {
+    if ('generation_seed' in result) result.generation_seed = null
+    if ('generation_params' in result) result.generation_params = null
+  }
+
+  if (options.optimizeForSize) {
+    for (const key of ['waypoints', 'patrol_routes', 'lights'] as const) {
+      const value = result[key]
+      if (Array.isArray(value) && value.length === 0) delete result[key]
+    }
+  }
+
+  return result as T
 }

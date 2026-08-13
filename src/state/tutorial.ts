@@ -93,7 +93,16 @@ export const GETTING_STARTED_TUTORIAL: Tutorial = {
       id: 'save-project',
       title: 'Save your work',
       body: 'Press Ctrl+S to save a local snapshot — it is auto-restored the next time you open Morgan-Bevy.',
-      targetSelector: '[data-tutorial-target="file-menu-trigger"]',
+      // Bug fix: this used to spotlight `file-menu-trigger`, which
+      // visually told the user to click the File menu, while the
+      // instruction (and the `keypress`/`ctrl+s` validation below)
+      // asks for a keyboard shortcut instead — the click target and
+      // the actual expected action didn't match. `keypress` steps
+      // aren't tied to a specific control, so spotlight the
+      // viewport (as `translate-object` above does for its own
+      // keypress step) instead of a button the user isn't meant to
+      // click.
+      targetSelector: '.viewport-3d',
       action: 'keypress',
       expectedValue: 'ctrl+s',
     },

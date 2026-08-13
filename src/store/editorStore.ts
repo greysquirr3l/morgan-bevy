@@ -795,10 +795,16 @@ export const useEditorStore = create<EditorState>()(
 
     addObjectDirect: (objectData: any) =>
       set(state => {
-        state.sceneObjects.set(objectData.id, {
+        // Fix (needed by PrefabManager's "Break Prefab" flow): use
+        // the caller-supplied `type` instead of hardcoding 'mesh' —
+        // non-mesh prefab members (light/group) were being silently
+        // miscategorized as meshes. Default to 'mesh' only when the
+        // caller doesn't pass one (e.g. App.tsx's grid-tile sync,
+        // which only ever creates mesh tiles).
+        const obj: SceneObject = {
           id: objectData.id,
           name: objectData.name,
-          type: 'mesh',
+          type: objectData.type ?? 'mesh',
           position: objectData.position,
           rotation: objectData.rotation,
           scale: objectData.scale,
@@ -823,7 +829,17 @@ export const useEditorStore = create<EditorState>()(
           walkable: objectData.walkable,
           tags: objectData.tags,
           metadata: objectData.metadata || {},
-        })
+        }
+        // Fix (needed by PrefabManager's "Break Prefab" flow):
+        // persist `prefabInstanceId` when provided so the broken
+        // object retains its link back to the source prefab.
+        // Convention (see the T91b comment above): an absent key,
+        // not an `undefined`-valued one, is what keeps the JSON
+        // round-trip clean — only set it when actually provided.
+        if (objectData.prefabInstanceId !== undefined) {
+          obj.prefabInstanceId = objectData.prefabInstanceId
+        }
+        state.sceneObjects.set(objectData.id, obj)
         // Scene updated - trigger debounced auto-save
         useEditorStore.getState().debouncedAutoSave()
       }),
@@ -871,6 +887,17 @@ export const useEditorStore = create<EditorState>()(
 
     removeObject: (id: ObjectId) => {
       set(state => {
+        // Defense in depth (item 3): `DeleteObjectCommand` and the
+        // UI already gate on `locked` / layer-locked before calling
+        // this action, but that's enforcement at the CALLER, not
+        // here. Re-check at the store boundary so any future caller
+        // that bypasses the command layer can't delete a locked
+        // object — no-op rather than throw, matching the command
+        // layer's "skip locked targets" behavior.
+        const obj = state.sceneObjects.get(id)
+        if (!obj) return
+        const layer = state.layers.find(l => l.id === obj.layerId)
+        if (obj.locked || layer?.locked) return
         state.sceneObjects.delete(id)
         state.selectedObjects = state.selectedObjects.filter(objId => objId !== id)
       })
@@ -883,18 +910,25 @@ export const useEditorStore = create<EditorState>()(
       set(state => {
         ids.forEach(id => {
           const original = state.sceneObjects.get(id)
-          if (original) {
-            // Generation site: minted here, not parsed from
-            // untrusted input — use the plain constructor.
-            const newId = ObjectId(`${original.name}_copy_${Date.now()}`)
-            state.sceneObjects.set(newId, {
-              ...original,
-              id: newId,
-              name: `${original.name}_copy`,
-              position: [original.position[0] + 2, original.position[1], original.position[2]],
-            })
-            newIds.push(newId)
-          }
+          if (!original) return
+          // Defense in depth (item 3): same lock re-check as
+          // `removeObject` above — `DuplicateCommand` already
+          // filters locked sources, but a future direct caller of
+          // this action shouldn't be able to duplicate a locked
+          // object or one on a locked layer. Skip it, don't throw.
+          if (original.locked) return
+          const layer = state.layers.find(l => l.id === original.layerId)
+          if (layer?.locked) return
+          // Generation site: minted here, not parsed from
+          // untrusted input — use the plain constructor.
+          const newId = ObjectId(`${original.name}_copy_${Date.now()}`)
+          state.sceneObjects.set(newId, {
+            ...original,
+            id: newId,
+            name: `${original.name}_copy`,
+            position: [original.position[0] + 2, original.position[1], original.position[2]],
+          })
+          newIds.push(newId)
         })
       })
       return newIds
@@ -910,9 +944,24 @@ export const useEditorStore = create<EditorState>()(
     ) =>
       set(state => {
         if (state.sceneObjects.has(id)) {
+          // Defense in depth (item 3): `TransformCommand` and the
+          // gizmo/Inspector callers already gate on `locked` /
+          // layer-locked, but that's enforcement at the CALLER, not
+          // here. Re-check at the store boundary so any future
+          // caller that bypasses those checks can't move a locked
+          // object — no-op rather than throw.
+          const target = state.sceneObjects.get(id)
+          const targetLayer = target && state.layers.find(l => l.id === target.layerId)
+          if (target?.locked || targetLayer?.locked) return
+
           if (transform.position) {
             const o = state.sceneObjects.get(id)
-            if (o) o.position = transform.position
+            // Clone rather than alias the incoming array: storing
+            // the caller's own array reference means any later
+            // mutation of that reference (e.g. a caller that
+            // shallow-copies a transform object elsewhere) would
+            // silently corrupt the committed scene state too.
+            if (o) o.position = [...transform.position]
 
             // Update grid position metadata for tile objects
             if (state.sceneObjects.get(id)?.metadata?.fromGrid && transform.position) {
@@ -929,11 +978,11 @@ export const useEditorStore = create<EditorState>()(
           }
           if (transform.rotation) {
             const o = state.sceneObjects.get(id)
-            if (o) o.rotation = transform.rotation
+            if (o) o.rotation = [...transform.rotation]
           }
           if (transform.scale) {
             const o = state.sceneObjects.get(id)
-            if (o) o.scale = transform.scale
+            if (o) o.scale = [...transform.scale]
           }
         }
       }),

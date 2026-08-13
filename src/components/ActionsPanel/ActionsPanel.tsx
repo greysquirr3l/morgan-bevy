@@ -4,9 +4,9 @@ import { Plus, Triangle } from 'lucide-react'
 import { DeleteObjectCommand, DuplicateCommand } from '@/utils/commands'
 
 export default function ActionsPanel() {
-  const { 
-    selectedObjects, 
-    addObject, 
+  const {
+    selectedObjects,
+    addObject,
     executeCommand
   } = useEditorStore()
 
@@ -55,7 +55,7 @@ export default function ActionsPanel() {
               <span className="text-2xl mb-1">⬜</span>
               <span>Cube</span>
             </button>
-            <button 
+            <button
               className="flex flex-col items-center p-2 bg-editor-bg hover:bg-editor-hover rounded text-xs"
               onClick={() => createPrimitive('sphere')}
               title="Create Sphere"
@@ -63,7 +63,7 @@ export default function ActionsPanel() {
               <span className="text-2xl mb-1">⭕</span>
               <span>Sphere</span>
             </button>
-            <button 
+            <button
               className="flex flex-col items-center p-2 bg-editor-bg hover:bg-editor-hover rounded text-xs"
               onClick={() => createPrimitive('pyramid')}
               title="Create Pyramid"
@@ -77,13 +77,13 @@ export default function ActionsPanel() {
         {/* Object Actions */}
         <div>
           <h3 className="text-sm font-semibold text-editor-accent mb-2 border-b border-editor-border/30 pb-1">
-            Object Actions 
+            Object Actions
             {selectedObjects.length > 0 && (
               <span className="text-editor-accent">({selectedObjects.length} selected)</span>
             )}
           </h3>
           <div className="space-y-2">
-            <button 
+            <button
               className="w-full flex items-center justify-center p-2 bg-editor-accent hover:bg-blue-600 text-white rounded text-sm disabled:opacity-50 disabled:cursor-not-allowed"
               onClick={duplicateSelected}
               disabled={selectedObjects.length === 0}
@@ -92,7 +92,7 @@ export default function ActionsPanel() {
               <Plus className="w-4 h-4 mr-2" />
               Duplicate
             </button>
-            <button 
+            <button
               className="w-full flex items-center justify-center p-2 bg-red-600 hover:bg-red-700 text-white rounded text-sm disabled:opacity-50 disabled:cursor-not-allowed"
               onClick={deleteSelected}
               disabled={selectedObjects.length === 0}

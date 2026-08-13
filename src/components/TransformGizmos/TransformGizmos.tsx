@@ -68,8 +68,14 @@ export default function TransformGizmos() {
 
       if (!activeObjectId || !activeMesh) return
 
-      // Store initial transform state for undo
-      const currentObject = sceneObjects.get(activeObjectId)
+      // Store initial transform state for undo. Read fresh from the
+      // store via getState() rather than closing over the `sceneObjects`
+      // destructured above — that map gets a new reference on every
+      // updateObjectTransform call during a drag (immer's Map plugin),
+      // and including it in this effect's deps below would tear down
+      // and reattach TransformControls (all its listeners) on every
+      // single drag frame instead of only at attach/mode-change time.
+      const currentObject = useEditorStore.getState().sceneObjects.get(activeObjectId)
       if (currentObject) {
         initialTransformRef.current = {
           position: [...currentObject.position] as [number, number, number],
@@ -159,7 +165,6 @@ export default function TransformGizmos() {
     transformMode,
     updateObjectTransform,
     executeCommand,
-    sceneObjects,
     setTransformDragging,
   ])
 
