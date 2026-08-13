@@ -7,11 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-08-13 - "Audit & Windows Compatibility Release"
+
 > Scope of this batch: Phases 8–12 + post-Phase-12 polish
 > (`T51`–`T93` + `T77b` + `T93 v2`) + the frontend functional-audit
 > follow-ups (Critical / Major / Minor findings, see
-> "Frontend functional audit fixes" below). Next release is planned
-> as `0.5.0` once this batch is tagged.
+> "Frontend functional audit fixes" below) + T90 v2 Inline emission
+> mode + a post-audit correctness/Windows-compatibility follow-up
+> pass (see "Post-audit follow-up + T90 v2 correctness + Windows
+> compatibility" below).
 
 ### Fixed — Frontend functional audit fixes (Critical / Major / Minor)
 
@@ -1195,6 +1199,104 @@ nursery + -D unwrap_used/expect_used/panic/indexing_slicing +
   Test totals after this batch: companion crate 40/40
   (+12 new SYSTEMS_SOURCE tests); editor 146/146 (+3 new T90v2
   tests); vitest 732/732.
+
+### Fixed — Post-audit follow-up + T90 v2 correctness + Windows compatibility
+
+- **Lighting-rig export, export-option checkboxes, prefab/lock
+  fixes** (commit `a41bbd6`). Found while spot-checking uncommitted
+  work still sitting in the tree from a prior session:
+  - The global lighting rig (T55) never round-tripped into any
+    export payload. Added `LightRigEntry`/`LightRigExport` and wired
+    `lights` through both `buildLevelExportPayload` paths and
+    `ExportPanel`.
+  - `ExportPanel`'s "Include Metadata" / "Include Generation Data" /
+    "Optimize for Size" checkboxes were inert — the Rust
+    `export_level` command signature doesn't accept them, so extra
+    `invoke()` args were silently dropped by serde. Added
+    `applyExportOptions` to filter the payload client-side within
+    what the Rust structs' serde attributes actually allow.
+  - `PrefabManager`'s "Break Prefab" flow: `addObject` hardcoded
+    `type: 'mesh'`, silently miscategorizing light/group prefab
+    members; also now persists `prefabInstanceId` on break.
+  - Added lock re-checks at the `editorStore` boundary for
+    remove/duplicate/transform actions (defense in depth beyond the
+    existing caller-side checks); `updateObjectTransform` now clones
+    incoming position/rotation/scale arrays instead of aliasing the
+    caller's reference.
+  - `BoxSelection`: resolve `InstancedMesh` instances back to their
+    `ObjectId` by position match so drag-select works past the
+    instancing threshold.
+  - `App.tsx`: null-guard `tileDefinition.mesh?.mesh_type` (crashed
+    in the client-side fallback theme), and fixed a bare `return`
+    inside a `try` block that could permanently stick startup on
+    "Loading Morgan-Bevy..." for any stale/corrupt autosave blob.
+  - `KeyboardShortcutsModal` category dropdown now derives from the
+    same `shortcutGroups` the list renders instead of a hand-written
+    array that had drifted out of sync (listed a "file" category
+    that no longer exists, omitted "Clipboard").
+  - `useMeasurementTool`: clear `current` too when removing the
+    in-progress measurement, not just the history array.
+  - `tutorial.ts`: getting-started keypress step spotlighted the
+    File menu button while asking for a keyboard shortcut; now
+    spotlights the viewport, matching the other keypress step.
+  - Removed four leftover `[TEMP-DEBUG]` / `TEMP_DEBUG_PAYLOAD`
+    `console.log` statements left over from developing the above.
+
+- **T90 v2 Inline mode never actually compiled** (commit `9de911b`).
+  `SYSTEMS_SOURCE` stamps all nine reference systems verbatim and
+  unconditionally regardless of `MarkerSet` — only which systems get
+  *registered* was gated, not which bodies are present in the
+  output. `emit_companion_type_imports` gated the
+  `use bevy_morgan_integration::{...}` import list per-marker
+  instead, so every Inline-mode export failed with `E0433`: `Door` /
+  `Open` / `Collectible` / `NavMeshHint` were never imported under
+  any condition, and the rest were missing whenever their specific
+  marker was absent from the level. No existing test caught this —
+  every Inline-mode assertion checks for substring presence in the
+  generated string, not whether it actually compiles. Fixed by
+  importing the full fixed companion type set whenever Inline mode
+  fires and the marker set is non-empty, matching what's actually
+  stamped into the file, instead of gating per marker flag.
+
+- **Windows compatibility audit + 3 fixes** (commit `5def760`). The
+  Windows CI matrix, installers, and docs were already in place —
+  these are behavioral bugs the audit found, not new platform
+  support:
+  - `.github/workflows/ci.yml`: the `backend` job's pedantic-clippy
+    step (bash trailing-backslash line continuations) and
+    `cargo-deny` step (invokes a `#!/usr/bin/env bash` script) had
+    no `shell:` override, so both ran under `windows-latest`'s
+    default `pwsh`, which understands neither — the Windows CI leg's
+    clippy/cargo-deny steps had almost certainly been red without
+    anyone chasing it down. Added `defaults: run: shell: bash` to
+    the job (`windows-latest` ships Git Bash).
+  - `src-tauri/src/assets.rs`: `default_import_cache_dir()` fell
+    back to `std::env::var("HOME")`, which Windows doesn't set, so
+    asset import failed there unless the undocumented
+    `MORGANA_APP_DATA` override was used. Now resolves via
+    `app_handle.path().app_data_dir()`, the same cross-platform
+    Tauri API `generate_thumbnails`/`cleanup_thumbnails` in this
+    file already use, and what
+    `docs/developer/customisation-faq.md` already (incorrectly)
+    claimed this path used.
+  - `MaterialEditor.tsx` / `ExportPanel.tsx`: both split
+    backend-returned file paths on `'/'` only to derive a display
+    filename; those paths are native-separator (backslash on
+    Windows), so the full path showed instead of just the filename.
+    Switched to `/[\\/]/`, matching the pattern already used in
+    `FileMenu.tsx` / `useStartupFile.ts`.
+  - Audit also surfaced lower-priority, not-yet-fixed items:
+    `assets.rs` vs `assets/scanner.rs` normalize scanned file paths
+    inconsistently (one forces `/`, the other keeps native `\`, so
+    they disagree on Windows); thumbnail regeneration can
+    intermittently fail via `fs::rename` if the destination is open
+    elsewhere (Windows locks more aggressively than Unix; failure is
+    logged, not surfaced); `icons/icon.ico` has only a single
+    256×256 image (blurry taskbar/title-bar icon); canonicalized
+    startup paths carry Windows' `\\?\` long-path prefix into the
+    UI. The (untracked, `packaging/` is gitignored per the T72
+    rollback below) Scoop manifest also claims an `arm64` release
+    asset the CI build matrix never produces.
 
 ### Removed / Reverted
 
