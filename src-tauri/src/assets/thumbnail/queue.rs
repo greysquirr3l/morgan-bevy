@@ -149,7 +149,11 @@ async fn worker_loop(
 /// Pure-ish job step: render + write + DB upsert. Pulled out of
 /// `worker_loop` so the unit tests can call it directly without
 /// spinning up a tokio runtime.
-fn process_job(db: &Mutex<AssetDatabase>, thumbnails_dir: &Path, job: &ThumbnailJob) -> Result<(), String> {
+fn process_job(
+    db: &Mutex<AssetDatabase>,
+    thumbnails_dir: &Path,
+    job: &ThumbnailJob,
+) -> Result<(), String> {
     let out_path = thumbnail_path(thumbnails_dir, job.asset_id);
 
     // 1. Render. Pure function — no I/O.

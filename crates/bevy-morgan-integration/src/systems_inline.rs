@@ -271,7 +271,10 @@ mod tests {
         // The plugin build() registers these add_systems /
         // add_observer lines; the inline source must too or the
         // consumer's runtime breaks in lock-step.
-        assert!(SYSTEMS_SOURCE.contains("add_systems("), "missing add_systems call");
+        assert!(
+            SYSTEMS_SOURCE.contains("add_systems("),
+            "missing add_systems call"
+        );
         assert!(
             SYSTEMS_SOURCE.contains("door_proximity_open"),
             "missing door_proximity_open system"

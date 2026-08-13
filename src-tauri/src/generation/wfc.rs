@@ -655,13 +655,13 @@ impl WFCGenerator {
 
 #[cfg(test)]
 mod tests {
-#![allow(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    clippy::indexing_slicing,
-    clippy::items_after_statements,
-    reason = "test code is allowed to use unwrap/expect for concise assertions"
-)]
+    #![allow(
+        clippy::unwrap_used,
+        clippy::expect_used,
+        clippy::indexing_slicing,
+        clippy::items_after_statements,
+        reason = "test code is allowed to use unwrap/expect for concise assertions"
+    )]
 
     use super::*;
 

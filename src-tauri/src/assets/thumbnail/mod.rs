@@ -252,11 +252,8 @@ mod tests {
         // Without this scope clippy `significant_drop_tightening`
         // flags the binding as outliving the `runtime.block_on` call.
         {
-            let queue = ThumbnailQueue::spawn(
-                Arc::clone(&db),
-                thumbs_dir.clone(),
-                runtime.handle(),
-            );
+            let queue =
+                ThumbnailQueue::spawn(Arc::clone(&db), thumbs_dir.clone(), runtime.handle());
             queue
                 .submit(ThumbnailJob {
                     asset_id,
@@ -282,7 +279,11 @@ mod tests {
 
         // The output file should exist + be a valid 256x256 WebP.
         let out = thumbnail_path(&thumbs_dir, asset_id);
-        assert!(out.exists(), "thumbnail file not written: {}", out.display());
+        assert!(
+            out.exists(),
+            "thumbnail file not written: {}",
+            out.display()
+        );
         let bytes = std::fs::read(&out).expect("read webp");
         assert!(bytes.len() > 12, "WebP suspiciously small");
         assert_eq!(&bytes[0..4], b"RIFF");
@@ -320,7 +321,9 @@ mod tests {
         .unwrap();
 
         // No thumbnail yet → must show up as pending.
-        let pending = db.list_assets_needing_thumbnails(THUMBNAIL_SIZE).expect("pending");
+        let pending = db
+            .list_assets_needing_thumbnails(THUMBNAIL_SIZE)
+            .expect("pending");
         assert_eq!(pending.len(), 1);
         assert_eq!(pending[0].0, 1);
 
@@ -334,7 +337,9 @@ mod tests {
             [],
         )
         .unwrap();
-        let pending = db.list_assets_needing_thumbnails(THUMBNAIL_SIZE).expect("pending");
+        let pending = db
+            .list_assets_needing_thumbnails(THUMBNAIL_SIZE)
+            .expect("pending");
         assert_eq!(
             pending.len(),
             1,
@@ -352,7 +357,9 @@ mod tests {
             .unwrap();
         db.upsert_thumbnail(1, "/tmp/thumb_1_256.webp", THUMBNAIL_SIZE, asset_mtime)
             .expect("upsert");
-        let pending = db.list_assets_needing_thumbnails(THUMBNAIL_SIZE).expect("pending");
+        let pending = db
+            .list_assets_needing_thumbnails(THUMBNAIL_SIZE)
+            .expect("pending");
         assert_eq!(pending.len(), 0, "fresh mtime must not re-queue");
     }
 

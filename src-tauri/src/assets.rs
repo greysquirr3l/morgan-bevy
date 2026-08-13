@@ -99,10 +99,10 @@ pub async fn initialize_asset_database(app_handle: tauri::AppHandle) -> Result<(
     // with the scanner via `Arc<Mutex<AssetDatabase>>` — both
     // sides lock briefly, never concurrently with each other for
     // long. The worker pulls from the channel until the app exits.
-    let db_for_queue = Arc::new(Mutex::new(
-        AssetDatabase::new(&db_path)
-            .map_err(|e| format!("Failed to open DB for thumbnail queue: {e}"))?,
-    ));
+    let db_for_queue =
+        Arc::new(Mutex::new(AssetDatabase::new(&db_path).map_err(|e| {
+            format!("Failed to open DB for thumbnail queue: {e}")
+        })?));
     let queue = thumbnail::ThumbnailQueue::spawn(
         Arc::clone(&db_for_queue),
         thumbnails_dir,
@@ -163,14 +163,14 @@ pub async fn scan_assets_database(app_handle: tauri::AppHandle) -> Result<ScanRe
         // Cleanup: walk the thumbnails dir, drop orphans. We open a
         // separate connection so we don't share the lock with the
         // worker (which holds its own Arc<Mutex<AssetDatabase>>).
-        if let Ok(db) = AssetDatabase::new(
-            app_handle
-                .path()
-                .app_data_dir().map_or_else(|_| PathBuf::from("assets.db"), |p| p.join(".morgana").join("assets.db")),
-        ) {
-            let app_data_dir = app_handle
-                .path()
-                .app_data_dir().map_or_else(|_| PathBuf::from("thumbnails"), |p| p.join(".morgana").join("thumbnails"));
+        if let Ok(db) = AssetDatabase::new(app_handle.path().app_data_dir().map_or_else(
+            |_| PathBuf::from("assets.db"),
+            |p| p.join(".morgana").join("assets.db"),
+        )) {
+            let app_data_dir = app_handle.path().app_data_dir().map_or_else(
+                |_| PathBuf::from("thumbnails"),
+                |p| p.join(".morgana").join("thumbnails"),
+            );
             if let Err(e) = thumbnail::cleanup::cleanup_orphans(&db, &app_data_dir) {
                 log::warn!("T33 cleanup_orphans failed: {e}");
             }
@@ -186,11 +186,10 @@ pub async fn scan_assets_database(app_handle: tauri::AppHandle) -> Result<ScanRe
             // The DB connection inside the worker is the source of
             // truth for staleness; build a fresh `AssetDatabase`
             // handle here for the read.
-            if let Ok(db) = AssetDatabase::new(
-                app_handle
-                    .path()
-                    .app_data_dir().map_or_else(|_| PathBuf::from("assets.db"), |p| p.join(".morgana").join("assets.db")),
-            ) {
+            if let Ok(db) = AssetDatabase::new(app_handle.path().app_data_dir().map_or_else(
+                |_| PathBuf::from("assets.db"),
+                |p| p.join(".morgana").join("assets.db"),
+            )) {
                 if let Err(e) = queue.enqueue_all_pending(&db) {
                     log::warn!("T33 enqueue_all_pending failed: {e}");
                 }

@@ -618,8 +618,8 @@ mod tests {
             max: [8.0, 5.5],
             kind: ObstacleKind::Wall,
         };
-        let mesh = generate_navmesh(&[floor_10x10()], &[wall])
-            .expect("generate_navmesh should succeed");
+        let mesh =
+            generate_navmesh(&[floor_10x10()], &[wall]).expect("generate_navmesh should succeed");
 
         assert_eq!(mesh.polygons.len(), 2, "wall should split the floor in two");
         assert_eq!(
@@ -627,7 +627,10 @@ mod tests {
             1,
             "the doorway gap should produce exactly one connection"
         );
-        assert!(mesh.obstacles.is_empty(), "wall becomes a split, not a hole");
+        assert!(
+            mesh.obstacles.is_empty(),
+            "wall becomes a split, not a hole"
+        );
 
         let connection = &mesh.connections[0];
         assert_ne!(
@@ -657,8 +660,8 @@ mod tests {
             max: [10.0, 5.5],
             kind: ObstacleKind::Wall,
         };
-        let mesh = generate_navmesh(&[floor_10x10()], &[wall])
-            .expect("generate_navmesh should succeed");
+        let mesh =
+            generate_navmesh(&[floor_10x10()], &[wall]).expect("generate_navmesh should succeed");
 
         assert_eq!(mesh.polygons.len(), 2, "wall should still split the floor");
         assert!(
@@ -678,8 +681,8 @@ mod tests {
             max: [5.0, 5.0],
             kind: ObstacleKind::FreeStanding,
         };
-        let mesh = generate_navmesh(&[floor_10x10()], &[pillar])
-            .expect("generate_navmesh should succeed");
+        let mesh =
+            generate_navmesh(&[floor_10x10()], &[pillar]).expect("generate_navmesh should succeed");
 
         assert_eq!(
             mesh.polygons.len(),

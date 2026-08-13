@@ -340,12 +340,7 @@ impl BSPGenerator {
         }
     }
 
-    fn connect_rooms(
-        &mut self,
-        room1: &Room,
-        room2: &Room,
-        params: &BSPGenerationParams,
-    ) {
+    fn connect_rooms(&mut self, room1: &Room, room2: &Room, params: &BSPGenerationParams) {
         let rng = self.rng_mut();
 
         // Find connection points (random points on room edges)
@@ -363,7 +358,6 @@ impl BSPGenerator {
             point2_y,
             params.corridor_width,
         );
-
     }
 
     fn create_l_corridor(&mut self, x1: u32, y1: u32, x2: u32, y2: u32, width: u32) {

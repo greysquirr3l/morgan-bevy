@@ -124,7 +124,8 @@ impl AssetScanner {
             }
         }
 
-        scan_result.scan_duration_ms = u64::try_from(start_time.elapsed().as_millis()).unwrap_or(u64::MAX);
+        scan_result.scan_duration_ms =
+            u64::try_from(start_time.elapsed().as_millis()).unwrap_or(u64::MAX);
 
         info!(
             "Asset scan completed in {}ms. Processed {} assets with {} errors",
@@ -315,13 +316,13 @@ pub struct DatabaseStats {
 
 #[cfg(test)]
 mod tests {
-#![allow(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    clippy::indexing_slicing,
-    clippy::items_after_statements,
-    reason = "test code is allowed to use unwrap/expect for concise assertions"
-)]
+    #![allow(
+        clippy::unwrap_used,
+        clippy::expect_used,
+        clippy::indexing_slicing,
+        clippy::items_after_statements,
+        reason = "test code is allowed to use unwrap/expect for concise assertions"
+    )]
 
     use super::*;
     use tempfile::tempdir;

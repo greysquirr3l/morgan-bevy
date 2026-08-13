@@ -1,6 +1,6 @@
 pub mod bsp;
-pub mod wfc;
 pub mod themes;
+pub mod wfc;
 
 // pub use bsp::BSPGenerator;
 // pub use wfc::WFCGenerator;

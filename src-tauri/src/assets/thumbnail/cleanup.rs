@@ -32,11 +32,10 @@ pub fn cleanup_orphans(db: &AssetDatabase, thumbnails_dir: &Path) -> Result<usiz
 
     // 1. Disk files with no DB row.
     for path in &on_disk {
-        if !recorded.contains(path)
-            && std::fs::remove_file(path).is_ok() {
-                removed += 1;
-                debug_log_removed(path);
-            }
+        if !recorded.contains(path) && std::fs::remove_file(path).is_ok() {
+            removed += 1;
+            debug_log_removed(path);
+        }
     }
 
     // 2. DB rows whose file no longer exists on disk.

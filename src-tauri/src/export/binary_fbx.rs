@@ -225,13 +225,13 @@ impl Default for FbxBuilder {
 
 #[cfg(test)]
 mod tests {
-#![allow(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    clippy::indexing_slicing,
-    clippy::items_after_statements,
-    reason = "test code is allowed to use unwrap/expect for concise assertions"
-)]
+    #![allow(
+        clippy::unwrap_used,
+        clippy::expect_used,
+        clippy::indexing_slicing,
+        clippy::items_after_statements,
+        reason = "test code is allowed to use unwrap/expect for concise assertions"
+    )]
 
     use super::*;
 
@@ -294,7 +294,10 @@ mod tests {
     }
 
     #[test]
-    #[allow(clippy::float_cmp, reason = "literal 2.5 is exactly representable in IEEE 754 f64; verifies bit-exact round-trip")]
+    #[allow(
+        clippy::float_cmp,
+        reason = "literal 2.5 is exactly representable in IEEE 754 f64; verifies bit-exact round-trip"
+    )]
     fn scalar_f64_property_round_trips() {
         // The f64 primitive is the one we depend on for transforms; verify
         // that the tag ('D') and 8-byte payload are present.
