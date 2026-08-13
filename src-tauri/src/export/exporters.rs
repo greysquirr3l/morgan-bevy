@@ -888,14 +888,16 @@ impl LevelExporter {
     /// T42/T91 bugfix: emit `use bevy_morgan_integration::{...};`
     /// importing whichever of `SpawnPoint` / `TriggerVolume` / `Light`
     /// / `Animation` / `Audio` / `Vfx` the level's objects actually
-    /// T90 v2: also import the bookkeeping types referenced by
-    /// `SYSTEMS_SOURCE` when emitting Inline mode — those bodies
-    /// reference `PickupEvent`, `TriggerActivated`, `Lights`,
-    /// `Animations`, `VfxEntries`, `PlayerStart`, `NavMeshSource`,
-    /// `AudioStartEvent`, `AudioEndEvent` by short name. The
-    /// companion crate re-exports all of them from `bevy_morgan_integration`,
-    /// so a single import line covers both the marker types and
-    /// the bookkeeping types the inline systems touch.
+    /// use, instead of the generator locally redefining those types.
+    ///
+    /// T90 v2: `SystemsMode::Inline` stamps `SYSTEMS_SOURCE` verbatim
+    /// and unconditionally — every reference system's body is always
+    /// present in the output, not gated per-marker (only which systems
+    /// get *registered* is gated, in `emit_systems_registration`). So
+    /// whenever Inline mode fires and the marker set is non-empty, the
+    /// full fixed set of companion types is imported regardless of
+    /// which specific markers this level uses — anything less leaves
+    /// some stamped function body referencing an unimported type.
     fn emit_companion_type_imports(
         code: &mut String,
         level_data: &LevelData,
@@ -903,59 +905,65 @@ impl LevelExporter {
         systems_mode: SystemsMode,
     ) -> Result<()> {
         let mut companion_types: Vec<&str> = Vec::new();
-        if level_data.objects.iter().any(|o| o.spawn_point.is_some()) {
-            companion_types.push("SpawnPoint");
-        }
-        if level_data
-            .objects
-            .iter()
-            .any(|o| o.trigger_volume.is_some())
-        {
-            companion_types.push("TriggerVolume");
-        }
-        if level_data.objects.iter().any(|o| o.light.is_some()) {
-            companion_types.push("Light");
-        }
-        if level_data.objects.iter().any(|o| o.animation.is_some()) {
-            companion_types.push("Animation");
-        }
-        if level_data.objects.iter().any(|o| o.audio.is_some()) {
-            companion_types.push("Audio");
-        }
-        if level_data.objects.iter().any(|o| o.vfx.is_some()) {
-            companion_types.push("Vfx");
-        }
-        // T90 v2: Inline mode stamps the SYSTEMS_SOURCE bodies
-        // verbatim. Those bodies reference the bookkeeping types
-        // by short name; the consumer's compile must resolve them.
-        // CompanionReference mode doesn't need them — the plugin
-        // already wires `add_message::<PickupEvent>()` etc. internally.
-        if systems_mode == SystemsMode::Inline {
-            // Always import the bookkeeping types we always use
-            // whenever Inline mode fires (the plugin registers
-            // them even with an empty marker set).
+        if systems_mode == SystemsMode::Inline && !marker_set.is_empty() {
+            // T90 v2: `SYSTEMS_SOURCE` stamps every reference system's
+            // body verbatim and unconditionally — it isn't gated
+            // internally by `marker_set`, only which systems get
+            // *registered* is (`emit_systems_registration`). So every
+            // type any stamped function body references by short name
+            // must be in scope regardless of which markers this level
+            // actually uses. A previous version of this branch gated
+            // the import list by individual marker flags, which left
+            // `Door` / `Open` / `Collectible` / `NavMeshHint`
+            // (referenced unconditionally by `door_proximity_open` /
+            // `collectible_pickup` / `nav_mesh_collector`) unimported
+            // in every Inline export, and the rest missing whenever
+            // their specific marker was absent — always a compile
+            // error (E0433) the moment Inline mode was used.
             companion_types.extend_from_slice(&[
+                "SpawnPoint",
+                "TriggerVolume",
+                "Light",
+                "Animation",
+                "Audio",
+                "Vfx",
+                "Door",
+                "Open",
+                "Collectible",
+                "NavMeshHint",
+                "Player",
+                "PickupEvent",
+                "TriggerActivated",
+                "AudioStartEvent",
+                "AudioEndEvent",
                 "PlayerStart",
                 "NavMeshSource",
                 "Lights",
                 "Animations",
                 "VfxEntries",
             ]);
-            if marker_set.door || marker_set.collectible {
-                companion_types.push("PickupEvent");
+        } else {
+            if level_data.objects.iter().any(|o| o.spawn_point.is_some()) {
+                companion_types.push("SpawnPoint");
             }
-            if marker_set.trigger_volume {
-                companion_types.push("TriggerActivated");
+            if level_data
+                .objects
+                .iter()
+                .any(|o| o.trigger_volume.is_some())
+            {
+                companion_types.push("TriggerVolume");
             }
-            if marker_set.audio {
-                companion_types.push("AudioStartEvent");
-                companion_types.push("AudioEndEvent");
+            if level_data.objects.iter().any(|o| o.light.is_some()) {
+                companion_types.push("Light");
             }
-            // Player is referenced by `door_proximity_open` and
-            // `collectible_pickup` — import it when either marker
-            // is present.
-            if marker_set.door || marker_set.collectible {
-                companion_types.push("Player");
+            if level_data.objects.iter().any(|o| o.animation.is_some()) {
+                companion_types.push("Animation");
+            }
+            if level_data.objects.iter().any(|o| o.audio.is_some()) {
+                companion_types.push("Audio");
+            }
+            if level_data.objects.iter().any(|o| o.vfx.is_some()) {
+                companion_types.push("Vfx");
             }
         }
         if !companion_types.is_empty() {
