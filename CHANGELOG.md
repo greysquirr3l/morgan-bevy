@@ -1298,6 +1298,12 @@ nursery + -D unwrap_used/expect_used/panic/indexing_slicing +
     rollback below) Scoop manifest also claims an `arm64` release
     asset the CI build matrix never produces.
 
+- **`cargo fmt` across both Rust crates** (commit `2a4bce3`). No CI
+  gate runs `cargo fmt --check`, so formatting had drifted in 12
+  files across both crates. Whitespace/line-wrap only — no logic
+  changes; `cargo test` (146/146) and the CI clippy profile both
+  pass unchanged after formatting.
+
 ### Removed / Reverted
 
 - **T72 — Distribution packaging** (rolled back per user request on
