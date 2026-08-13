@@ -912,13 +912,105 @@ clippy::pedantic -W clippy::nursery` is clean for the T93 files.
     unrelated to these fixes; 4 eliminated by the audit
     cleanups).
 
-### Added — Pre-audit patch batch (T92–T98 + orphan / clippy cleanup)
+### Fixed — Post-audit patch batch
 
-A series of focused fixes and features that landed between T90 and the
-broad-scope `6e3dbd9` audit. Each is captured in its own commit;
-the audit fixes the user-facing surface, but these commits shipped
-the wiring and quality-of-life work that the audit findings later
-depended on.
+Two follow-up commits after the audit landed that fixed real
+integration bugs the audit itself surfaced but didn't fully
+close:
+
+- **T55 — Global lighting rig round-trips into exports**
+  (commit `a41bbd6`). The T55 `lights` array never made it
+  into any export payload — `buildLevelExportPayload` walked
+  the scene objects but never read `state.lights`. Added
+  `LightRigEntry` / `LightRigExport` shapes; both export
+  payload paths now include the rig; the ExportPanel
+  "Lighting" sub-tab lists them in the manifest preview.
+  Closes the residual gap where the lighting panel was wired
+  but the exporter ignored it (cf. Critical #7 which fixed
+  the viewport side).
+
+- **ExportPanel option checkboxes were inert** (commit
+  `a41bbd6`). "Include Metadata" / "Include Generation Data" /
+  "Optimize for Size" toggled `useState` but the values never
+  reached the Rust side — the serde `DefaultOptions` silently
+  dropped unknown fields on the generated `LevelData` struct,
+  so passing extra `invoke()` args had no effect. Added
+  `applyExportOptions(level, options)` client-side that filters
+  the payload to what the Rust struct's serde attributes allow,
+  rather than relying on the consumer to honour the flags.
+
+- **PrefabManager break-prefab mis-categorized lights / groups**
+  (commit `a41bbd6`). `addObject(type: 'mesh', position)` hard-
+  coded `'mesh'` regardless of the prefab object's actual type,
+  silently miscategorizing every broken light / group as a mesh.
+  Reads the prefab object's type and passes it through;
+  persists `prefabInstanceId` on break so broken objects still
+  track the source prefab.
+
+- **Defense-in-depth lock checks at the editorStore boundary**
+  (commit `a41bbd6`). Beyond the existing call-site checks in
+  `DeleteObjectCommand` / `DuplicateCommand`, added a second
+  guard at the store's `remove / duplicate` / transform actions
+  so a future caller can't slip a locked object past the lock
+  via a different code path.
+
+- **updateObjectTransform clones input arrays** (commit
+  `a41bbd6`). Previously aliased the caller's `position /
+rotation / scale` arrays, which means a later UI update would
+  silently mutate the prior frame's array — visible as a
+  flicker on slider release.
+
+- **BoxSelection drag-select on InstancedMesh** (commit
+  `a41bbd6`). Past the instancing threshold, raycaster hits
+  returned `instanceId`, not `objectId`; the drag-rectangle
+  branch dropped the selection. Resolve `instanceId` →
+  `ObjectId` via position match against the per-mesh
+  visibility table.
+
+- **App.tsx startup-recovery bug** (commit `a41bbd6`). The
+  autosave recovery path had a bare `return` inside a try
+  block that could permanently stick the editor on "Loading
+  Morgan-Bevy..." for any stale / corrupt autosave blob. Wrapped
+  with explicit fall-through.
+
+- **App.tsx fallback theme `tileDefinition.mesh?.mesh_type`
+  null guard** (commit `a41bbd6`). The fallback theme had a
+  `mesh: null` shape; the un-`?.` access crashed every paint
+  tile render on web preview / offline runs.
+
+- **KeyboardShortcutsModal category dropdown** (commit
+  `a41bbd6`). The category select had drifted from the
+  rendered groups (Major #14 only fixed the list). Now derives
+  its `<option>` set from the same `shortcutGroups` array the
+  list renders.
+
+- **useMeasurementTool clears `current` on remove** (commit
+  `a41bbd6`). `removeById` only cleared the history entry;
+  the in-progress overlay still showed the last measurement.
+  Now also clears `current` so the overlay disappears.
+
+- **Tutorial getting-started step 1 spotlight** (commit
+  `a41bbd6`). The keypress validation asked for a shortcut
+  while the spotlight was on the File-menu button — the global
+  hook never saw it. Spotlight the viewport instead, matching
+  the procedural-generation tutorial's keypress step.
+
+- **T90 v2 Inline mode never compiled** (commit `9de911b`).
+  `emit_companion_type_imports` gated the `use
+bevy_morgan_integration` import list per marker — so every
+  Inline-mode export compiled with `Door` / `Open` /
+  `Collectible` / `NavMeshHint` (etc.) referenced but never
+  imported, surfacing as `E0433 unresolved-type`. The
+  Registration gating in `emit_systems_registration` is
+  unaffected; we just always import the full fixed companion
+  type set whenever Inline mode fires. Unused stamped
+  functions produce a harmless `dead_code` warning in the
+  consumer's project. No existing test caught this because
+  every Inline-mode assertion checked substring presence, not
+  compilability.
+  the audit fixes the user-facing surface, but these commits shipped
+  the wiring and quality-of-life work that the audit findings later
+  depended on.
 
 - **T92 — Viewport blank-screen diagnostic + clear colour** —
   a fresh launch with no scene objects rendered as opaque
