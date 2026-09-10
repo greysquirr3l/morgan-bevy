@@ -91,12 +91,7 @@ confidence-threshold = 0.8
 
 [bans]
 multiple-versions = "warn"
-# `wildcards` downgraded from `deny` → `warn` so the
-# proc-macro-error transitive wildcard pulled in via taiki-e
-# dev-deps doesn't sink CI. The crate is dev-only (RUSTSEC-2024-0370)
-# and only used at build time. Promote back to `deny` once
-# taiki-e/{...} pins to a specific proc-macro-error version.
-wildcards = "warn"
+wildcards = "deny"
 highlight = "all"
 allow = []
 deny = [

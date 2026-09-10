@@ -43,8 +43,10 @@ rayon = "1.8"  # For parallel asset scanning
 # `systems_inline` module exposes `SYSTEMS_SOURCE` as a `&'static str`
 # constant; we `push_str` it into the generated Bevy file at emit
 # time. Path dependency (not a published crate) so the editor and
-# companion crate evolve in lockstep.
-bevy-morgan-integration = { path = "../crates/bevy-morgan-integration" }
+# companion crate evolve in lockstep. `version` is explicit so
+# cargo-deny's `[bans] wildcards = "deny"` policy does not flag
+# the path-only reference as an unbounded version constraint.
+bevy-morgan-integration = { path = "../crates/bevy-morgan-integration", version = "0.5.0" }
 
 # BSP and procedural generation
 petgraph = "0.6"
