@@ -64,6 +64,23 @@ jobs:
       - name: Install dependencies
         run: npm ci --no-audit --no-fund
 
+      # The `cargo-deny.sh.test.ts` integration test spawns the
+      # cargo-deny CLI. Install it alongside the frontend test runner
+      # so the test doesn't fail with `no such command: deny` on a
+      # runner that has no other Rust CI step.
+      #
+      # `taiki-e/install-action@v1`'s bare `tool: cargo-deny` resolves
+      # to cargo-deny 0.13.5 (the version frozen into the action's
+      # lookup table). That release uses an older spdx crate that
+      # rejects `Unicode-3.0` as "unknown term". Pin to 0.20.2 (matches
+      # our local development baseline) using the action's `@version`
+      # suffix syntax — the action does NOT accept a separate `version:`
+      # input.
+      - name: Install cargo-deny (frontend test dependency)
+        uses: taiki-e/install-action@v1
+        with:
+          tool: cargo-deny@0.20.2
+
       - name: Lint
         run: npm run lint
 
@@ -98,6 +115,26 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      # Tauri requires WebKitGTK + GLib system libraries on Linux.
+      # Without this step, `cargo build` fails inside `glib-sys`'s
+      # build script (`pkg-config: Package glib-2.0 was not found`).
+      # macOS and Windows runners ship the equivalent libraries
+      # pre-installed, so this step is Ubuntu-only.
+      - name: Install Tauri Linux system dependencies
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            build-essential \
+            curl \
+            wget \
+            file \
+            libxdo-dev \
+            libssl-dev \
+            libayatana-appindicator3-dev \
+            librsvg2-dev
+
       - name: Setup Rust toolchain
         uses: dtolnay/rust-toolchain@stable
 
@@ -106,15 +143,40 @@ jobs:
         with:
           workspaces: src-tauri -> target
 
+      # `tauri::generate_context!()` validates `tauri.conf.json`'s
+      # `build.frontendDist` at compile time and panics if the path
+      # is missing. The frontend build produces `dist/` in the
+      # `frontend` job, but it doesn't run here. A minimal stub
+      # satisfies the macro without forcing a job-to-job dependency.
+      - name: Stub dist/ for tauri::generate_context!()
+        run: |
+          mkdir -p dist
+          echo '<!DOCTYPE html><title>morgan-bevy build artifact stub</title>' > dist/index.html
+
       - name: Install cargo-deny (prebuilt)
         # Prebuilt binary is ~10x faster than `cargo install --locked`
         # and avoids pulling a second Rust toolchain into the runner.
-        # taiki-e/install-action uses `tool:` (not `version:`) — the
-        # latest release is fetched automatically. Pinned to a
-        # major tag so Renovate can bump it.
+        #
+        # IMPORTANT: pin the version in the `tool:` string. The action
+        # does NOT accept a separate `version:` input. Without the
+        # `@0.20.2` suffix, this action's frozen lookup table
+        # resolves `tool: cargo-deny` to 0.13.5, whose older `spdx`
+        # crate rejects `Unicode-3.0` as an "unknown term" and
+        # breaks deny.toml validation.
+        #
+        # On Windows runners the install-action's bash entry-point
+        # fails (`Command failed: bash --noprofile --norc ... main.sh`).
+        # Fall back to `cargo install` on Windows only — slower
+        # (~60s for the build) but reliable.
+        if: matrix.os != 'windows-latest'
         uses: taiki-e/install-action@v1
         with:
-          tool: cargo-deny
+          tool: cargo-deny@0.20.2
+
+      - name: Install cargo-deny (cargo fallback for Windows)
+        if: matrix.os == 'windows-latest'
+        shell: bash
+        run: cargo install cargo-deny --locked
 
       - name: cargo check
         run: cargo check --manifest-path src-tauri/Cargo.toml --all-targets

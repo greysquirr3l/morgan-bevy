@@ -25,7 +25,7 @@ class StubResizeObserver {
   unobserve() {}
   disconnect() {}
 }
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+ 
 globalThis.ResizeObserver = StubResizeObserver as unknown as any
 
 Object.defineProperty(window, 'matchMedia', {
@@ -64,7 +64,7 @@ function stubCanvasContext() {
     measureText: () => ({ width: 0 }) as TextMetrics,
   }
   const originalGetContext = HTMLCanvasElement.prototype.getContext
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+   
   type GetContextFn = typeof HTMLCanvasElement.prototype.getContext
   const stubbed: GetContextFn = function getContext(
     this: HTMLCanvasElement,
@@ -113,20 +113,20 @@ const invokeMock = vi.fn(async (cmd: string, _args?: unknown) => {
   }
 })
 const transformCallbackMock = vi.fn(() => 1)
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+ 
 ;(globalThis as unknown as { __TAURI_INTERNALS__: unknown }).__TAURI_INTERNALS__ = {
   invoke: invokeMock,
   transformCallback: transformCallbackMock,
   metadata: { currentWindow: { label: 'main' }, currentWebview: { label: 'main' } },
   plugins: {},
 }
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+ 
 ;(
   globalThis as unknown as { __TAURI_EVENT_PLUGIN_INTERNALS__: unknown }
 ).__TAURI_EVENT_PLUGIN_INTERNALS__ = {
   unregisterListener: () => Promise.resolve(),
 }
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+ 
 ;(window as unknown as { __TAURI__: unknown }).__TAURI__ = {
   invoke: invokeMock,
   event: { listen: () => Promise.resolve(1), emit: () => Promise.resolve() },

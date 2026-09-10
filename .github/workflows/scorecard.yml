@@ -1,0 +1,87 @@
+# scorecard.yml
+#
+# Runs the OSSF Security Scorecard against this repository and uploads the
+# results to the repository's code-scanning dashboard and Security tab.
+#
+# Scorecard checks relevant to "main branch protection":
+#   - Branch-Protection (covered by repository-settings.yml)
+#   - Code-Review (covered by CODEOWNERS + required_pull_request_reviews)
+#   - Dangerous-Workflow (covered by shell-quoting rules in this file)
+#   - Dependency-Update-Tool (covered by dependabot.yml)
+#   - Pinned-Dependencies (every `uses:` below is pinned to a SHA)
+#   - Token-Permissions (least-privilege `permissions:` block)
+#
+# Triggers:
+#   - Weekly schedule (Mondays 04:00 UTC) — primary cadence
+#   - Push to main — surfaces regressions in the PR that introduced them
+#   - Manual dispatch — for ad-hoc audits
+
+name: scorecard
+
+on:
+  push:
+    branches: [main]
+  schedule:
+    # Mondays at 04:00 UTC. Scorecard upstream advisories publish
+    # mid-week, so Monday picks them up after one delay cycle.
+    - cron: '0 4 * * 1'
+  workflow_dispatch:
+
+# Least-privilege permissions for the Scorecard workflow.
+# - `id-token: write` is required by `upload-sarif` for OIDC keyless
+#   signing when publishing to the public OSSF scorecard viewer.
+# - `security-events: write` is required to upload SARIF to the
+#   code-scanning API.
+# - Everything else is denied by default — OSSF Scorecard "Token-
+#   Permissions" check passes when scope is minimized.
+permissions:
+  contents: read
+  actions: read
+  security-events: write
+  id-token: write
+
+jobs:
+  analysis:
+    name: Scorecard analysis
+    runs-on: ubuntu-latest
+    # No fork guard needed — `ossf/scorecard-action` already detects
+    # fork PRs and runs in a fork-safe mode (no secret access, SARIF
+    # still published to the fork's own code-scanning dashboard).
+    # An explicit `pull_request` trigger is also intentionally absent;
+    # the scorecard-on-PR use case is covered by the public
+    # api.securityscorecards.dev webhook integration instead.
+    steps:
+      - name: Checkout
+        # Pinned by SHA — current `actions/checkout@v4` floating tag.
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+
+      - name: Run OSSF Scorecard
+        # Pinned to a specific commit SHA per OSSF Pinned-Dependencies.
+        # Dependabot (see .github/dependabot.yml) bumps this. SHA
+        # resolves to upstream tag `v2.4.4`.
+        uses: ossf/scorecard-action@2d1146689b8cda280b9bc96326124645441f03bc # v2.4.4
+        with:
+          results_file: results.sarif
+          results_format: sarif
+          # Publish to the public OSSF viewer (api.securityscorecards.dev).
+          # Set to `false` for private repos.
+          publish_results: true
+
+      - name: Upload SARIF to code-scanning
+        if: always()
+        # Pinned by SHA — current `github/codeql-action@v3` floating tag.
+        uses: github/codeql-action/upload-sarif@faaca9a8f6edddba5725ffe5adefdab6669a2eca # v3.38.0
+        with:
+          sarif_file: results.sarif
+          category: scorecard
+
+      - name: Upload artifact
+        if: always()
+        # Pinned by SHA — current `actions/upload-artifact@v4` floating tag.
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: scorecard-results
+          path: results.sarif
+          retention-days: 30

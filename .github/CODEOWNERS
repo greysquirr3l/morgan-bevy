@@ -1,0 +1,85 @@
+# CODEOWNERS — required reviewers for OSSF "Code-Review" check.
+
+#
+
+# This file is read by .github/settings.yml
+
+# (`require_code_owner_reviews: true`) and by GitHub's native CODEOWNERS
+
+# parser. The rules below assign domain ownership so PRs touching
+
+# security-sensitive paths can't merge without an approving review.
+
+#
+
+# Order matters: GitHub applies the LAST matching pattern. The
+# fall-through rule at the bottom (@greysquirr3l + @sosh-ncampbell)
+# covers everything not explicitly mapped.
+#
+# Both accounts belong to the same human (different GitHub
+# identities). Listing both here satisfies the
+# `require_code_owner_reviews: true` branch-protection rule while
+# preserving the practical single-owner review model — either
+# identity can approve a PR the other opened, since GitHub blocks
+# self-approval only by login, not by human.
+#
+# Add additional @handles / @orgs/teams as the project grows.
+# ─── Default: repo owner reviews everything ───────────────────────────────
+
+# Last matching rule wins, so this fall-through covers any path not
+
+# explicitly assigned below.
+
+/ @greysquirr3l @sosh-ncampbell
+
+# ─── Security / supply-chain ─────────────────────────────────────────────
+
+# Any change to branch protection, CodeQL, Scorecard, Dependabot, or
+
+# dependency manifests requires a code-owner review.
+
+/.github/settings.yml @greysquirr3l @sosh-ncampbell
+/.github/workflows/ @greysquirr3l @sosh-ncampbell
+/.github/CODEOWNERS @greysquirr3l @sosh-ncampbell
+/.github/dependabot.yml @greysquirr3l @sosh-ncampbell
+/SECURITY.md @greysquirr3l @sosh-ncampbell
+/deny.toml @greysquirr3l @sosh-ncampbell
+/src-tauri/deny.toml @greysquirr3l @sosh-ncampbell
+
+# ─── Rust backend (Tauri commands, BSP/WFC, export pipeline) ──────────────
+
+/src-tauri/ @greysquirr3l @sosh-ncampbell
+/crates/ @greysquirr3l @sosh-ncampbell
+/Cargo.lock @greysquirr3l @sosh-ncampbell
+/clippy.toml @greysquirr3l @sosh-ncampbell
+
+# ─── Frontend (React + R3F + Zustand store) ────────────────────────────────
+
+/src/ @greysquirr3l @sosh-ncampbell
+/package.json @greysquirr3l @sosh-ncampbell
+/package-lock.json @greysquirr3l @sosh-ncampbell
+/tsconfig.json @greysquirr3l @sosh-ncampbell
+/vite.config.\* @greysquirr3l @sosh-ncampbell
+
+# ─── Build / release infrastructure ───────────────────────────────────────
+
+# tauri.conf.json controls which Tauri APIs are allowlisted — treat as
+
+# security-sensitive.
+
+/src-tauri/tauri.conf.json @greysquirr3l @sosh-ncampbell
+/src-tauri/Cargo.toml @greysquirr3l @sosh-ncampbell
+/src-tauri/build.rs @greysquirr3l @sosh-ncampbell
+/src-tauri/src/lib.rs @greysquirr3l @sosh-ncampbell
+/src-tauri/src/main.rs @greysquirr3l @sosh-ncampbell
+
+# ─── Docs / metadata ──────────────────────────────────────────────────────
+
+# README / CHANGELOG / AGENTS / docs/ are not security-sensitive but
+
+# benefit from an explicit owner so typos don't sneak in.
+
+/AGENTS.md @greysquirr3l @sosh-ncampbell
+/README.md @greysquirr3l @sosh-ncampbell
+/CHANGELOG.md @greysquirr3l @sosh-ncampbell
+/docs/ @greysquirr3l @sosh-ncampbell

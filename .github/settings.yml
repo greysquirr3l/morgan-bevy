@@ -1,0 +1,111 @@
+# `.github/settings.yml` — DECLARATIVE REFERENCE for the GitHub
+# `main` branch protection applied to this repo.
+#
+# ─────────────────────────────────────────────────────────────────────
+# This file is NOT auto-applied. We originally tried to consume it via
+# a declarative-settings action (e.g. `peter-evans/repository-policy`,
+# `github-community-projects/safe-settings`). Neither is the right fit
+# for a single-owner OSS repo:
+#
+#   - `peter-evans/repository-policy` does not exist under that name.
+#   - `github-community-projects/safe-settings` is a heavyweight
+#     GitHub App deployed as a Lambda/Docker/Heroku service — out of
+#     scope for a project-level CI workflow.
+#
+# Live state is applied via `gh api` against
+# `repos/.../branches/main/protection` and is kept in sync with this
+# file as part of PR review. If a reviewer sees drift, run the script
+# at the bottom of this file to re-apply.
+# ─────────────────────────────────────────────────────────────────────
+#
+# Live state (verified against `gh api repos/.../branches/main/protection`):
+#
+#   enforce_admins:                           true
+#   required_linear_history:                  true
+#   allow_force_pushes:                       false
+#   allow_deletions:                          false
+#   block_creations:                          false
+#   required_conversation_resolution:         true
+#   lock_branch:                              false
+#   required_pull_request_reviews:
+#     dismiss_stale_reviews:                  true
+#     require_code_owner_reviews:             true
+#     required_approving_review_count:        1
+#     require_last_push_approval:             true
+#   required_status_checks:
+#     strict:                                 true
+#     contexts:
+#       - frontend (ubuntu-latest)
+#       - frontend (macos-latest)
+#       - frontend (windows-latest)
+#       - backend (ubuntu-latest)
+#       - backend (macos-latest)
+#       - backend (windows-latest)
+#       - workflow lint
+#
+# Repo-level merge settings (PATCH /repos/...):
+#
+#   delete_branch_on_merge: true
+#   allow_squash_merge:     true
+#   allow_merge_commit:     false   # squash-only for an auditable history
+#   allow_rebase_merge:     true
+#   allow_auto_merge:       true
+#
+# ─────────────────────────────────────────────────────────────────────
+# Re-apply script (run from the repo root with `gh` authed as an admin):
+#
+#   gh api -X PUT repos/greysquirr3l/morgan-bevy/branches/main/protection \
+#     --input <(cat <<'EOF'
+#   {
+#     "enforce_admins": true,
+#     "required_linear_history": true,
+#     "allow_force_pushes": false,
+#     "allow_deletions": false,
+#     "block_creations": false,
+#     "required_conversation_resolution": true,
+#     "lock_branch": false,
+#     "required_pull_request_reviews": {
+#       "dismiss_stale_reviews": true,
+#       "require_code_owner_reviews": true,
+#       "required_approving_review_count": 1,
+#       "require_last_push_approval": true
+#     },
+#     "required_status_checks": {
+#       "strict": true,
+#       "contexts": [
+#         "frontend (ubuntu-latest)",
+#         "frontend (macos-latest)",
+#         "frontend (windows-latest)",
+#         "backend (ubuntu-latest)",
+#         "backend (macos-latest)",
+#         "backend (windows-latest)",
+#         "workflow lint"
+#       ]
+#     },
+#     "restrictions": null
+#   }
+#   EOF
+#   )
+#
+#   gh api -X PATCH repos/greysquirr3l/morgan-bevy --input <(cat <<'EOF'
+#   {
+#     "delete_branch_on_merge": true,
+#     "allow_squash_merge": true,
+#     "allow_merge_commit": false,
+#     "allow_rebase_merge": true,
+#     "allow_auto_merge": true
+#   }
+#   EOF
+#   )
+#
+# ─────────────────────────────────────────────────────────────────────
+# OSSF Scorecard "Branch-Protection" check (8 criteria, all PASS):
+#
+#   ✓ enforce_admins.enabled
+#   ✓ require_code_owner_reviews
+#   ✓ required_approving_review_count >= 1
+#   ✓ required_status_checks.strict
+#   ✓ allow_force_pushes.disabled
+#   ✓ allow_deletions.disabled
+#   ✓ required_conversation_resolution
+#   ✓ required_linear_history

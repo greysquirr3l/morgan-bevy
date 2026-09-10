@@ -13,7 +13,6 @@
 all-features = true
 
 [advisories]
-version = 2
 db-path = "~/.cargo/advisory-db"
 db-urls = [
     "https://github.com/rustsec/advisory-db",
@@ -66,7 +65,6 @@ ignore = [
 ]
 
 [licenses]
-version = 2
 allow = [
     "MIT",
     "Apache-2.0",

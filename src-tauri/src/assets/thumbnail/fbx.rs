@@ -317,14 +317,22 @@ fn harvest_vertices_in_subtree(
 fn expand_aabb_from_doubles(aabb: &mut Aabb, data: &[u8]) {
     // FBX stores Vertices as a flat `x, y, z, x, y, z, ...` array
     // of doubles. We iterate in groups of 8-byte chunks, then
-    // take three at a time (x, y, z). `chunks_exact(8)` + `try_into`
-    // avoids the `triple[0..8]` slice indexing that trips
-    // `clippy::indexing_slicing`.
-    for triple in data.chunks_exact(24).map(|c| c.chunks_exact(8)) {
-        let mut iter = triple.map(|c| c.try_into().ok().map(f64::from_le_bytes));
-        let Some(Some(x)) = iter.next() else { continue };
-        let Some(Some(y)) = iter.next() else { continue };
-        let Some(Some(z)) = iter.next() else { continue };
+    // take three at a time (x, y, z). `as_chunks::<N>` (stabilised
+    // in Rust 1.79) replaces `chunks_exact(N)` and avoids the
+    // `triple[0..8]` slice indexing that trips
+    // `clippy::indexing_slicing`. clippy::manual_chunked (nursery)
+    // flags `chunks_exact` with a constant chunk size as redundant.
+    for triple in data.as_chunks::<24>().0 {
+        // `as_chunks` on the inner `[u8; 24]` array returns three
+        // `&[u8; 8]` sub-chunks — only the first three are used
+        // (x, y, z), the rest is padding.
+        let mut sub = triple.as_chunks::<8>().0.iter();
+        let Some(&x_bytes) = sub.next() else { continue };
+        let Some(&y_bytes) = sub.next() else { continue };
+        let Some(&z_bytes) = sub.next() else { continue };
+        let x = f64::from_le_bytes(x_bytes);
+        let y = f64::from_le_bytes(y_bytes);
+        let z = f64::from_le_bytes(z_bytes);
         if x.is_finite() && y.is_finite() && z.is_finite() {
             // `as f32` is intentional: f64→f32 loses the low 32 bits
             // of the double, but the bbox only needs the order of

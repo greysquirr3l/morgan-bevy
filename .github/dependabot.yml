@@ -1,0 +1,134 @@
+# dependabot.yml
+#
+# OSSF Scorecard "Dependency-Update-Tool" check passes when the repo
+# has a working Dependabot / Renovate config that produces PRs.
+#
+# Covers three ecosystems:
+#   - npm         — frontend (package.json + package-lock.json)
+#   - cargo       — Rust backend (src-tauri/Cargo.toml + workspace crates/)
+#   - github-actions — keeps SHA-pinned actions current
+#
+# Conventions:
+#   - Patch + minor updates land on a weekly cadence (low noise)
+#   - Major updates are separated so they're reviewed in isolation
+#   - PRs land against the protected `main` branch and require a code-
+#     owner review per CODEOWNERS + settings.yml
+#   - `@greysquirr3l` is the only reviewer today; add teams as the
+#     project grows.
+
+version: 2
+
+# YAML anchor — referenced via `<<: *common` in each update entry below.
+# Dependabot v2 schema does not allow shared defaults under `updates:`
+# (that key must be a list), so we factor the common keys into an
+# anchor and merge them into each entry. Single source of truth for
+# labels + PR-limit across all ecosystems.
+_common: &common
+  # Open at most 10 PRs at a time across all ecosystems — keeps the
+  # queue reviewable.
+  open-pull-requests-limit: 10
+  # Apply the `dependencies` label so review tooling can find these PRs.
+  labels:
+    - dependencies
+
+updates:
+  # ─── npm (frontend) ─────────────────────────────────────────────────────
+  - package-ecosystem: 'npm'
+    directory: '/'
+    schedule:
+      interval: 'weekly'
+      day: 'monday'
+      time: '06:00'
+      timezone: 'UTC'
+    # Group patch+minor React/Ecosystem deps so we don't drown in
+    # single-line PRs; majors stay separate for visibility.
+    groups:
+      react-and-r3f:
+        patterns:
+          - 'react*'
+          - '@react-three/*'
+          - '@types/react*'
+        update-types:
+          - 'minor'
+          - 'patch'
+      tauri-sdk:
+        patterns:
+          - '@tauri-apps/*'
+        update-types:
+          - 'minor'
+          - 'patch'
+      dev-tooling:
+        patterns:
+          - 'vitest'
+          - 'eslint*'
+          - '@typescript-eslint/*'
+          - 'prettier'
+          - 'typescript'
+          - 'vite'
+          - '@vitejs/*'
+        update-types:
+          - 'minor'
+          - 'patch'
+    # Major npm updates are NOT in the groups above; they emit alone.
+    commit-message:
+      prefix: 'deps'
+      prefix-development: 'deps(dev)'
+      include: 'scope'
+    <<: *common
+
+  # ─── Cargo (Rust backend) ───────────────────────────────────────────────
+  - package-ecosystem: 'cargo'
+    directory: '/src-tauri'
+    schedule:
+      interval: 'weekly'
+      day: 'tuesday'
+      time: '06:00'
+      timezone: 'UTC'
+    # cargo-deny runs on every PR (see ci.yml) and will flag license/
+    # advisory regressions introduced by dependency bumps.
+    groups:
+      tauri-and-plugins:
+        patterns:
+          - 'tauri*'
+          - 'tauri-plugin-*'
+        update-types:
+          - 'minor'
+          - 'patch'
+      proc-gen-and-export:
+        patterns:
+          - 'bevy*'
+          - 'gltf'
+          - 'fbx'
+          - 'ron'
+          - 'serde*'
+          - 'rusqlite*'
+          - 'tokio*'
+          - 'rayon'
+        update-types:
+          - 'minor'
+          - 'patch'
+    commit-message:
+      prefix: 'deps(rust)'
+      include: 'scope'
+    <<: *common
+
+  # ─── GitHub Actions (keeps SHA pins current) ───────────────────────────
+  # Per OSSF "Pinned-Dependencies", all `uses:` references should be
+  # SHA-pinned. This Dependabot config bumps those SHAs when upstream
+  # tags move. Workflows that genuinely need to bump majors (e.g.
+  # actions/checkout v4 → v5) must be edited manually because GitHub
+  # Actions SHA bumps alone don't follow major-version jumps.
+  - package-ecosystem: 'github-actions'
+    directory: '/'
+    schedule:
+      interval: 'weekly'
+      day: 'wednesday'
+      time: '06:00'
+      timezone: 'UTC'
+    commit-message:
+      prefix: 'ci'
+    # Ignore tauri-action — its major versions deliberately don't auto-
+    # bump because target matrix changes are coupled with code changes.
+    ignore:
+      - dependency-name: 'tauri-apps/tauri-action'
+    <<: *common

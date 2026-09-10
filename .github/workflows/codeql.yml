@@ -1,0 +1,70 @@
+# codeql.yml
+#
+# GitHub CodeQL SAST scan. CodeQL is the OSSF-recommended static-analysis
+# engine for the "SAST" Scorecard check.
+#
+# Languages in scope:
+#   - `javascript-typescript` — covers React/TS frontend
+#   - `rust` — covers the Tauri backend (BSP/WFC generators, asset DB,
+#     export pipeline). CodeQL's Rust support is in beta but covers
+#     enough taint/dataflow patterns to be worth running.
+#
+# Triggers:
+#   - Push to main — analyze each merged change
+#   - Weekly schedule — pick up new CodeQL rules between pushes
+#   - Manual dispatch
+
+name: codeql
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    # Wednesdays 05:00 UTC. CodeQL packs publish Tuesday-ish.
+    - cron: '0 5 * * 3'
+  workflow_dispatch:
+
+permissions:
+  # CodeQL needs security-events:write to upload SARIF and
+  # actions:read for the standard init step. Everything else denied.
+  contents: read
+  actions: read
+  security-events: write
+
+jobs:
+  analyze:
+    name: Analyze (${{ matrix.language }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - language: javascript-typescript
+            build-mode: none
+          - language: rust
+            # `none` for Rust because we don't build — CodeQL extracts
+            # the source tree directly. Cargo-based build isn't
+            # supported by CodeQL Rust analysis yet.
+            build-mode: none
+    steps:
+      - name: Checkout
+        # Pinned by SHA — current `actions/checkout@v4` floating tag.
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+
+      - name: Initialize CodeQL
+        # Pinned by SHA — current `github/codeql-action@v3` floating tag.
+        uses: github/codeql-action/init@faaca9a8f6edddba5725ffe5adefdab6669a2eca # v3.38.0
+        with:
+          languages: ${{ matrix.language }}
+          build-mode: ${{ matrix.build-mode }}
+          queries: security-and-quality
+
+      - name: Perform CodeQL Analysis
+        # Pinned by SHA — current `github/codeql-action@v3` floating tag.
+        uses: github/codeql-action/analyze@faaca9a8f6edddba5725ffe5adefdab6669a2eca # v3.38.0
+        with:
+          category: /language:${{ matrix.language }}
