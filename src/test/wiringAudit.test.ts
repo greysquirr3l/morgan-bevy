@@ -19,8 +19,14 @@
  * catches.
  */
 import { readdirSync, readFileSync } from 'node:fs'
-import { join } from 'node:path'
+import { basename, join, relative } from 'node:path'
 import { describe, expect, it } from 'vitest'
+
+// Cross-platform path helper. `listFiles` returns OS-native paths
+// (`\` on Windows, `/` elsewhere). All comparisons and reported
+// locations normalize to forward slashes so this audit produces
+// stable output on every runner.
+const relPath = (p: string): string => relative(process.cwd(), p).replace(/\\/g, '/')
 
 const srcDir = join(process.cwd(), 'src')
 const mainRs = join(process.cwd(), 'src-tauri', 'src', 'main.rs')
@@ -99,7 +105,7 @@ function findUnusedExports(files: string[]): Finding[] {
         findings.push({
           category: 'unused-export',
           name,
-          location: file.replace(`${process.cwd()}/`, ''),
+          location: relPath(file),
           severity: 'low',
         })
       }
@@ -200,8 +206,10 @@ function findUnusedHooks(): Finding[] {
   const findings: Finding[] = []
   for (const file of files) {
     // Hook name = filename without extension + camelCase from
-    // `useSomething`. Strip the `.ts`.
-    const name = file.replace(hooksDir + '/', '').replace(/\.ts$/, '')
+    // `useSomething`. Use `basename` instead of a manual `.replace`
+    // because `join` uses `\` on Windows — a literal
+    // `hooksDir + '/'` doesn't match the OS-native path.
+    const name = basename(file, '.ts')
     // Hooks are used via identifier reference, not call expression.
     // `useFoo` is referenced as `useFoo()` or `const x = useFoo()`
     // anywhere in src/.
@@ -214,7 +222,7 @@ function findUnusedHooks(): Finding[] {
       findings.push({
         category: 'unused-hook',
         name,
-        location: file.replace(`${process.cwd()}/`, ''),
+        location: relPath(file),
         severity: 'medium',
       })
     }

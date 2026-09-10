@@ -62,6 +62,13 @@ function rel(p: string): string {
   return p.replace(`${process.cwd()}/`, '')
 }
 
+// `listFiles` returns OS-native paths — `\` on Windows, `/` elsewhere.
+// Normalize to forward slashes for the self-exclusion check so the
+// audit doesn't self-match when run on a Windows runner.
+function isSelf(p: string): boolean {
+  return p.replace(/\\/g, '/').endsWith(AUDIT_SELF)
+}
+
 // Strict: a real injection vector. We exclude the audit's own test
 // file so it doesn't self-match (the audit mentions the
 // `dangerouslySetInnerHTML` token in a comment).
@@ -71,7 +78,7 @@ describe('T87 security audit: frontend dangerous DOM APIs', () => {
   it('contains no dangerouslySetInnerHTML', () => {
     const offenders: string[] = []
     for (const file of listFiles(srcDir, /\.(ts|tsx)$/)) {
-      if (file.endsWith(AUDIT_SELF)) continue
+      if (isSelf(file)) continue
       if (fileBody(file).includes('dangerouslySetInnerHTML')) {
         offenders.push(rel(file))
       }
@@ -82,7 +89,7 @@ describe('T87 security audit: frontend dangerous DOM APIs', () => {
   it('contains no eval() or new Function()', () => {
     const offenders: string[] = []
     for (const file of listFiles(srcDir, /\.(ts|tsx)$/)) {
-      if (file.endsWith(AUDIT_SELF)) continue
+      if (isSelf(file)) continue
       const b = fileBody(file)
       if (/\beval\s*\(/.test(b) || /\bnew\s+Function\s*\(/.test(b)) {
         offenders.push(rel(file))
@@ -94,7 +101,7 @@ describe('T87 security audit: frontend dangerous DOM APIs', () => {
   it('contains no raw innerHTML writes', () => {
     const offenders: string[] = []
     for (const file of listFiles(srcDir, /\.(ts|tsx)$/)) {
-      if (file.endsWith(AUDIT_SELF)) continue
+      if (isSelf(file)) continue
       const b = fileBody(file)
       // Match `.innerHTML =` (no React JSX wrapper). String
       // concatenation into innerHTML is the XSS vector.
