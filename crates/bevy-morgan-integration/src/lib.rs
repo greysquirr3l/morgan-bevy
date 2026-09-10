@@ -77,10 +77,14 @@ impl BoundingBox {
     /// Returns the center of the box as a `Vec3`.
     #[must_use]
     pub const fn center(&self) -> Vec3 {
+        // `f32::midpoint` (stabilised in Rust 1.85) avoids the
+        // overflow that `(min + max) / 2` can produce near
+        // `f32::MAX`. clippy::manual_midpoint enforces the
+        // stdlib-named version.
         Vec3::new(
-            (self.min[0] + self.max[0]) * 0.5,
-            (self.min[1] + self.max[1]) * 0.5,
-            (self.min[2] + self.max[2]) * 0.5,
+            f32::midpoint(self.min[0], self.max[0]),
+            f32::midpoint(self.min[1], self.max[1]),
+            f32::midpoint(self.min[2], self.max[2]),
         )
     }
 
