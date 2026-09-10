@@ -64,8 +64,11 @@ function fileBody(path: string): string {
 
 function isPublicSurface(file: string): boolean {
   // Pure type / schema files re-export through index.ts; flagging
-  // their members as "unused" produces noise.
-  return !/\/types\//.test(file) && !/\/schemas\//.test(file) && !/\/brand\./.test(file)
+  // their members as "unused" produces noise. Normalise the path
+  // separator first — the regex patterns assume forward slashes,
+  // but `listFiles` returns `\`-separated paths on Windows.
+  const normalised = file.replace(/\\/g, '/')
+  return !/\/types\//.test(normalised) && !/\/schemas\//.test(normalised) && !/\/brand\./.test(normalised)
 }
 
 /**
