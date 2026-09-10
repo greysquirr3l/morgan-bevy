@@ -106,11 +106,12 @@ impl Aabb {
             && mx2.is_finite()
             && mn2 <= mx2
     }
-    fn centre(self) -> [f32; 3] {
-        // `f32::midpoint` (stabilised in Rust 1.85) avoids the
-        // overflow that `(min + max) * 0.5` can produce near
+    const fn centre(self) -> [f32; 3] {
+        // `f32::midpoint` (const-stable since Rust 1.85) avoids
+        // the overflow that `(min + max) * 0.5` can produce near
         // `f32::MAX`. clippy::manual_midpoint enforces the
-        // stdlib-named version.
+        // stdlib-named version; clippy::missing_const_for_fn
+        // requires the function be `const`-able.
         [
             f32::midpoint(self.min[0], self.max[0]),
             f32::midpoint(self.min[1], self.max[1]),

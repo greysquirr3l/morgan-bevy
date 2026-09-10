@@ -327,15 +327,9 @@ fn expand_aabb_from_doubles(aabb: &mut Aabb, data: &[u8]) {
         // `&[u8; 8]` sub-chunks — only the first three are used
         // (x, y, z), the rest is padding.
         let mut sub = triple.as_chunks::<8>().0.iter();
-        let Some(Ok(x_bytes)) = sub.next().map(|c| <[u8; 8]>::try_from(*c)) else {
-            continue;
-        };
-        let Some(Ok(y_bytes)) = sub.next().map(|c| <[u8; 8]>::try_from(*c)) else {
-            continue;
-        };
-        let Some(Ok(z_bytes)) = sub.next().map(|c| <[u8; 8]>::try_from(*c)) else {
-            continue;
-        };
+        let Some(&x_bytes) = sub.next() else { continue };
+        let Some(&y_bytes) = sub.next() else { continue };
+        let Some(&z_bytes) = sub.next() else { continue };
         let x = f64::from_le_bytes(x_bytes);
         let y = f64::from_le_bytes(y_bytes);
         let z = f64::from_le_bytes(z_bytes);
