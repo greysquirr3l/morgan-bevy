@@ -13,24 +13,24 @@
 #
 
 # Order matters: GitHub applies the LAST matching pattern. The
-
-# fall-through rule at the bottom (@greysquirr3l) covers everything not
-
-# explicitly mapped.
-
+# fall-through rule at the bottom (@greysquirr3l + @sosh-ncampbell)
+# covers everything not explicitly mapped.
 #
-
-# Add additional @handles / @orgs/teams as the project grows; for now
-
-# the single-owner repo has @greysquirr3l as the sole approver.
-
+# Both accounts belong to the same human (different GitHub
+# identities). Listing both here satisfies the
+# `require_code_owner_reviews: true` branch-protection rule while
+# preserving the practical single-owner review model — either
+# identity can approve a PR the other opened, since GitHub blocks
+# self-approval only by login, not by human.
+#
+# Add additional @handles / @orgs/teams as the project grows.
 # ─── Default: repo owner reviews everything ───────────────────────────────
 
 # Last matching rule wins, so this fall-through covers any path not
 
 # explicitly assigned below.
 
-/ @greysquirr3l
+/ @greysquirr3l @sosh-ncampbell
 
 # ─── Security / supply-chain ─────────────────────────────────────────────
 
@@ -38,28 +38,28 @@
 
 # dependency manifests requires a code-owner review.
 
-/.github/settings.yml @greysquirr3l
-/.github/workflows/ @greysquirr3l
-/.github/CODEOWNERS @greysquirr3l
-/.github/dependabot.yml @greysquirr3l
-/SECURITY.md @greysquirr3l
-/deny.toml @greysquirr3l
-/src-tauri/deny.toml @greysquirr3l
+/.github/settings.yml @greysquirr3l @sosh-ncampbell
+/.github/workflows/ @greysquirr3l @sosh-ncampbell
+/.github/CODEOWNERS @greysquirr3l @sosh-ncampbell
+/.github/dependabot.yml @greysquirr3l @sosh-ncampbell
+/SECURITY.md @greysquirr3l @sosh-ncampbell
+/deny.toml @greysquirr3l @sosh-ncampbell
+/src-tauri/deny.toml @greysquirr3l @sosh-ncampbell
 
 # ─── Rust backend (Tauri commands, BSP/WFC, export pipeline) ──────────────
 
-/src-tauri/ @greysquirr3l
-/crates/ @greysquirr3l
-/Cargo.lock @greysquirr3l
-/clippy.toml @greysquirr3l
+/src-tauri/ @greysquirr3l @sosh-ncampbell
+/crates/ @greysquirr3l @sosh-ncampbell
+/Cargo.lock @greysquirr3l @sosh-ncampbell
+/clippy.toml @greysquirr3l @sosh-ncampbell
 
 # ─── Frontend (React + R3F + Zustand store) ────────────────────────────────
 
-/src/ @greysquirr3l
-/package.json @greysquirr3l
-/package-lock.json @greysquirr3l
-/tsconfig.json @greysquirr3l
-/vite.config.\* @greysquirr3l
+/src/ @greysquirr3l @sosh-ncampbell
+/package.json @greysquirr3l @sosh-ncampbell
+/package-lock.json @greysquirr3l @sosh-ncampbell
+/tsconfig.json @greysquirr3l @sosh-ncampbell
+/vite.config.\* @greysquirr3l @sosh-ncampbell
 
 # ─── Build / release infrastructure ───────────────────────────────────────
 
@@ -67,11 +67,11 @@
 
 # security-sensitive.
 
-/src-tauri/tauri.conf.json @greysquirr3l
-/src-tauri/Cargo.toml @greysquirr3l
-/src-tauri/build.rs @greysquirr3l
-/src-tauri/src/lib.rs @greysquirr3l
-/src-tauri/src/main.rs @greysquirr3l
+/src-tauri/tauri.conf.json @greysquirr3l @sosh-ncampbell
+/src-tauri/Cargo.toml @greysquirr3l @sosh-ncampbell
+/src-tauri/build.rs @greysquirr3l @sosh-ncampbell
+/src-tauri/src/lib.rs @greysquirr3l @sosh-ncampbell
+/src-tauri/src/main.rs @greysquirr3l @sosh-ncampbell
 
 # ─── Docs / metadata ──────────────────────────────────────────────────────
 
@@ -79,7 +79,7 @@
 
 # benefit from an explicit owner so typos don't sneak in.
 
-/AGENTS.md @greysquirr3l
-/README.md @greysquirr3l
-/CHANGELOG.md @greysquirr3l
-/docs/ @greysquirr3l
+/AGENTS.md @greysquirr3l @sosh-ncampbell
+/README.md @greysquirr3l @sosh-ncampbell
+/CHANGELOG.md @greysquirr3l @sosh-ncampbell
+/docs/ @greysquirr3l @sosh-ncampbell
