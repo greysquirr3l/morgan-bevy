@@ -69,16 +69,17 @@ jobs:
       # so the test doesn't fail with `no such command: deny` on a
       # runner that has no other Rust CI step.
       #
-      # `taiki-e/install-action@v1`'s default `tool: cargo-deny`
-      # resolves to cargo-deny 0.13.5 (the version frozen into the
-      # action's lookup table). That release uses an older spdx
-      # crate that rejects `Unicode-3.0` as "unknown term". Pin to
-      # 0.20.2 (matches our local development baseline).
+      # `taiki-e/install-action@v1`'s bare `tool: cargo-deny` resolves
+      # to cargo-deny 0.13.5 (the version frozen into the action's
+      # lookup table). That release uses an older spdx crate that
+      # rejects `Unicode-3.0` as "unknown term". Pin to 0.20.2 (matches
+      # our local development baseline) using the action's `@version`
+      # suffix syntax — the action does NOT accept a separate `version:`
+      # input.
       - name: Install cargo-deny (frontend test dependency)
         uses: taiki-e/install-action@v1
         with:
-          tool: cargo-deny
-          version: '0.20.2'
+          tool: cargo-deny@0.20.2
 
       - name: Lint
         run: npm run lint
@@ -155,13 +156,13 @@ jobs:
       - name: Install cargo-deny (prebuilt)
         # Prebuilt binary is ~10x faster than `cargo install --locked`
         # and avoids pulling a second Rust toolchain into the runner.
-        # taiki-e/install-action uses `tool:` (not `version:`) — the
-        # latest release is fetched automatically.
         #
-        # IMPORTANT: pin `version:` explicitly. Without it, this
-        # action's frozen lookup table resolves `tool: cargo-deny` to
-        # 0.13.5, whose older `spdx` crate rejects `Unicode-3.0` as
-        # an "unknown term" and breaks the deny.toml validation.
+        # IMPORTANT: pin the version in the `tool:` string. The action
+        # does NOT accept a separate `version:` input. Without the
+        # `@0.20.2` suffix, this action's frozen lookup table
+        # resolves `tool: cargo-deny` to 0.13.5, whose older `spdx`
+        # crate rejects `Unicode-3.0` as an "unknown term" and
+        # breaks deny.toml validation.
         #
         # On Windows runners the install-action's bash entry-point
         # fails (`Command failed: bash --noprofile --norc ... main.sh`).
@@ -170,8 +171,7 @@ jobs:
         if: matrix.os != 'windows-latest'
         uses: taiki-e/install-action@v1
         with:
-          tool: cargo-deny
-          version: '0.20.2'
+          tool: cargo-deny@0.20.2
 
       - name: Install cargo-deny (cargo fallback for Windows)
         if: matrix.os == 'windows-latest'
