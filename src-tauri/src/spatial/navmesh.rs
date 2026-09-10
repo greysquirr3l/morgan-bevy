@@ -513,7 +513,10 @@ fn try_partition(region: Rect2, wall: Rect2) -> Option<Split> {
 }
 
 const fn midpoint(a: f32, b: f32) -> f32 {
-    (a + b) * 0.5
+    // `f32::midpoint` (const-stable since Rust 1.85) avoids the
+    // overflow that `(a + b) * 0.5` can produce near `f32::MAX`.
+    // clippy::manual_midpoint enforces the stdlib-named version.
+    f32::midpoint(a, b)
 }
 
 /// The unblocked interval in `region`'s X-range not covered by
