@@ -60,7 +60,7 @@ function listSrcFiles(dir: string, out: string[] = []): string[] {
       else if (/\.(ts|tsx|rs)$/.test(entry.name)) out.push(full)
     }
   } catch (e) {
-    // eslint-disable-next-line no-console
+     
     console.warn(`listSrcFiles(${dir}) failed:`, e)
   }
   return out
