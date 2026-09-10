@@ -1,0 +1,85 @@
+# CODEOWNERS — required reviewers for OSSF "Code-Review" check.
+
+#
+
+# This file is read by .github/settings.yml
+
+# (`require_code_owner_reviews: true`) and by GitHub's native CODEOWNERS
+
+# parser. The rules below assign domain ownership so PRs touching
+
+# security-sensitive paths can't merge without an approving review.
+
+#
+
+# Order matters: GitHub applies the LAST matching pattern. The
+
+# fall-through rule at the bottom (@greysquirr3l) covers everything not
+
+# explicitly mapped.
+
+#
+
+# Add additional @handles / @orgs/teams as the project grows; for now
+
+# the single-owner repo has @greysquirr3l as the sole approver.
+
+# ─── Default: repo owner reviews everything ───────────────────────────────
+
+# Last matching rule wins, so this fall-through covers any path not
+
+# explicitly assigned below.
+
+/ @greysquirr3l
+
+# ─── Security / supply-chain ─────────────────────────────────────────────
+
+# Any change to branch protection, CodeQL, Scorecard, Dependabot, or
+
+# dependency manifests requires a code-owner review.
+
+/.github/settings.yml @greysquirr3l
+/.github/workflows/ @greysquirr3l
+/.github/CODEOWNERS @greysquirr3l
+/.github/dependabot.yml @greysquirr3l
+/SECURITY.md @greysquirr3l
+/deny.toml @greysquirr3l
+/src-tauri/deny.toml @greysquirr3l
+
+# ─── Rust backend (Tauri commands, BSP/WFC, export pipeline) ──────────────
+
+/src-tauri/ @greysquirr3l
+/crates/ @greysquirr3l
+/Cargo.lock @greysquirr3l
+/clippy.toml @greysquirr3l
+
+# ─── Frontend (React + R3F + Zustand store) ────────────────────────────────
+
+/src/ @greysquirr3l
+/package.json @greysquirr3l
+/package-lock.json @greysquirr3l
+/tsconfig.json @greysquirr3l
+/vite.config.\* @greysquirr3l
+
+# ─── Build / release infrastructure ───────────────────────────────────────
+
+# tauri.conf.json controls which Tauri APIs are allowlisted — treat as
+
+# security-sensitive.
+
+/src-tauri/tauri.conf.json @greysquirr3l
+/src-tauri/Cargo.toml @greysquirr3l
+/src-tauri/build.rs @greysquirr3l
+/src-tauri/src/lib.rs @greysquirr3l
+/src-tauri/src/main.rs @greysquirr3l
+
+# ─── Docs / metadata ──────────────────────────────────────────────────────
+
+# README / CHANGELOG / AGENTS / docs/ are not security-sensitive but
+
+# benefit from an explicit owner so typos don't sneak in.
+
+/AGENTS.md @greysquirr3l
+/README.md @greysquirr3l
+/CHANGELOG.md @greysquirr3l
+/docs/ @greysquirr3l
