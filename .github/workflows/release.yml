@@ -13,7 +13,7 @@
 # generated from CHANGELOG.md.
 #
 # Per AGENTS.md: any CI step that creates commits (none in this workflow)
-# must set the greysquirr3l identity.
+# must set the Nick Campbell identity.
 
 name: release
 
@@ -24,7 +24,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: 'Tag to release (e.g. v0.5.0). Leave blank for the latest tag.'
+        description: 'Tag to release (e.g. v0.6.0). Leave blank for the latest tag.'
         required: false
 
 permissions:
