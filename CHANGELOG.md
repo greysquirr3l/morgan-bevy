@@ -7,6 +7,46 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-10-22 - "Bevy 0.20 & Supply-Chain Hardening"
+
+> **Breaking for companion-crate consumers.** The observer API changed shape
+> (`On<Add, T>` → `On<Add<T>>`). The *generated* export contract is unchanged —
+> `Mesh3d` + `MeshMaterial3d` + `Transform` + `Name` still compile exactly as
+> before against Bevy 0.20. Bump `bevy-morgan-integration` to `0.6` and Bevy to
+> `0.20` together.
+
+### Security — 11 known-vulnerable advisories cleared
+
+`cargo deny check` was failing on a stale local advisory cache. Fetching fresh
+advisories surfaced 11 new errors, none of which were suppressible.
+
+**Five real TLS vulnerabilities, fixed by upgrading:**
+
+| Crate | From | To | Advisory |
+| --- | --- | --- | --- |
+| rustls | 0.23.43 | 0.23.46 | RUSTSEC-2026-0285, 0346, 0349 |
+| rustls-webpki | 0.103.14 | 0.103.16 | RUSTSEC-2026-0382/0383 |
+| webpki-root-certs | 1.0.9 | 1.0.10 | RUSTSEC-2026-0285 |
+
+Covering: TLS 1.3 handshake messages accepted across encryption-level boundaries,
+client-session `Debug` impls leaking TLS secrets, and certificate verification
+accepting distrusted intermediates.
+
+**Six blocked upstream, now documented in `deny.toml`** with the dependency path
+and the reason there is no local fix:
+
+- `RUSTSEC-2026-0367/0368/0369` — `zip` extraction vulnerabilities. Reached via
+  `zip → tauri-plugin-updater`. The plugin pins `zip` to the 4.x line; the fix is
+  in 9.x, which is semver-breaking for the plugin. Verified still 4.6.1 on the
+  latest `tauri-plugin-updater` (2.14.0).
+- `RUSTSEC-2026-0370/0371/0372` — unmaintained `zvariant`, `zbus_names`,
+  `zvariant_derive` via `zbus → ashpd → rfd`. Linux-only; fixing needs `rfd`
+  0.16+, also semver-breaking.
+
+`dependabot_security_updates` was disabled repo-wide, so none of these would have
+been surfaced automatically. Now enabled, along with
+`secret_scanning_validity_checks`.
+
 ### Changed — Bevy 0.19 → 0.20
 
 The `bevy-morgan-integration` companion crate now targets Bevy 0.20 (released
@@ -41,12 +81,32 @@ and the absence of the old two-argument form, so the next Bevy bump fails loudly
 instead of silently. AGENTS.md and the `bevy-compat.md` roll-forward checklist
 both gained an explicit "grep the string literals, not just the AST" step.
 
+### Fixed — lint and CI
+
+- **8 clippy errors** caught by the backend CI gate: 5 × `assert_is_empty` with
+  no failure message, 2 × `useless_conversion` (an `[f32; 3]` destructured
+  through a tuple in the GLB thumbnail parser), and 1 unfulfilled
+  `#[expect(clippy::float_cmp)]` whose comparison no longer triggers the lint.
+  These were masked locally by cached clippy results until the lockfile changed.
+- **Commit identity.** AGENTS.md mandated the `greysquirr3l` identity, but that is
+  the GitHub handle — the author name is `Nick Campbell`, which 13 of the last 15
+  commits already used. Corrected in AGENTS.md, CONTRIBUTING.md,
+  `docs/dev/ci.md`, `auto-tag.yml`, and the test asserting it. Also documented
+  that `GIT_AUTHOR_NAME` / `GIT_COMMITTER_NAME` override every `git config` level
+  when exported in the shell.
+- **All workflow actions SHA-pinned.** `ci.yml`, `release.yml` and `auto-tag.yml`
+  used floating major tags, capping the OSSF Scorecard Pinned-Dependencies check.
+  Every SHA verified to resolve to a real commit.
+
 ### Documentation
 
 - Added `docs/dev/BEVY_0.19_TO_0.20_MIGRATION.md`.
 - Updated `docs/dev/bevy-compat.md`: baseline moved to 0.20, a 0.20 row added to
   the breaking-deltas table, and the roll-forward checklist rewritten to name the
   crates that actually carry the Bevy dependency.
+- `README.md`: all eight Bevy 0.19 references moved to 0.20.
+- `SECURITY.md`: supported-versions table refreshed — it still listed 0.4.x and
+  0.3.x and never listed the 0.5.x line.
 
 ## [0.5.0] - 2026-08-13 - "Audit & Windows Compatibility Release"
 
