@@ -1,4 +1,4 @@
-//! Sample app demonstrating the integration with Bevy 0.19.
+//! Sample app demonstrating the integration with Bevy 0.20.
 //!
 //! Run with: `cargo run --example sample_app -p bevy-morgan-integration`
 //!

@@ -82,7 +82,7 @@ impl EntityId {
     /// Reconstruct a Bevy `Entity` handle from this id. The consumer
     /// must verify liveness via `world.get_entity(entity)` before use.
     ///
-    /// Note: Bevy 0.19 does not expose `Entity::from_raw_u32` as a
+    /// Note: Bevy 0.20 does not expose `Entity::from_raw_u32` as a
     /// `const fn`. This method panics if the encoded entity is
     /// invalid; callers should verify liveness with
     /// `world.get_entity(entity)` (returns `None` if the entity has
@@ -268,7 +268,7 @@ impl Plugin for MorganLevelSystems {
                 Update,
                 (door_proximity_open, collectible_pickup, nav_mesh_collector),
             )
-            // Observers: fired on `On<Add, MarkerType>`. The editor
+            // Observers: fired on `On<Add<MarkerType>>`. The editor
             // gates each observer by the corresponding `MarkerSet`
             // bit; the unconditional `add_observer` here keeps the
             // plugin self-contained for tests.
@@ -342,10 +342,10 @@ pub fn collectible_pickup(
 /// so consumers can read it from any system.
 #[expect(
     clippy::needless_pass_by_value,
-    reason = "On<Add, T> is a Bevy system param; it must be by-value"
+    reason = "On<Add<T>> is a Bevy system param; it must be by-value"
 )]
 pub fn spawn_point_observer(
-    add: On<Add, SpawnPoint>,
+    add: On<Add<SpawnPoint>>,
     spawn_points: Query<&SpawnPoint>,
     mut commands: Commands,
 ) {
@@ -359,7 +359,7 @@ pub fn spawn_point_observer(
 /// Reads `TriggerVolume` collisions and emits `TriggerActivated`
 /// messages.
 ///
-/// Bevy 0.19's collision events require `Collider` to be on the
+/// Bevy 0.20's collision events require `Collider` to be on the
 /// player entity too; consumers wire their own collision plugin
 /// (e.g. `avian3d`) and this system runs alongside it. The
 /// reference implementation emits one event per volume per tick
@@ -422,7 +422,7 @@ pub struct AudioEndEvent {
     pub entity: EntityId,
 }
 
-/// `On<Add, Light>` observer — records every light marker in a
+/// `On<Add<Light>>` observer — records every light marker in a
 /// `Lights` resource.
 ///
 /// The consumer reads the resource on their own schedule to attach
@@ -436,9 +436,9 @@ pub struct Lights {
 
 #[expect(
     clippy::needless_pass_by_value,
-    reason = "On<Add, T> is a Bevy system param; it must be by-value"
+    reason = "On<Add<T>> is a Bevy system param; it must be by-value"
 )]
-pub fn light_observer(add: On<Add, Light>, lights: Query<&Light>, mut resources: ResMut<Lights>) {
+pub fn light_observer(add: On<Add<Light>>, lights: Query<&Light>, mut resources: ResMut<Lights>) {
     if let Ok(light) = lights.get(add.entity) {
         resources
             .entries
@@ -446,7 +446,7 @@ pub fn light_observer(add: On<Add, Light>, lights: Query<&Light>, mut resources:
     }
 }
 
-/// `On<Add, Animation>` observer — records the animation in a
+/// `On<Add<Animation>>` observer — records the animation in a
 /// resource. The consumer wires `bevy_animation::AnimationPlayer`
 /// from their own setup.
 #[derive(Resource, Debug, Default, Clone, Serialize, Deserialize)]
@@ -456,10 +456,10 @@ pub struct Animations {
 
 #[expect(
     clippy::needless_pass_by_value,
-    reason = "On<Add, T> is a Bevy system param; it must be by-value"
+    reason = "On<Add<T>> is a Bevy system param; it must be by-value"
 )]
 pub fn animation_player_observer(
-    add: On<Add, Animation>,
+    add: On<Add<Animation>>,
     animations: Query<&Animation>,
     mut resources: ResMut<Animations>,
 ) {
@@ -470,7 +470,7 @@ pub fn animation_player_observer(
     }
 }
 
-/// `On<Add, Audio>` observer — fires events for the consumer's
+/// `On<Add<Audio>>` observer — fires events for the consumer's
 /// audio system to react to.
 ///
 /// For `Ambient` sources: a single `AudioStartEvent`. For `OneShot`:
@@ -478,10 +478,10 @@ pub fn animation_player_observer(
 /// consumer can despawn the entity when the buffer finishes.
 #[expect(
     clippy::needless_pass_by_value,
-    reason = "On<Add, T> is a Bevy system param; it must be by-value"
+    reason = "On<Add<T>> is a Bevy system param; it must be by-value"
 )]
 pub fn audio_observer(
-    add: On<Add, Audio>,
+    add: On<Add<Audio>>,
     audios: Query<&Audio>,
     mut start_events: MessageWriter<AudioStartEvent>,
     mut end_events: MessageWriter<AudioEndEvent>,
@@ -501,7 +501,7 @@ pub fn audio_observer(
     }
 }
 
-/// `On<Add, Vfx>` observer — records the VFX marker in a
+/// `On<Add<Vfx>>` observer — records the VFX marker in a
 /// resource.
 ///
 /// The consumer reads the resource to attach the matching Bevy
@@ -514,9 +514,9 @@ pub struct VfxEntries {
 
 #[expect(
     clippy::needless_pass_by_value,
-    reason = "On<Add, T> is a Bevy system param; it must be by-value"
+    reason = "On<Add<T>> is a Bevy system param; it must be by-value"
 )]
-pub fn vfx_observer(add: On<Add, Vfx>, vfxes: Query<&Vfx>, mut resources: ResMut<VfxEntries>) {
+pub fn vfx_observer(add: On<Add<Vfx>>, vfxes: Query<&Vfx>, mut resources: ResMut<VfxEntries>) {
     if let Ok(vfx) = vfxes.get(add.entity) {
         resources
             .entries

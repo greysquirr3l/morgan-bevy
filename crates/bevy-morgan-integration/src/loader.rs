@@ -515,7 +515,7 @@ mod tests {
     /// drop `obj.light` / `obj.animation` / `obj.audio` / `obj.vfx` —
     /// the loader only ever inserted `SpawnPoint` / `TriggerVolume` /
     /// tag-driven markers, even though those four fields exist on
-    /// `ExportedEntity` and the companion crate ships `On<Add, _>`
+    /// `ExportedEntity` and the companion crate ships `On<Add<_>>`
     /// observers (`light_observer`, `animation_player_observer`,
     /// `audio_observer`, `vfx_observer`) specifically to react to
     /// them. Build a level with all four markers set and assert the

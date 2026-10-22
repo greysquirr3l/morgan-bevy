@@ -7,6 +7,47 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed — Bevy 0.19 → 0.20
+
+The `bevy-morgan-integration` companion crate now targets Bevy 0.20 (released
+2026-10-08). The generator's emitted component shape (`Mesh3d` +
+`MeshMaterial3d` + `Transform` + `Name`) is unchanged; only the emitted file
+header now reads `// Generated level code for Bevy 0.20+`.
+
+Two breaking changes applied, both mechanical:
+
+- **Observer `B: Bundle` generic.** Bevy 0.20 removed the `B: Bundle` parameter
+  from `On<E, B>` and moved it onto the lifecycle event, so `On<Add, T>` becomes
+  `On<Add<T>>`. Migrated for all five observers (`spawn_point`, `light`,
+  `animation_player`, `audio`, `vfx`).
+- **`glam` 0.32 → 0.33.** Bevy 0.20 moved to glam 0.33; the crate's explicit pin
+  moved in lockstep so consumers don't resolve two glam copies.
+
+Full rationale, plus a table of the 0.20 changes evaluated and deliberately
+skipped, is in `docs/dev/BEVY_0.19_TO_0.20_MIGRATION.md`.
+
+### Fixed — inline export mode could silently ship uncompilable source
+
+`SYSTEMS_SOURCE` in `crates/bevy-morgan-integration/src/systems_inline.rs` is a
+raw string literal the compiler never parses, so it held a second, fully-qualified
+copy of all five observer signatures. Bevy API changes landed in `systems.rs` and
+never reached it — `cargo check` stayed green while every Inline-mode export
+shipped source the consumer could not build. This is the same class of failure as
+the earlier "T90 v2 Inline mode never compiled" bug, recurring in a new disguise.
+
+The signatures are migrated, and a new regression test
+(`observer_signatures_match_bevy_020_shape`) now pins both the current spelling
+and the absence of the old two-argument form, so the next Bevy bump fails loudly
+instead of silently. AGENTS.md and the `bevy-compat.md` roll-forward checklist
+both gained an explicit "grep the string literals, not just the AST" step.
+
+### Documentation
+
+- Added `docs/dev/BEVY_0.19_TO_0.20_MIGRATION.md`.
+- Updated `docs/dev/bevy-compat.md`: baseline moved to 0.20, a 0.20 row added to
+  the breaking-deltas table, and the roll-forward checklist rewritten to name the
+  crates that actually carry the Bevy dependency.
+
 ## [0.5.0] - 2026-08-13 - "Audit & Windows Compatibility Release"
 
 > Scope of this batch: Phases 8–12 + post-Phase-12 polish
