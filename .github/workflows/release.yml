@@ -13,7 +13,7 @@
 # generated from CHANGELOG.md.
 #
 # Per AGENTS.md: any CI step that creates commits (none in this workflow)
-# must set the greysquirr3l identity.
+# must set the Nick Campbell identity.
 
 name: release
 
@@ -24,7 +24,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: 'Tag to release (e.g. v0.5.0). Leave blank for the latest tag.'
+        description: 'Tag to release (e.g. v0.6.0). Leave blank for the latest tag.'
         required: false
 
 permissions:
@@ -145,18 +145,21 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAG: ${{ needs.resolve-tag.outputs.tag }}
         run: |
-          # Pull the latest CHANGELOG section matching this tag from the
+          # Pull the CHANGELOG section matching this tag from the
           # repository and prepend it to the draft release.
           body=$(gh api "repos/$GITHUB_REPOSITORY/contents/CHANGELOG.md?ref=$TAG" --jq '.content' | base64 -d)
-          # Extract the section for this tag (between "# [...]" headers).
-          section=$(printf '%s\n' "$body" | awk -v tag="## \[$TAG" '
-            $0 ~ tag { found=1 }
-            found && /^## \[/ && $0 !~ tag { exit }
+          # CHANGELOG headings follow Keep a Changelog and are unversioned
+          # with respect to the tag prefix: the tag is `v0.6.0` but the
+          # heading is `## [0.6.0]`. Strip any leading `v` so the two match.
+          ver="${TAG#v}"
+          section=$(printf '%s\n' "$body" | awk -v ver="$ver" '
+            $0 ~ ("^## \\[" ver "[^0-9]") { found=1 }
+            found && /^## \[/ && $0 !~ ("^## \\[" ver "[^0-9]") { exit }
             found { print }
           ')
           if [ -n "$section" ]; then
             gh release edit "$TAG" --notes "$section"
             echo "Updated release notes for $TAG"
           else
-            echo "::warning::No CHANGELOG section found for $TAG"
+            echo "::warning::No CHANGELOG section found for $TAG (looked for \`## [$ver]\`)"
           fi

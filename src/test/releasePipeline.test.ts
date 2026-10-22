@@ -152,6 +152,14 @@ describe('release.yml', () => {
     expect(runs).toMatch(/CHANGELOG/)
   })
 
+  it('strips the tag "v" prefix before matching a CHANGELOG heading', () => {
+    // Tags are `v0.6.0`; CHANGELOG headings follow Keep a Changelog and
+    // read `## [0.6.0]`. Without stripping the prefix the awk match never
+    // fires and every release ships with empty notes.
+    const runs = collectRuns(release).join('\n')
+    expect(runs).toMatch(/ver="\$\{TAG#v\}"/)
+  })
+
   it('uses Node 22 (matches CI)', () => {
     const uses = collectUses(release)
     expect(uses.some(u => u.startsWith('actions/setup-node@'))).toBe(true)

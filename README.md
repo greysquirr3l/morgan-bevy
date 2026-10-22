@@ -37,7 +37,7 @@
   rooms, corridors, lights, waypoints, paint blobs, navmeshes. If
   you want to model a character or sculpt a hero prop, use
   [Blender](https://blender.org) and import the result.
-- **Not a Bevy engine.** Morgan targets Bevy 0.19 and emits Rust
+- **Not a Bevy engine.** Morgan targets Bevy 0.20 and emits Rust
   source / RON / JSON / glTF / FBX — it does not embed Bevy or
   replace the Bevy asset pipeline. Generated levels load with a
   thin integration crate ([`crates/bevy-morgan-integration/`](crates/bevy-morgan-integration/))
@@ -59,7 +59,7 @@
 Most level editors either lock you into a single engine or treat
 procedural generation as an afterthought. Morgan does both:
 
-- **First-class Bevy 0.19 exporter.** Generated Rust source compiles
+- **First-class Bevy 0.20 exporter.** Generated Rust source compiles
   against a vanilla Bevy project — no proprietary runtime, no
   schema-drift patches. See [`docs/dev/bevy-compat.md`](docs/dev/bevy-compat.md) for the contract.
 - **Deterministic BSP + WFC generation.** Same seed, same level. No
@@ -119,7 +119,7 @@ tools** to enable rapid level design and iteration.
 
 ### 🎮 **Target Users**
 
-- **Game Developers** using Bevy 0.19
+- **Game Developers** using Bevy 0.20
 - **Level Designers** and 3D environment artists
 - **Indie Game Studios** needing rapid prototyping tools
 - **Procedural Generation** enthusiasts
@@ -148,7 +148,7 @@ tools** to enable rapid level design and iteration.
 ### 📤 **Export Pipeline**
 
 - ✅ **JSON / RON / Rust source / GLTF / binary FBX 7.7** - five formats, one manifest
-- ✅ **Bevy 0.19 contract** - Generated code uses `Mesh3d` + `MeshMaterial3d` + `Transform` + `Name` (no `PbrBundle`)
+- ✅ **Bevy 0.20 contract** - Generated code uses `Mesh3d` + `MeshMaterial3d` + `Transform` + `Name` (no `PbrBundle`)
 - ✅ **Bevy-compatible texture handles** - emitted with the right `Image` loaders
 - ✅ **Export panel** - format toggles, live previews, target-directory picker
 - ✅ **T90 v2 Inline emission mode** - `SystemsMode::Inline` embeds the per-marker system bodies verbatim in the consumer's generated file. The runtime becomes hermetic — no `bevy_morgan_integration::systems` dep, no silent `cargo update` drift. Re-exports preserve the choice across regenerations.
@@ -218,7 +218,7 @@ Headline items:
 Beyond that, the editor is feature-complete for the MVP scope — the
 remaining work is polish (UI ergonomics, additional export targets,
 real Bevy-side consumer examples) tracked in the contributing section
-below. The Bevy 0.19 export contract is the only stability promise
+below. The Bevy 0.20 export contract is the only stability promise
 we make; see [`docs/dev/bevy-compat.md`](docs/dev/bevy-compat.md).
 
 ---
@@ -238,7 +238,7 @@ we make; see [`docs/dev/bevy-compat.md`](docs/dev/bevy-compat.md).
 | **Build System**     | [Vite](https://vitejs.dev/) 5 + [Cargo](https://doc.rust-lang.org/cargo/)                                 | Hot-reload dev server; release build via `tauri build` |
 | **Quality Gates**    | TypeScript strict · ESLint · Vitest · Cargo test · Cargo Clippy (pedantic + nursery) · cargo-deny         | All six preflight checks run in CI                     |
 
-The Bevy 0.19 export contract is the only stability promise we make;
+The Bevy 0.20 export contract is the only stability promise we make;
 see [`docs/dev/bevy-compat.md`](docs/dev/bevy-compat.md).
 
 ---
@@ -295,7 +295,7 @@ npm run tauri build
 | **Phase 3**  | ✅ Complete | **Asset Database**        | SQLite Database, Advanced Asset Browser, Search & Collections |
 | **Phase 4**  | ✅ Complete | **Advanced Editing**      | Box Selection, Undo/Redo, Enhanced UI                         |
 | **Phase 5**  | ✅ Complete | **Procedural Generation** | BSP, WFC, Theme System, Seed Management                       |
-| **Phase 6**  | ✅ Complete | **Export & Integration**  | JSON / RON / Rust / GLTF / FBX + Bevy 0.19 contract           |
+| **Phase 6**  | ✅ Complete | **Export & Integration**  | JSON / RON / Rust / GLTF / FBX + Bevy 0.20 contract           |
 | **Phase 7**  | ✅ Complete | **Performance**           | LOD, frustum culling, instancing, 60 FPS @ 10K+ objects       |
 | **Phase 8**  | ✅ Complete | **Advanced Tools**        | Snap points, surface snapping, lighting, paint                |
 | **Phase 9**  | ✅ Complete | **Polish**                | Examples, docs, in-app help, marketing                        |
@@ -351,7 +351,7 @@ on GitHub. If you've ever wanted a real `cargo clippy -- -W pedantic
 
 | Area                                | Why it matters                                                                                                                                                                 | Where to start                                                                              |
 | ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------- |
-| **Bevy export consumers**           | The exported Rust source has to compile against real Bevy 0.19 projects. Adding real-world consumer code to `crates/bevy-morgan-integration/` validates the contract.          | `crates/bevy-morgan-integration/` README + `examples/`                                      |
+| **Bevy export consumers**           | The exported Rust source has to compile against real Bevy 0.20 projects. Adding real-world consumer code to `crates/bevy-morgan-integration/` validates the contract.          | `crates/bevy-morgan-integration/` README + `examples/`                                      |
 | **Procedural generation**           | BSP and WFC are the headline features. Better heuristics, additional constraints (corridor width, room aspect ratio), new algorithms (Drunkard's Walk, WFC with backtracking). | `src-tauri/src/generation/`                                                                 |
 | **Export targets**                  | The export pipeline supports JSON / RON / Rust / glTF / binary FBX. Adding more (e.g. native Bevy scenes with markers) widens the consumer audience.                           | `src-tauri/src/export/`                                                                     |
 | **Theming / paint / navmesh tools** | Editor polish — brushes, snap points, surface snapping, navmesh generation. Smaller, self-contained tasks.                                                                     | `src/components/PaintTool/`, `src/utils/surfaceSnap.ts`, `src-tauri/src/spatial/navmesh.rs` |
