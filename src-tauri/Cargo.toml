@@ -11,10 +11,10 @@ categories = ["game-development", "graphics", "editor"]
 
 # Tauri specific configuration
 [build-dependencies]
-tauri-build = { version = "2.5.2", features = [] }
+tauri-build = { version = "2.5", features = [] }
 
 [dependencies]
-tauri = { version = "2.9", features = [] }
+tauri = { version = "2.11", features = [] }
 tauri-plugin-fs = "2"
 tauri-plugin-dialog = "2"
 tauri-plugin-shell = "2"
