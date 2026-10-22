@@ -94,8 +94,8 @@ impl Aabb {
         }
     }
     pub(crate) fn is_valid(self) -> bool {
-        let (mn0, mn1, mn2) = (self.min[0], self.min[1], self.min[2]);
-        let (mx0, mx1, mx2) = (self.max[0], self.max[1], self.max[2]);
+        let [mn0, mn1, mn2] = self.min;
+        let [mx0, mx1, mx2] = self.max;
         mn0.is_finite()
             && mx0.is_finite()
             && mn0 <= mx0

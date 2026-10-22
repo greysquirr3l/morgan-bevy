@@ -152,7 +152,7 @@ mod tests {
 
         let rgb = render_for_asset("Texture", &src).expect("render");
         let bytes = dispatch::encode_webp(&rgb, WEBP_QUALITY);
-        assert!(!bytes.is_empty());
+        assert!(!bytes.is_empty(), "encoder produced no WebP bytes");
         // RIFF / WEBP magic header check.
         assert_eq!(&bytes[0..4], b"RIFF");
         assert_eq!(&bytes[8..12], b"WEBP");

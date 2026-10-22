@@ -682,7 +682,10 @@ mod tests {
     #[test]
     fn test_tileset_loading() {
         let (tiles, constraints) = TilesetLibrary::get_tileset("dungeon");
-        assert!(!tiles.is_empty());
-        assert!(!constraints.is_empty());
+        assert!(!tiles.is_empty(), "dungeon tileset produced no tiles");
+        assert!(
+            !constraints.is_empty(),
+            "dungeon tileset produced no constraints"
+        );
     }
 }

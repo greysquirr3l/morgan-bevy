@@ -674,10 +674,6 @@ mod tests {
     }
 
     #[test]
-    #[expect(
-        clippy::float_cmp,
-        reason = "exact literal values with no arithmetic in between; float equality is well-defined here"
-    )]
     fn free_standing_obstacle_is_recorded_without_splitting_the_polygon() {
         let pillar = Obstacle {
             min: [4.0, 4.0],
@@ -693,7 +689,10 @@ mod tests {
             "a free-standing obstacle must not split the polygon"
         );
         assert_eq!(mesh.obstacles.len(), 1, "the pillar should be recorded");
-        assert!(mesh.connections.is_empty());
+        assert!(
+            mesh.connections.is_empty(),
+            "a free-standing obstacle must not open a connection"
+        );
         assert_eq!(mesh.obstacles[0].min, [4.0, 0.0, 4.0]);
         assert_eq!(mesh.obstacles[0].max, [5.0, 0.0, 5.0]);
     }
@@ -739,7 +738,10 @@ mod tests {
         // Deferred scope: v1 never populates off-mesh connections,
         // but the field must exist and serialize.
         let mesh = generate_navmesh(&[floor_10x10()], &[]).expect("should succeed");
-        assert!(mesh.off_mesh_connections.is_empty());
+        assert!(
+            mesh.off_mesh_connections.is_empty(),
+            "v1 never populates off-mesh connections"
+        );
     }
 
     // ─── Serde round-trip ───────────────────────────────────────────────
