@@ -554,7 +554,7 @@ mod tests {
         let empty = MarkerSet::new();
         assert!(empty.is_empty());
         assert!(!empty.is_any());
-        assert!(empty.system_names().is_empty());
+        assert!(empty.system_names().is_empty(), "{:?}", empty.system_names());
 
         let mut with_door = MarkerSet::new();
         with_door.door = true;
