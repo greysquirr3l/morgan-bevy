@@ -9,7 +9,7 @@
 #   - sccache is unreliable here (permission errors). Disable it explicitly.
 #   - cargo-deny must always fetch fresh advisories in CI — local cache can
 #     be stale and miss real advisories.
-#   - All git commit activity must use the greysquirr3l identity (see T67).
+#   - All git commit activity must use the Nick Campbell identity (see T67).
 #
 # Per AGENTS.md and T66:
 #   - The clippy invocation matches the local `l` alias from .cargo/config.toml.

@@ -56,12 +56,12 @@ crates and takes a few minutes; subsequent rebuilds are fast.
 ### Configure git
 
 ```bash
-git config user.name 'greysquirr3l'
+git config user.name 'Nick Campbell'
 git config user.email '[email protected]'
 ```
 
 Per the project rule, every commit on this repo uses the
-`greysquirr3l` identity. CI workflows that commit (auto-tag, etc.)
+`Nick Campbell` identity. CI workflows that commit (auto-tag, etc.)
 explicitly set this in their job step.
 
 ## Daily workflow
