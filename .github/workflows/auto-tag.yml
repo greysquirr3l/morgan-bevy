@@ -8,7 +8,7 @@
 # workflow chains off this one via `on: workflow_run`, which sidesteps
 # the loop-prevention block.
 #
-# The git identity is explicitly set to greysquirr3l (per AGENTS.md).
+# The git identity is explicitly set to Nick Campbell (per AGENTS.md).
 
 name: auto-tag
 
@@ -30,15 +30,15 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           fetch-depth: 0
 
-      - name: Configure git identity (greysquirr3l)
+      - name: Configure git identity (Nick Campbell)
         # AGENTS.md: never leave the default github-actions[bot] identity in
         # any commit.
         run: |
-          git config user.name 'greysquirr3l'
+          git config user.name 'Nick Campbell'
           git config user.email '[email protected]'
 
       - name: Read latest tag

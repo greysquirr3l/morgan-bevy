@@ -43,7 +43,36 @@ yanked = "warn"
 #   on Windows.
 # RUSTSEC-2025-0080, 0081, 0100 — Tauri ecosystem advisory noise; tracked
 #   upstream.
+#
+# --- Added 2026-10-22 (fresh advisories via `cargo deny fetch`) ---
+#
+# RUSTSEC-2026-0367 / 0368 / 0369 — `zip` extraction vulnerabilities (SUID/SGID
+#   bit preservation, symlink escape from the destination directory, and
+#   permission application through symlinks). Path: zip → tauri-plugin-updater
+#   → morgan-bevy. `tauri-plugin-updater` pins `zip` to the 4.x line; the
+#   advisory is fixed in 9.x, which is a semver-breaking move the plugin has
+#   not made. Verified: still 4.6.1 at the latest tauri-plugin-updater
+#   (2.14.0). No local fix; re-check on the next Tauri bump. Risk is bounded:
+#   `zip` is only reached by the updater's own archive handling, and the editor
+#   does not extract untrusted archives with it.
+# RUSTSEC-2026-0370 / 0371 / 0372 — Unmaintained `zvariant`, `zbus_names`,
+#   `zvariant_derive`. Path: zvariant → zbus → ashpd → rfd → morgan-bevy.
+#   These are Linux-only (ashpd is the XDG portal backend). Fixing needs
+#   `rfd` 0.16+, which is a semver break for us; the crates are unmaintained
+#   but not known-vulnerable. Re-check on the next `rfd` bump.
+#
+# NOTE: the five `rustls` / `webpki` advisories (RUSTSEC-2026-0285, 0346,
+# 0348, 0349, 0382/0383) that appeared in the same refresh were FIXED, not
+# ignored — rustls 0.23.43 → 0.23.46, rustls-webpki 0.103.14 → 0.103.16,
+# webpki-root-certs 1.0.9 → 1.0.10. Cargo.lock is gitignored, so CI resolves
+# these patched versions on a fresh checkout with no manifest change.
 ignore = [
+    "RUSTSEC-2026-0367",  # zip — SUID/SGID preservation on extract — via tauri-plugin-updater
+    "RUSTSEC-2026-0368",  # zip — symlink escape from destination dir — via tauri-plugin-updater
+    "RUSTSEC-2026-0369",  # zip — perms applied through symlinks — via tauri-plugin-updater
+    "RUSTSEC-2026-0370",  # zvariant (unmaintained) — via zbus → ashpd → rfd
+    "RUSTSEC-2026-0371",  # zbus_names (unmaintained) — via zbus → ashpd → rfd
+    "RUSTSEC-2026-0372",  # zvariant_derive (unmaintained) — via zbus → ashpd → rfd
     "RUSTSEC-2023-0089",  # paste (unmaintained) — via tauri-codegen
     "RUSTSEC-2024-0370",  # proc-macro-error (unmaintained)
     "RUSTSEC-2024-0411",  # atk-sys (unmaintained) — via gtk → muda → tauri

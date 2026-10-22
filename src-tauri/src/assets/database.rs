@@ -1000,7 +1000,10 @@ mod t32_tests {
         let none = db
             .search_by_tags(&["wall".to_string(), "missing".to_string()])
             .unwrap();
-        assert!(none.is_empty());
+        assert!(
+            none.is_empty(),
+            "a tag with no matching asset must return no rows, got {none:?}"
+        );
     }
 
     #[test]

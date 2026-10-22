@@ -1,4 +1,4 @@
-//! `bevy-morgan-integration` — Bevy 0.19 runtime helpers for levels
+//! `bevy-morgan-integration` — Bevy 0.20 runtime helpers for levels
 //! exported by the Morgan-Bevy editor.
 //!
 //! This crate is a workspace member of the `morgan-bevy` repo and lives

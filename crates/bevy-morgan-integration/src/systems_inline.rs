@@ -9,7 +9,7 @@
 //!
 //! ## Why two sources of the same code?
 //!
-//! `systems.rs` is the **runtime** path: live Bevy 0.19 functions
+//! `systems.rs` is the **runtime** path: live Bevy 0.20 functions
 //! registered by `MorganLevelSystems`. Tests against the plugin
 //! exercise those directly. `SYSTEMS_SOURCE` is the **emission**
 //! path: the same bodies, copied out as a raw `&str` so the
@@ -142,7 +142,7 @@ pub fn collectible_pickup(
 /// For `PlayerStart` spawn points, inserts a `PlayerStart` resource
 /// so consumers can read it from any system.
 pub fn spawn_point_observer(
-    add: bevy::prelude::On<bevy::prelude::Add, SpawnPoint>,
+    add: bevy::prelude::On<bevy::prelude::Add<SpawnPoint>>,
     spawn_points: bevy::prelude::Query<&SpawnPoint>,
     mut commands: bevy::prelude::Commands,
 ) {
@@ -156,7 +156,7 @@ pub fn spawn_point_observer(
 /// Reads `TriggerVolume` collisions and emits `TriggerActivated`
 /// messages.
 ///
-/// Bevy 0.19's collision events require `Collider` to be on the
+/// Bevy 0.20's collision events require `Collider` to be on the
 /// player entity too; consumers wire their own collision plugin
 /// (e.g. `avian3d`) and this system runs alongside it. The
 /// reference implementation emits one event per volume per tick
@@ -174,10 +174,10 @@ pub fn trigger_volume_observer(
     }
 }
 
-/// `On<Add, Light>` observer — records every light marker in a
+/// `On<Add<Light>>` observer — records every light marker in a
 /// `Lights` resource.
 pub fn light_observer(
-    add: bevy::prelude::On<bevy::prelude::Add, Light>,
+    add: bevy::prelude::On<bevy::prelude::Add<Light>>,
     lights: bevy::prelude::Query<&Light>,
     mut resources: bevy::prelude::ResMut<Lights>,
 ) {
@@ -188,11 +188,11 @@ pub fn light_observer(
     }
 }
 
-/// `On<Add, Animation>` observer — records the animation in a
+/// `On<Add<Animation>>` observer — records the animation in a
 /// resource. The consumer wires `bevy_animation::AnimationPlayer`
 /// from their own setup.
 pub fn animation_player_observer(
-    add: bevy::prelude::On<bevy::prelude::Add, Animation>,
+    add: bevy::prelude::On<bevy::prelude::Add<Animation>>,
     animations: bevy::prelude::Query<&Animation>,
     mut resources: bevy::prelude::ResMut<Animations>,
 ) {
@@ -203,10 +203,10 @@ pub fn animation_player_observer(
     }
 }
 
-/// `On<Add, Audio>` observer — fires events for the consumer's
+/// `On<Add<Audio>>` observer — fires events for the consumer's
 /// audio system to react to.
 pub fn audio_observer(
-    add: bevy::prelude::On<bevy::prelude::Add, Audio>,
+    add: bevy::prelude::On<bevy::prelude::Add<Audio>>,
     audios: bevy::prelude::Query<&Audio>,
     mut start_events: bevy::prelude::MessageWriter<AudioStartEvent>,
     mut end_events: bevy::prelude::MessageWriter<AudioEndEvent>,
@@ -226,9 +226,9 @@ pub fn audio_observer(
     }
 }
 
-/// `On<Add, Vfx>` observer — records the VFX marker in a resource.
+/// `On<Add<Vfx>>` observer — records the VFX marker in a resource.
 pub fn vfx_observer(
-    add: bevy::prelude::On<bevy::prelude::Add, Vfx>,
+    add: bevy::prelude::On<bevy::prelude::Add<Vfx>>,
     vfxes: bevy::prelude::Query<&Vfx>,
     mut resources: bevy::prelude::ResMut<VfxEntries>,
 ) {
@@ -262,9 +262,36 @@ mod tests {
     //!    editor's gated emission stays in sync.
     //! 3. `SYSTEMS_SOURCE` does NOT pull `bevy_morgan_integration::*`
     //!    — Inline mode is supposed to be runtime-independent.
+    //! 4. `SYSTEMS_SOURCE` uses the same Bevy API *shapes* as
+    //!    `systems.rs` — including generic arity, which the compiler
+    //!    cannot check inside a string literal.
 
     use super::SYSTEMS_SOURCE;
     use crate::systems::MarkerSet;
+
+    #[test]
+    fn observer_signatures_match_bevy_020_shape() {
+        // `SYSTEMS_SOURCE` is a string literal, so `rustc` cannot see
+        // its contents — a Bevy API change lands here silently and
+        // every Inline-mode export ships source the consumer cannot
+        // compile. Bevy 0.20 moved the observer `B: Bundle` generic
+        // off `On<E, B>` and onto the lifecycle event itself, so the
+        // arity went from 2 (`On<Add, T>`) to 1 (`On<Add<T>>`).
+        //
+        // Pin both spellings: the new one must be present for each
+        // observer, and the old 2-arg form must be gone entirely.
+        for ty in ["SpawnPoint", "Light", "Animation", "Audio", "Vfx"] {
+            assert!(
+                SYSTEMS_SOURCE.contains(&format!("bevy::prelude::On<bevy::prelude::Add<{ty}>>")),
+                "inline source missing Bevy 0.20 observer signature for `{ty}`; \
+                 expected `bevy::prelude::On<bevy::prelude::Add<{ty}>>`"
+            );
+        }
+        assert!(
+            !SYSTEMS_SOURCE.contains("bevy::prelude::On<bevy::prelude::Add,"),
+            "inline source still uses the pre-0.20 `On<Add, T>` arity"
+        );
+    }
 
     #[test]
     fn contains_all_plugin_registrations() {

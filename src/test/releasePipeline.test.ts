@@ -6,7 +6,7 @@
  *   - workflow_run chain (auto-tag after ci, release after auto-tag)
  *   - 3-OS × 4-target build matrix
  *   - tauri-action usage (per nick.md, that's the official entry)
- *   - greysquirr3l identity in any job that creates commits
+ *   - Nick Campbell identity in any job that creates commits
  *   - resolve-tag job handles both workflow_run AND workflow_dispatch
  *
  * Combined with src/test/release.test.ts (next-tag.sh) this gives
@@ -64,7 +64,7 @@ describe('auto-tag.yml', () => {
     expect(job?.if).toMatch(/head_branch.*main/)
     const runs = (job.steps ?? []).map(s => s.run ?? '').join('\n')
     // Set up git author before any commit; never leave github-actions[bot].
-    expect(runs).toMatch(/git config user\.name 'greysquirr3l'/)
+    expect(runs).toMatch(/git config user\.name 'Nick Campbell'/)
     expect(runs).toMatch(/git config user\.email '\[email protected\]'/)
   })
 

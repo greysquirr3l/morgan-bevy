@@ -1,7 +1,7 @@
 # bevy-morgan-integration
 
 > Companion crate to [Morgan-Bevy](https://github.com/greysquirr3l/morgan-bevy).
-> Bevy 0.19 runtime helpers for levels exported by the editor.
+> Bevy 0.20 runtime helpers for levels exported by the editor.
 
 This crate sits beside the editor and provides the **runtime half** of a
 Morgan-Bevy export pipeline:
@@ -23,9 +23,13 @@ without `E0119` conflicts on the marker types.
 
 `bevy-morgan-integration` is versioned **in lockstep with the editor**.
 The editor's `Cargo.toml` and this crate's `Cargo.toml` carry the same
-`version` field. A `bevy` major-version bump (0.19 → 0.20) requires
+`version` field. A `bevy` major-version bump (0.20 → 0.21) requires
 both crates to bump together. The migration procedure lives in
-[`docs/dev/BEVY_0.18_TO_0.19_MIGRATION.md`](https://github.com/greysquirr3l/morgan-bevy/blob/main/docs/dev/BEVY_0.18_TO_0.19_MIGRATION.md).
+[`docs/dev/BEVY_0.19_TO_0.20_MIGRATION.md`](https://github.com/greysquirr3l/morgan-bevy/blob/main/docs/dev/BEVY_0.19_TO_0.20_MIGRATION.md).
+
+> **Upgrading from 0.19?** Note that Bevy 0.20 moved the observer `B: Bundle`
+> generic off `On<E, B>` onto the lifecycle event, so `On<Add, T>` is now
+> `On<Add<T>>`. This crate handles that for you; see the migration guide.
 
 ## Install
 
@@ -33,9 +37,9 @@ Add the dependency next to your `bevy` and `avian3d` entries:
 
 ```toml
 [dependencies]
-bevy = "0.19"
+bevy = "0.20"
 avian3d = "0.7"
-bevy-morgan-integration = "0.4"
+bevy-morgan-integration = "0.5"
 ```
 
 Then load an exported level:
@@ -99,6 +103,6 @@ for the end-to-end workflow.
 
 ## Compatibility
 
-- Bevy **0.19** (latest at the time of writing)
+- Bevy **0.20** (latest at the time of writing)
 - avian3d **0.7** for collision
-- glam **0.32** for math (matches Bevy 0.19's `bevy_math` glam pin)
+- glam **0.33** for math (matches Bevy 0.20's `bevy_math` glam pin)
