@@ -25,10 +25,13 @@ dist-ssr
 
 # Rust
 /src-tauri/target/
-/src-tauri/Cargo.lock
 /target/
-/Cargo.lock
 **/*.rs.bk
+# Cargo.lock files are committed deliberately. For an application (not a
+# library) the lockfile pins the exact dependency graph that gets built
+# and shipped, so CI and local builds resolve identically. This also makes
+# cargo-deny's advisory results reproducible instead of drifting with
+# whatever is newest at resolve time.
 
 # TypeScript
 *.tsbuildinfo
