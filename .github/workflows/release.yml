@@ -92,6 +92,25 @@ jobs:
       - name: Checkout
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
+      # Tauri's Linux backend links against GTK/WebKit/glib via glib-sys,
+      # which are not present on a stock ubuntu-latest runner. Without this
+      # the build dies at `pkg-config --libs glib-2.0`. Mirrors the same
+      # step in ci.yml; macOS and Windows runners ship equivalents.
+      - name: Install Tauri Linux system dependencies
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            build-essential \
+            curl \
+            wget \
+            file \
+            libxdo-dev \
+            libssl-dev \
+            libayatana-appindicator3-dev \
+            librsvg2-dev
+
       - name: Setup Rust toolchain
         uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable
         with:
