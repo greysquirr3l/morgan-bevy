@@ -24,12 +24,21 @@ for arg in "$@"; do
   esac
 done
 
-cd "$(dirname "$0")/../src-tauri"
+cd "$(dirname "$0")/.."
 
 if [ "$NO_FETCH" -eq 0 ]; then
   echo "→ cargo deny fetch (fresh advisories)"
   cargo deny fetch
 fi
 
-echo "→ cargo deny check (bans, licenses, sources, advisories)"
+# Two manifests with two different policies:
+#   ./src-tauri/deny.toml  → the Tauri application crate
+#   ./deny.toml            → root workspace (bevy-morgan-integration + Bevy)
+# `cargo deny check` resolves the manifest from the current directory, so
+# run each in its own subshell. Both are linted; the root workspace was
+# previously unenforced.
+echo "→ cargo deny check (src-tauri/deny.toml)"
+(cd src-tauri && cargo deny check)
+
+echo "→ cargo deny check (deny.toml — root workspace)"
 cargo deny check

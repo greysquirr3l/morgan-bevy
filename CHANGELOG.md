@@ -7,6 +7,48 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Cargo.lock files are now committed** (previously gitignored). This is an
+  application, not a library, so the lockfile pins the exact graph that ships;
+  CI and local builds now resolve identically. It also makes `cargo deny`
+  advisory results reproducible instead of drifting with whatever is newest.
+  Two lockfiles are tracked: the root workspace (`Cargo.lock`, covering the
+  Bevy companion crate) and `src-tauri/Cargo.lock`.
+- **`rfd` 0.14 → 0.17.** Drops `zbus 4`, `zvariant`, `zbus_names`, and
+  `zvariant_derive` from the dependency graph entirely — `rfd` 0.17 uses ashpd
+  directly. Clears advisories `RUSTSEC-2026-0370/0371/0372`; their
+  `deny.toml` ignores are removed. No source changes required; `FileDialog`
+  usage compiles unchanged.
+
+### Added
+
+- **`scripts/check-tauri-version-parity.sh`** plus a CI step. Tauri aborts the
+  build when a Rust crate and its npm package sit on different major/minor,
+  and it compares versions *resolved from Cargo.lock*. That made the mismatch
+  invisible locally and visible only in `release.yml`, which broke two
+  consecutive release builds. This performs the same comparison against the
+  manifest requirements — exactly what a fresh CI resolve starts from — and
+  fails in seconds. Verified to reproduce the historical
+  `tauri-plugin-sql 2.3.1` vs `2.4.0` failure.
+- **Root `deny.toml`.** The companion-crate workspace had no supply-chain
+  policy at all, so `cargo deny` never linted it. `scripts/cargo-deny.sh` now
+  checks both manifests. The new policy mirrors `src-tauri/deny.toml`; a test
+  asserts the two license allow-lists stay in sync.
+- Regression tests for both of the above.
+
+### Fixed
+
+- **`vite.config.js`** used `var` for a never-reassigned binding (`no-var`).
+
+### Known
+
+- `RUSTSEC-2026-0367/0368/0369` (`zip`) remain ignored and documented in
+  `src-tauri/deny.toml`. `tauri-plugin-updater` gates `zip` behind a
+  default-on feature; disabling it would break Windows updater installs,
+  which consume `.msi.zip`/`.nsis.zip` artifacts. The fix is only in `zip`
+  9.x and the plugin declares `zip ^4`, so there is no local fix to apply.
+
 ## [0.6.0] - 2026-10-22 - "Bevy 0.20 & Supply-Chain Hardening"
 
 > **Breaking for companion-crate consumers.** The observer API changed shape

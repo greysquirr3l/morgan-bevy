@@ -5,6 +5,7 @@ import { describe, expect, it } from 'vitest'
 
 const projectRoot = resolve(__dirname, '../..')
 const denyToml = resolve(projectRoot, 'src-tauri/deny.toml')
+const rootDenyToml = resolve(projectRoot, 'deny.toml')
 const scriptPath = resolve(projectRoot, 'scripts/cargo-deny.sh')
 
 describe('cargo-deny supply-chain policy (T66)', () => {
@@ -41,12 +42,34 @@ describe('cargo-deny supply-chain policy (T66)', () => {
     expect(text).toMatch(/unknown-git\s*=\s*"deny"/)
   })
 
+  it('root deny.toml exists and mirrors the src-tauri allow-list', () => {
+    expect(existsSync(rootDenyToml)).toBe(true)
+    const root = readFileSync(rootDenyToml, 'utf8')
+    for (const section of ['[graph]', '[advisories]', '[licenses]', '[bans]', '[sources]']) {
+      expect(root, `root deny.toml missing ${section}`).toContain(section)
+    }
+    // Same license policy in both manifests, or the workspace and the app
+    // would ship under different rules.
+    const app = readFileSync(denyToml, 'utf8')
+    for (const license of ['MIT', 'Apache-2.0', 'BSD-2-Clause', 'BSD-3-Clause', 'ISC']) {
+      expect(app).toMatch(new RegExp(`^\\s*"${license.replace('.', '\\.')}"`, 'm'))
+      expect(root).toMatch(new RegExp(`^\\s*"${license.replace('.', '\\.')}"`, 'm'))
+    }
+  })
+
   it('every ignore entry is annotated with a reason', () => {
     const text = readFileSync(denyToml, 'utf8')
     const ignoreBlock = text.match(/ignore\s*=\s*\[([\s\S]*?)\]/)
     expect(ignoreBlock).not.toBeNull()
     const before = text.slice(0, ignoreBlock!.index!)
     expect(before).toMatch(/^#\s+RUSTSEC/m)
+  })
+
+  it('no longer ignores the zvariant advisories (rfd 0.17 dropped zbus 4)', () => {
+    const text = readFileSync(denyToml, 'utf8')
+    for (const id of ['RUSTSEC-2026-0370', 'RUSTSEC-2026-0371', 'RUSTSEC-2026-0372']) {
+      expect(text, `${id} should no longer be ignored`).not.toContain(`"${id}"`)
+    }
   })
 
   it('script wrapper exists and is executable', () => {
@@ -56,7 +79,7 @@ describe('cargo-deny supply-chain policy (T66)', () => {
     expect(stat).toMatch(/cargo deny check/)
   })
 
-  it('cargo deny check --no-fetch passes on the current lockfile', () => {
+  it('cargo deny check --no-fetch passes on both manifests', () => {
     const result = spawnSync('bash', ['scripts/cargo-deny.sh', '--no-fetch'], {
       cwd: projectRoot,
       encoding: 'utf8',
@@ -66,6 +89,13 @@ describe('cargo-deny supply-chain policy (T66)', () => {
     // eslint-disable-next-line no-control-regex -- ANSI escapes are the only reliable way to parse cargo-deny output
     const output = raw.replace(/\x1b\[[0-9;]*m/g, '')
     expect(result.status, `cargo-deny exited with ${result.status}\n${output}`).toBe(0)
-    expect(output).toContain('advisories ok, bans ok, licenses ok, sources ok')
+    // Both the app crate and the root workspace must be linted. The
+    // banner count proves two real checks ran; the labels prove each
+    // manifest was named. A stub printing the label would satisfy only
+    // one of the two assertions.
+    expect(output).toContain('cargo deny check (src-tauri/deny.toml)')
+    expect(output).toContain('cargo deny check (deny.toml — root workspace)')
+    const passes = output.match(/advisories ok, bans ok, licenses ok, sources ok/g)
+    expect(passes, 'expected two clean cargo-deny runs').toHaveLength(2)
   }, 60_000)
 })

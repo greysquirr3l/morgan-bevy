@@ -56,23 +56,30 @@ yanked = "warn"
 #   `zip` is only reached by the updater's own archive handling, and the editor
 #   does not extract untrusted archives with it.
 # RUSTSEC-2026-0370 / 0371 / 0372 — Unmaintained `zvariant`, `zbus_names`,
-#   `zvariant_derive`. Path: zvariant → zbus → ashpd → rfd → morgan-bevy.
-#   These are Linux-only (ashpd is the XDG portal backend). Fixing needs
-#   `rfd` 0.16+, which is a semver break for us; the crates are unmaintained
-#   but not known-vulnerable. Re-check on the next `rfd` bump.
+#   `zvariant_derive` — were previously ignored here. FIXED 2026-10-22 by
+#   bumping `rfd` 0.14 → 0.17, which drops `zbus 4` from the graph entirely
+#   (rfd 0.17 uses ashpd directly). All three crates are gone from
+#   Cargo.lock, so the ignores are no longer needed and were removed.
+#   `rfd` 0.17 also removes `xdg-home` and pulls in the `wayland-*` crates.
 #
-# NOTE: the five `rustls` / `webpki` advisories (RUSTSEC-2026-0285, 0346,
-# 0348, 0349, 0382/0383) that appeared in the same refresh were FIXED, not
-# ignored — rustls 0.23.43 → 0.23.46, rustls-webpki 0.103.14 → 0.103.16,
-# webpki-root-certs 1.0.9 → 1.0.10. Cargo.lock is gitignored, so CI resolves
-# these patched versions on a fresh checkout with no manifest change.
+#   NOTE: the five `rustls` / `webpki` advisories (RUSTSEC-2026-0285, 0346,
+#   0348, 0349, 0382/0383) that appeared in the same refresh were FIXED by
+#   upgrading, not ignored. Cargo.lock is now committed (it was gitignored
+#   until 2026-10-22), so those pinned versions are part of the repo and
+#   CI resolves exactly what was audited.
+#
+#   Why `zip` stays ignored: `tauri-plugin-updater` gates it behind the
+#   default-on `zip` feature (it pulls `zip` + `tar` + `flate2` for archive
+#   extraction). Turning the feature off would break Windows updater installs,
+#   which consume `.msi.zip` / `.nsis.zip` artifacts — a real feature
+#   regression, not a security win. The fix is only available in `zip` 9.x,
+#   and the plugin declares `zip ^4`. Re-check when tauri-plugin-updater
+#   moves to `zip` 5+. Risk is bounded: `zip` is only reached by the
+#   updater's own archive handling over artifacts we publish ourselves.
 ignore = [
     "RUSTSEC-2026-0367",  # zip — SUID/SGID preservation on extract — via tauri-plugin-updater
     "RUSTSEC-2026-0368",  # zip — symlink escape from destination dir — via tauri-plugin-updater
     "RUSTSEC-2026-0369",  # zip — perms applied through symlinks — via tauri-plugin-updater
-    "RUSTSEC-2026-0370",  # zvariant (unmaintained) — via zbus → ashpd → rfd
-    "RUSTSEC-2026-0371",  # zbus_names (unmaintained) — via zbus → ashpd → rfd
-    "RUSTSEC-2026-0372",  # zvariant_derive (unmaintained) — via zbus → ashpd → rfd
     "RUSTSEC-2023-0089",  # paste (unmaintained) — via tauri-codegen
     "RUSTSEC-2024-0370",  # proc-macro-error (unmaintained)
     "RUSTSEC-2024-0411",  # atk-sys (unmaintained) — via gtk → muda → tauri
