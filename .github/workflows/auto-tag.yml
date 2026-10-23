@@ -1,7 +1,13 @@
 # auto-tag.yml
 #
-# Triggers on CI success (`workflow_run` of ci.yml) and pushes a new
-# semver tag if HEAD is a release commit.
+# Triggers on CI success (`workflow_run` of ci.yml) and pushes a new semver
+# tag -- but only when CHANGELOG.md has unreleased entries under
+# `## [Unreleased]`. An empty `[Unreleased]` means there is nothing to
+# release, so the tag step is skipped.
+#
+# That gate is not optional. Without it this workflow tagged unconditionally
+# on every green CI run, and produced `v0.6.1` pointing at a commit already
+# released as v0.6.0.
 #
 # Per nick.md: tag pushes via GITHUB_TOKEN do NOT trigger downstream
 # `on: push: tags` workflows (loop prevention). The downstream release
@@ -41,6 +47,23 @@ jobs:
           git config user.name 'Nick Campbell'
           git config user.email '[email protected]'
 
+      # Release gate. This workflow used to tag unconditionally on every
+      # green CI run, which produced `v0.6.1` pointing at a commit already
+      # released as v0.6.0 -- a tag for a version that was never built.
+      #
+      # Keep a Changelog convention: entries pending release live under
+      # `## [Unreleased]`; release prep moves them under a dated version
+      # heading. Empty `[Unreleased]` therefore means nothing to release.
+      - name: Check for unreleased CHANGELOG entries
+        id: changelog
+        run: |
+          if bash scripts/changelog-has-unreleased.sh; then
+            echo "should_tag=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "should_tag=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::No unreleased CHANGELOG entries -- skipping tag."
+          fi
+
       - name: Read latest tag
         id: read-tag
         run: |
@@ -55,6 +78,8 @@ jobs:
           echo "next=$next" >> "$GITHUB_OUTPUT"
 
       - name: Push tag
+        # Gated: only tags when [Unreleased] has real bullet entries.
+        if: steps.changelog.outputs.should_tag == 'true'
         env:
           TAG: ${{ steps.next-tag.outputs.next }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
