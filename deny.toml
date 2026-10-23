@@ -1,0 +1,57 @@
+# deny.toml — root workspace (`./Cargo.lock`)
+#
+# This covers the companion crate `bevy-morgan-integration` and its Bevy
+# dependency closure. The `src-tauri/` package is excluded from this
+# manifest (see the root `Cargo.toml` `[workspace] exclude`) and has its
+# own `src-tauri/deny.toml`.
+#
+# Mirrors the relevant parts of `src-tauri/deny.toml` so the same CI
+# pipeline (scripts/cargo-deny.sh) can lint both. Add new license allows
+# here AND in src-tauri/deny.toml to keep the two policies aligned.
+
+[graph]
+all-features = true
+
+[advisories]
+# Local advisory caches can be stale (per AGENTS.md and the release notes).
+# `scripts/cargo-deny.sh` always fetches fresh advisories in CI; this
+# declaration is for the local fallback path.
+db-path = "~/.cargo/advisory-db"
+db-urls = ["https://github.com/rustsec/advisory-db"]
+yanked = "warn"
+ignore = []
+
+[licenses]
+# Same allow-list as src-tauri/deny.toml. zvariant / zbus_names / etc were
+# removed from the dependency graph when rfd bumped to 0.17, so no
+# unmaintained-crate license exceptions are needed here.
+allow = [
+    "MIT",
+    "Apache-2.0",
+    "Apache-2.0 WITH LLVM-exception",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "BSL-1.0",
+    "ISC",
+    "MPL-2.0",
+    "Unicode-DFS-2016",
+    "Unicode-3.0",
+    "Zlib",
+    "OpenSSL",
+    "CC0-1.0",
+    "0BSD",
+    "MIT-0",
+    "CDLA-Permissive-2.0",
+]
+confidence-threshold = 0.8
+
+[bans]
+multiple-versions = "warn"
+wildcards = "deny"
+highlight = "all"
+
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"
+allow-registry = ["https://github.com/rust-lang/crates.io-index"]
+allow-git = []
