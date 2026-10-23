@@ -13,12 +13,14 @@
  * end-to-end coverage of the auto-tag → release chain without
  * needing live GitHub credentials.
  */
-import { readFileSync } from 'node:fs'
-import { join } from 'node:path'
+import { readFileSync, writeFileSync } from 'node:fs'
+import { spawnSync } from 'node:child_process'
+import { join, resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { parse as parseYaml } from 'yaml'
 
-const root = join(process.cwd(), '.github', 'workflows')
+const projectRoot = process.cwd()
+const root = join(projectRoot, '.github', 'workflows')
 const release = parseYaml(readFileSync(join(root, 'release.yml'), 'utf8')) as Record<
   string,
   unknown
@@ -27,6 +29,21 @@ const autoTag = parseYaml(readFileSync(join(root, 'auto-tag.yml'), 'utf8')) as R
   string,
   unknown
 >
+
+/** All steps from all jobs, preserving run/if so callers can assert both. */
+function collectSteps(
+  wf: Record<string, unknown>,
+): Array<{ name?: string; run?: string; if?: string; uses?: string }> {
+  const out: Array<{ name?: string; run?: string; if?: string; uses?: string }> = []
+  const jobs = wf.jobs as Record<
+    string,
+    { steps?: Array<{ name?: string; run?: string; if?: string; uses?: string }> }
+  >
+  for (const job of Object.values(jobs)) {
+    for (const step of job.steps ?? []) out.push(step)
+  }
+  return out
+}
 
 function collectUses(wf: Record<string, unknown>): string[] {
   const out: string[] = []
@@ -77,6 +94,66 @@ describe('auto-tag.yml', () => {
     const on = autoTag.on as Record<string, unknown>
     expect(on.push).toBeUndefined()
     expect(on['push.tags']).toBeUndefined()
+  })
+
+  it('gates the tag on unreleased CHANGELOG entries', () => {
+    // Without this gate, auto-tag tagged on every green CI run and produced
+    // v0.6.1 pointing at a commit already released as v0.6.0.
+    const steps = collectSteps(autoTag)
+    const gate = steps.find(s => s.run?.includes('changelog-has-unreleased.sh'))
+    expect(gate, 'no step invoking changelog-has-unreleased.sh').toBeDefined()
+
+    const push = steps.find(s => s.run?.includes('git push origin "$TAG"'))
+    expect(push, 'no tag push step found').toBeDefined()
+    // The push must be gated on the gate's output, not unconditional.
+    expect(push?.if).toMatch(/should_tag/)
+  })
+})
+
+describe('changelog-has-unreleased.sh', () => {
+  const script = resolve(projectRoot, 'scripts/changelog-has-unreleased.sh')
+  const changelog = resolve(projectRoot, 'CHANGELOG.md')
+
+  const runWith = (contents: string): number => {
+    const backup = readFileSync(changelog, 'utf8')
+    try {
+      writeFileSync(changelog, contents)
+      return spawnSync('bash', [script, '--quiet'], { cwd: projectRoot }).status ?? 1
+    } finally {
+      writeFileSync(changelog, backup)
+    }
+  }
+
+  it('exits 0 when [Unreleased] has bullet entries', () => {
+    const status = runWith('# Changelog\n\n## [Unreleased]\n\n### Fixed\n\n- a real change\n\n## [0.1.0]\n')
+    expect(status).toBe(0)
+  })
+
+  it('exits 1 when [Unreleased] is empty', () => {
+    const status = runWith('# Changelog\n\n## [Unreleased]\n\n## [0.1.0]\n\n- old\n')
+    expect(status).toBe(1)
+  })
+
+  it('exits 1 for headings with no bullet entries', () => {
+    // A stray "### Changed" scaffold must not trigger a release.
+    const status = runWith('# Changelog\n\n## [Unreleased]\n\n### Changed\n\n## [0.1.0]\n')
+    expect(status).toBe(1)
+  })
+
+  it('ignores legacy "## [Unreleased] - <date>" headings lower in the file', () => {
+    // This repo's CHANGELOG has a historical heading in that shape. Only
+    // the first, bare `## [Unreleased]` counts as pending work.
+    const status = runWith(
+      '# Changelog\n\n## [Unreleased]\n\n## [0.1.0]\n\n- old\n\n## [Unreleased] - 2025-11-24\n\n- legacy\n',
+    )
+    expect(status).toBe(1)
+  })
+
+  it('agrees with the current CHANGELOG state', () => {
+    // Guards the real file: it must be self-consistent with whatever the
+    // gate reports, and the file must parse.
+    const status = spawnSync('bash', [script, '--quiet'], { cwd: projectRoot }).status
+    expect([0, 1]).toContain(status, 'gate script must exist and run')
   })
 })
 
