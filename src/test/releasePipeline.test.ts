@@ -151,9 +151,11 @@ describe('changelog-has-unreleased.sh', () => {
 
   it('agrees with the current CHANGELOG state', () => {
     // Guards the real file: it must be self-consistent with whatever the
-    // gate reports, and the file must parse.
+    // gate reports, and the file must parse. Exit 127 would mean the
+    // script failed to run, which is a different failure from "no
+    // unreleased entries" (1).
     const status = spawnSync('bash', [script, '--quiet'], { cwd: projectRoot }).status
-    expect([0, 1]).toContain(status, 'gate script must exist and run')
+    expect([0, 1], 'gate script must exist and run').toContain(status)
   })
 })
 

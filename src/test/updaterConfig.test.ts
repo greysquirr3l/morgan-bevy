@@ -73,7 +73,15 @@ describe('tauri updater config', () => {
   it('the updater endpoint points at this repository', () => {
     const updater = readConf()
     for (const endpoint of updater.endpoints ?? []) {
-      expect(endpoint).toMatch(/github\.com\/greysquirr3l\/morgan-bevy/)
+      // Anchored, and https-only: an unanchored `/github.com\/.../` matches
+      // anywhere in the string, so `https://evil.example/github.com/...`
+      // would pass it (CodeQL js/missing-regexp-anchor). The updater would
+      // then fetch a manifest from a host we do not control.
+      expect(endpoint).toMatch(
+        /^https:\/\/github\.com\/greysquirr3l\/morgan-bevy\/(?:releases|.*)/,
+      )
+      expect(new URL(endpoint).host).toBe('github.com')
+      expect(new URL(endpoint).pathname.startsWith('/greysquirr3l/morgan-bevy')).toBe(true)
     }
   })
 })
