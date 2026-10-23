@@ -40,5 +40,5 @@ fi
 echo "→ cargo deny check (src-tauri/deny.toml)"
 (cd src-tauri && cargo deny check)
 
-echo skip-root
+echo "→ cargo deny check (deny.toml — root workspace)"
 cargo deny check

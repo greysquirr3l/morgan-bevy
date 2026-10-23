@@ -89,9 +89,12 @@ describe('cargo-deny supply-chain policy (T66)', () => {
     // eslint-disable-next-line no-control-regex -- ANSI escapes are the only reliable way to parse cargo-deny output
     const output = raw.replace(/\x1b\[[0-9;]*m/g, '')
     expect(result.status, `cargo-deny exited with ${result.status}\n${output}`).toBe(0)
-    // Both the app crate and the root workspace must be linted. Assert on
-    // the success banner (which only a real `cargo deny check` prints)
-    // rather than the echo label, which a stub could satisfy.
+    // Both the app crate and the root workspace must be linted. The
+    // banner count proves two real checks ran; the labels prove each
+    // manifest was named. A stub printing the label would satisfy only
+    // one of the two assertions.
+    expect(output).toContain('cargo deny check (src-tauri/deny.toml)')
+    expect(output).toContain('cargo deny check (deny.toml — root workspace)')
     const passes = output.match(/advisories ok, bans ok, licenses ok, sources ok/g)
     expect(passes, 'expected two clean cargo-deny runs').toHaveLength(2)
   }, 60_000)
