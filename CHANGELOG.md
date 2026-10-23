@@ -82,8 +82,8 @@ and the reason there is no local fix:
   in 9.x, which is semver-breaking for the plugin. Verified still 4.6.1 on the
   latest `tauri-plugin-updater` (2.14.0).
 - `RUSTSEC-2026-0370/0371/0372` — unmaintained `zvariant`, `zbus_names`,
-  `zvariant_derive` via `zbus → ashpd → rfd`. Linux-only; fixing needs `rfd`
-  0.16+, also semver-breaking.
+  `zvariant_derive` via `zbus → ashpd → rfd`. **Fixed below** by the
+  `rfd` 0.14 → 0.17 bump, which drops `zbus 4` from the graph entirely.
 
 `dependabot_security_updates` was disabled repo-wide, so none of these would have
 been surfaced automatically. Now enabled, along with
@@ -150,6 +150,50 @@ both gained an explicit "grep the string literals, not just the AST" step.
 - `SECURITY.md`: supported-versions table refreshed — it still listed 0.4.x and
   0.3.x and never listed the 0.5.x line.
 
+
+---
+
+### Changed
+
+- **Cargo.lock files are now committed** (previously gitignored). This is an
+  application, not a library, so the lockfile pins the exact graph that ships;
+  CI and local builds now resolve identically. It also makes `cargo deny`
+  advisory results reproducible instead of drifting with whatever is newest.
+  Two lockfiles are tracked: the root workspace (`Cargo.lock`, covering the
+  Bevy companion crate) and `src-tauri/Cargo.lock`.
+- **`rfd` 0.14 → 0.17.** Drops `zbus 4`, `zvariant`, `zbus_names`, and
+  `zvariant_derive` from the dependency graph entirely — `rfd` 0.17 uses ashpd
+  directly. Clears advisories `RUSTSEC-2026-0370/0371/0372`; their
+  `deny.toml` ignores are removed. No source changes required; `FileDialog`
+  usage compiles unchanged.
+
+### Added
+
+- **`scripts/check-tauri-version-parity.sh`** plus a CI step. Tauri aborts the
+  build when a Rust crate and its npm package sit on different major/minor,
+  and it compares versions *resolved from Cargo.lock*. That made the mismatch
+  invisible locally and visible only in `release.yml`, which broke two
+  consecutive release builds. This performs the same comparison against the
+  manifest requirements — exactly what a fresh CI resolve starts from — and
+  fails in seconds. Verified to reproduce the historical
+  `tauri-plugin-sql 2.3.1` vs `2.4.0` failure.
+- **Root `deny.toml`.** The companion-crate workspace had no supply-chain
+  policy at all, so `cargo deny` never linted it. `scripts/cargo-deny.sh` now
+  checks both manifests. The new policy mirrors `src-tauri/deny.toml`; a test
+  asserts the two license allow-lists stay in sync.
+- Regression tests for both of the above.
+
+### Fixed
+
+- **`vite.config.js`** used `var` for a never-reassigned binding (`no-var`).
+
+### Known
+
+- `RUSTSEC-2026-0367/0368/0369` (`zip`) remain ignored and documented in
+  `src-tauri/deny.toml`. `tauri-plugin-updater` gates `zip` behind a
+  default-on feature; disabling it would break Windows updater installs,
+  which consume `.msi.zip`/`.nsis.zip` artifacts. The fix is only in `zip`
+  9.x and the plugin declares `zip ^4`, so there is no local fix to apply.
 ## [0.5.0] - 2026-08-13 - "Audit & Windows Compatibility Release"
 
 > Scope of this batch: Phases 8–12 + post-Phase-12 polish
