@@ -87,6 +87,15 @@ jobs:
       - name: Type-check
         run: npm run type-check
 
+      # Tauri aborts the build when a Rust crate and its npm package are on
+      # different major/minor. It compares the versions resolved from
+      # Cargo.lock, so the mismatch is invisible locally and only surfaces
+      # in release.yml — this has broken the release build twice. This runs
+      # the manifest-vs-npm comparison the Tauri CLI would do on a fresh
+      # resolve, so it fails here in seconds instead of at release time.
+      - name: Tauri version parity
+        run: bash scripts/check-tauri-version-parity.sh
+
       - name: Test
         run: npm test -- --run
 
