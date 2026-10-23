@@ -122,7 +122,7 @@ describe('release.yml', () => {
     // leg dies at `pkg-config --libs glib-2.0`. ci.yml has this step;
     // release.yml did not, so the Linux installer never built.
     const jobs = release.jobs as Record<string, {
-      steps?: Array<{ name?: string; if?: string; run?: string }>
+      steps?: Array<{ name?: string; if?: string; run?: string; uses?: string }>
     }>
     const steps = jobs.build?.steps ?? []
     const idx = steps.findIndex(s => s.run?.includes('libwebkit2gtk-4.1-dev'))
