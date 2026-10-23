@@ -134,6 +134,16 @@ describe('release.yml', () => {
     expect(idx).toBeLessThan(buildIdx)
   })
 
+  it('publish job sets GH_REPO because it has no checkout step', () => {
+    // `gh` infers the repo from a git remote. The publish job has no
+    // checkout, so `gh release edit` died with
+    // "fatal: not a git repository" — the release notes were never
+    // written even though all four installers uploaded fine.
+    const jobs = release.jobs as Record<string, { steps?: Array<{ run?: string }> }>
+    const runs = (jobs.publish?.steps ?? []).map(s => s.run ?? '').join('\n')
+    expect(runs).toMatch(/export GH_REPO="\$GITHUB_REPOSITORY"/)
+  })
+
   it('declares code-sign / notarisation secrets so a single change here covers all platforms', () => {
     // The Tauri action reads these via env; declaring them as job-level
     // env means a maintainer who adds a new secret doesn't have to

@@ -164,6 +164,10 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAG: ${{ needs.resolve-tag.outputs.tag }}
         run: |
+          # `gh` infers the repo from a git remote, and this job has no
+          # checkout step, so `gh release edit` failed with
+          # "fatal: not a git repository". Point it at the repo explicitly.
+          export GH_REPO="$GITHUB_REPOSITORY"
           # Pull the CHANGELOG section matching this tag from the
           # repository and prepend it to the draft release.
           body=$(gh api "repos/$GITHUB_REPOSITORY/contents/CHANGELOG.md?ref=$TAG" --jq '.content' | base64 -d)
