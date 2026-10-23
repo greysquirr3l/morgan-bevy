@@ -117,6 +117,23 @@ describe('release.yml', () => {
     expect(uses.some(u => u.startsWith('tauri-apps/tauri-action@'))).toBe(true)
   })
 
+  it('installs Tauri Linux system dependencies before building', () => {
+    // Without libwebkit2gtk-4.1-dev / glib-2.0 on the runner, the Linux
+    // leg dies at `pkg-config --libs glib-2.0`. ci.yml has this step;
+    // release.yml did not, so the Linux installer never built.
+    const jobs = release.jobs as Record<string, {
+      steps?: Array<{ name?: string; if?: string; run?: string; uses?: string }>
+    }>
+    const steps = jobs.build?.steps ?? []
+    const idx = steps.findIndex(s => s.run?.includes('libwebkit2gtk-4.1-dev'))
+    expect(idx, 'no apt step installing libwebkit2gtk-4.1-dev').toBeGreaterThan(-1)
+
+    // It must be gated to Linux only, and must precede the build step.
+    expect(steps[idx]?.if).toMatch(/ubuntu-latest/)
+    const buildIdx = steps.findIndex(s => s.uses?.startsWith('tauri-apps/tauri-action@'))
+    expect(idx).toBeLessThan(buildIdx)
+  })
+
   it('declares code-sign / notarisation secrets so a single change here covers all platforms', () => {
     // The Tauri action reads these via env; declaring them as job-level
     // env means a maintainer who adds a new secret doesn't have to
