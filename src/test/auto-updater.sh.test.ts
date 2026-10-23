@@ -19,7 +19,12 @@ describe('tauri-plugin-updater (T68)', () => {
     expect(parsed.plugins).toBeDefined()
     const updater = parsed.plugins?.updater as Record<string, unknown>
     expect(updater).toBeDefined()
-    expect(updater.active).toBe(true)
+    // `active` must be false while the pubkey is still the placeholder.
+    // v0.6.0 shipped with active=true + a REPLACE_WITH... key, so every
+    // update check failed signature verification. See updaterConfig.test.ts
+    // for the full guard.
+    const isPlaceholder = (updater.pubkey as string).startsWith('REPLACE_WITH')
+    expect(updater.active).toBe(isPlaceholder ? false : true)
     expect(Array.isArray(updater.endpoints)).toBe(true)
     const endpoints = updater.endpoints as string[]
     expect(endpoints[0]).toMatch(/^https:\/\/github\.com\//)

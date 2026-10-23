@@ -42,7 +42,9 @@
     "targets": "all",
     "fileAssociations": [
       {
-        "ext": ["morgan"],
+        "ext": [
+          "morgan"
+        ],
         "name": "Morgan-Bevy Project",
         "description": "A Morgan-Bevy 3D level project file",
         "mimeType": "application/x-morgan-project",
@@ -50,7 +52,9 @@
         "rank": "Owner"
       },
       {
-        "ext": ["morgan-project"],
+        "ext": [
+          "morgan-project"
+        ],
         "name": "Morgan-Bevy Project (legacy)",
         "description": "A Morgan-Bevy 3D level project file (legacy extension)",
         "mimeType": "application/x-morgan-project",
@@ -60,7 +64,8 @@
   },
   "plugins": {
     "updater": {
-      "active": true,
+      "//active": "DISABLED until a signing keypair exists. `pubkey` is still the literal placeholder below, so with active=true every 'Check for updates' fails signature verification against a fake key. To re-enable: `pnpm tauri signer generate -w ~/.tauri/morgan-bevy.key`, commit the printed PUBLIC key into pubkey, set TAURI_SIGNING_PRIVATE_KEY + TAURI_SIGNING_PRIVATE_KEY_PASSWORD as repo secrets, set active back to true, and add includeUpdaterJson: true to the tauri-action step in release.yml so latest.json is uploaded.",
+      "active": false,
       "dialog": true,
       "endpoints": [
         "https://github.com/greysquirr3l/morgan-bevy/releases/latest/download/latest.json"
